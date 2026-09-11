@@ -64,5 +64,11 @@
   "unitCost": "قیمت خرید",
   "receive": "دریافت",
   "noCustomers": "هنوز مشتری‌ای نیست",
+  "dashboard": "داشبورد",
+  "salesToday": "فروش امروز",
+  "profit": "سود",
+  "outstandingDebt": "طلب‌های معوق",
+  "lowStock": "کم‌موجودی",
+  "topSellers": "پرفروش‌ها",
   "signedInAs": "واردشده به‌عنوان {user}"
 }

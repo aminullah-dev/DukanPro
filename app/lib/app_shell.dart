@@ -7,6 +7,7 @@ import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_state.dart';
 import 'features/catalog/product_list_screen.dart';
 import 'features/customers/customers_screen.dart';
+import 'features/dashboard/dashboard_screen.dart';
 import 'features/pos/pos_screen.dart';
 import 'features/purchasing/receive_stock_screen.dart';
 import 'l10n/app_localizations.dart';
@@ -89,6 +90,13 @@ class AppShell extends ConsumerWidget {
                   ),
                   icon: const Icon(Icons.add_box_outlined),
                   label: Text(l.receiveStock),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const DashboardScreen()),
+                  ),
+                  icon: const Icon(Icons.dashboard_outlined),
+                  label: Text(l.dashboard),
                 ),
               ],
             ),

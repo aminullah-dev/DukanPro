@@ -64,5 +64,11 @@
   "unitCost": "د پیرود بیه",
   "receive": "ترلاسه کول",
   "noCustomers": "لا تر اوسه پیرودونکی نشته",
+  "dashboard": "ډشبورډ",
+  "salesToday": "د نن پلور",
+  "profit": "ګټه",
+  "outstandingDebt": "پاتې پورونه",
+  "lowStock": "کمه ذخیره",
+  "topSellers": "ډیر پلورل شوي",
   "signedInAs": "د {user} په توګه ننوتل"
 }

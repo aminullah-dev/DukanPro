@@ -213,6 +213,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noCustomers => 'No customers yet';
 
   @override
+  String get dashboard => 'Dashboard';
+
+  @override
+  String get salesToday => 'Sales today';
+
+  @override
+  String get profit => 'Profit';
+
+  @override
+  String get outstandingDebt => 'Outstanding debt';
+
+  @override
+  String get lowStock => 'Low stock';
+
+  @override
+  String get topSellers => 'Top sellers';
+
+  @override
   String signedInAs(String user) {
     return 'Signed in as $user';
   }

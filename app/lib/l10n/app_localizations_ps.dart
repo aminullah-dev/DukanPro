@@ -213,6 +213,24 @@ class AppLocalizationsPs extends AppLocalizations {
   String get noCustomers => 'لا تر اوسه پیرودونکی نشته';
 
   @override
+  String get dashboard => 'ډشبورډ';
+
+  @override
+  String get salesToday => 'د نن پلور';
+
+  @override
+  String get profit => 'ګټه';
+
+  @override
+  String get outstandingDebt => 'پاتې پورونه';
+
+  @override
+  String get lowStock => 'کمه ذخیره';
+
+  @override
+  String get topSellers => 'ډیر پلورل شوي';
+
+  @override
   String signedInAs(String user) {
     return 'د $user په توګه ننوتل';
   }

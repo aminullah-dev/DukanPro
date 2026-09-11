@@ -214,6 +214,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get noCustomers => 'هنوز مشتری‌ای نیست';
 
   @override
+  String get dashboard => 'داشبورد';
+
+  @override
+  String get salesToday => 'فروش امروز';
+
+  @override
+  String get profit => 'سود';
+
+  @override
+  String get outstandingDebt => 'طلب‌های معوق';
+
+  @override
+  String get lowStock => 'کم‌موجودی';
+
+  @override
+  String get topSellers => 'پرفروش‌ها';
+
+  @override
   String signedInAs(String user) {
     return 'واردشده به‌عنوان $user';
   }
@@ -426,6 +444,24 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get noCustomers => 'هنوز مشتری‌ای نیست';
+
+  @override
+  String get dashboard => 'داشبورد';
+
+  @override
+  String get salesToday => 'فروش امروز';
+
+  @override
+  String get profit => 'سود';
+
+  @override
+  String get outstandingDebt => 'طلب‌های معوق';
+
+  @override
+  String get lowStock => 'کم‌موجودی';
+
+  @override
+  String get topSellers => 'پرفروش‌ها';
 
   @override
   String signedInAs(String user) {

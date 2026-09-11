@@ -6,6 +6,7 @@ from dukan.application.catalog import ProductView
 from dukan.application.customers import CustomerView
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens
 from dukan.application.purchasing import GoodsReceiptView, SupplierView
+from dukan.application.reports import DashboardView
 from dukan.application.sales import SaleView, ShiftView
 
 
@@ -118,4 +119,14 @@ def goods_receipt_view_dict(v: GoodsReceiptView) -> dict:
         "number": v.number,
         "supplier_id": v.supplier_id,
         "total_cost_minor": v.total_cost_minor,
+    }
+
+
+def dashboard_view_dict(v: DashboardView) -> dict:
+    return {
+        "sales_today_minor": v.sales_today_minor,
+        "profit_today_minor": v.profit_today_minor,
+        "outstanding_debt_minor": v.outstanding_debt_minor,
+        "low_stock_count": v.low_stock_count,
+        "top_sellers": [{"name": t.name, "qty_minor": t.qty_minor} for t in v.top_sellers],
     }

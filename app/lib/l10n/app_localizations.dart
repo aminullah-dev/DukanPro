@@ -485,6 +485,42 @@ abstract class AppLocalizations {
   /// **'No customers yet'**
   String get noCustomers;
 
+  /// No description provided for @dashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard'**
+  String get dashboard;
+
+  /// No description provided for @salesToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales today'**
+  String get salesToday;
+
+  /// No description provided for @profit.
+  ///
+  /// In en, this message translates to:
+  /// **'Profit'**
+  String get profit;
+
+  /// No description provided for @outstandingDebt.
+  ///
+  /// In en, this message translates to:
+  /// **'Outstanding debt'**
+  String get outstandingDebt;
+
+  /// No description provided for @lowStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Low stock'**
+  String get lowStock;
+
+  /// No description provided for @topSellers.
+  ///
+  /// In en, this message translates to:
+  /// **'Top sellers'**
+  String get topSellers;
+
   /// No description provided for @signedInAs.
   ///
   /// In en, this message translates to:
