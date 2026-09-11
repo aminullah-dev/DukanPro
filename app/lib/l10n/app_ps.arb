@@ -1,0 +1,12 @@
+{
+  "@@locale": "ps",
+  "appTitle": "دوکان‌پرو",
+  "tagline": "آفلاین-محوره پلورنیز سیستم",
+  "posTitle": "پلور",
+  "subtotal": "فرعي ټول",
+  "total": "ټول",
+  "charge": "تادیه",
+  "cash": "نغدي",
+  "newSale": "نوی پلور",
+  "itemsInCart": "{count, plural, =0{هیڅ توکی نشته} =1{۱ توکی} other{{count} توکي}}"
+}

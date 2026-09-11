@@ -1,0 +1,18 @@
+name: dukan_sync
+description: >-
+  Offline-first sync engine for DukanPro — push/pull client, idempotency, and
+  per-aggregate conflict policy. Phase 0 declares the contracts; the engine is
+  implemented in Phase 6. See docs/sync-protocol.md.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  dukan_core:
+    path: ../dukan_core
+
+dev_dependencies:
+  test: ">=1.24.0 <2.0.0"
+  lints: ">=4.0.0 <7.0.0"

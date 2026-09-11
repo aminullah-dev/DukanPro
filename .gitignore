@@ -1,0 +1,43 @@
+# ── Dart / Flutter ───────────────────────────────────────────────
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+!app/pubspec.lock      # Flutter apps commit their lockfile; packages don't
+**/doc/api/
+.fvm/
+
+# Flutter platform build artifacts
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/Flutter/Flutter.framework
+app/ios/Flutter/Flutter.podspec
+app/macos/Pods/
+app/**/ephemeral/
+app/windows/flutter/ephemeral/
+app/android/.gradle/
+app/android/local.properties
+app/android/key.properties
+*.iml
+
+# ── Python (server) ──────────────────────────────────────────────
+server/.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# ── Secrets / local config ───────────────────────────────────────
+*.env
+.env.*
+!.env.example
+
+# ── OS / editor ──────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.log

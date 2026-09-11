@@ -1,0 +1,18 @@
+{
+  "@@locale": "en",
+  "appTitle": "DukanPro",
+  "@appTitle": { "description": "Application name shown in the title bar" },
+  "tagline": "Offline-first retail POS",
+  "@tagline": { "description": "One-line product tagline" },
+  "posTitle": "Sale",
+  "subtotal": "Subtotal",
+  "total": "Total",
+  "charge": "Charge",
+  "cash": "Cash",
+  "newSale": "New sale",
+  "itemsInCart": "{count, plural, =0{No items} =1{1 item} other{{count} items}}",
+  "@itemsInCart": {
+    "description": "Cart item count with ICU plural",
+    "placeholders": { "count": { "type": "int" } }
+  }
+}

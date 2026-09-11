@@ -1,0 +1,12 @@
+"""Health check router."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+
+router = APIRouter(tags=["system"])
+
+
+@router.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "service": "dukanpro", "version": "0.1.0"}

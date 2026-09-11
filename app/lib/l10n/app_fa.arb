@@ -1,0 +1,12 @@
+{
+  "@@locale": "fa",
+  "appTitle": "دکان‌پرو",
+  "tagline": "سیستم فروش آفلاین‌محور",
+  "posTitle": "فروش",
+  "subtotal": "جمع جزء",
+  "total": "مجموع",
+  "charge": "پرداخت",
+  "cash": "نقد",
+  "newSale": "فروش جدید",
+  "itemsInCart": "{count, plural, =0{بدون قلم} =1{۱ قلم} other{{count} قلم}}"
+}

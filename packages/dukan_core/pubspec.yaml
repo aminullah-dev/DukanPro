@@ -1,0 +1,16 @@
+name: dukan_core
+description: >-
+  DukanPro domain + application + shared primitives. PURE DART — depends on no
+  framework (no Flutter, no DB, no HTTP). This is the structural enforcement of
+  the "domain imports nothing" invariant: if someone imports Flutter here, it
+  will not resolve.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+# NOTE: intentionally NO `dependencies:` block. Keep it that way.
+dev_dependencies:
+  test: ">=1.24.0 <2.0.0"
+  lints: ">=4.0.0 <7.0.0"

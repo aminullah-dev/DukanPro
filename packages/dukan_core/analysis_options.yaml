@@ -1,0 +1,9 @@
+include: package:lints/recommended.yaml
+
+# dukan_core is pure Dart. Do not add a Flutter dependency to this package.
+# The absence of `flutter` in pubspec.yaml is the machine-enforced guarantee
+# that the domain/application/shared layers import no framework.
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true

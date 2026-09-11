@@ -1,0 +1,36 @@
+[importlinter]
+root_package = dukan
+include_external_packages = True
+
+[importlinter:contract:domain-pure]
+name = Domain imports no framework and no outer layer
+type = forbidden
+source_modules =
+    dukan.domain
+forbidden_modules =
+    dukan.application
+    dukan.infrastructure
+    dukan.ui
+    fastapi
+    sqlalchemy
+    httpx
+    alembic
+
+[importlinter:contract:application-pure]
+name = Application imports no framework, UI, or infrastructure
+type = forbidden
+source_modules =
+    dukan.application
+forbidden_modules =
+    dukan.infrastructure
+    dukan.ui
+    fastapi
+    sqlalchemy
+    httpx
+
+[importlinter:contract:ui-infra-independent]
+name = UI and infrastructure are independent peers
+type = independence
+modules =
+    dukan.ui
+    dukan.infrastructure

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  client:
+    name: Flutter client
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: dukan_core (pure Dart) — analyze + test + no-flutter check
+        working-directory: packages/dukan_core
+        run: |
+          dart pub get
+          dart analyze
+          dart test
+          ! dart pub deps --style=compact | grep -qiE '(^| )flutter( |$)'
+      - name: dukan_data / sync / hardware
+        run: |
+          for p in dukan_data dukan_sync dukan_hardware; do
+            (cd "packages/$p" && dart pub get && dart analyze && { [ -d test ] && dart test || true; })
+          done
+      - name: App — analyze + test
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter gen-l10n
+          flutter analyze
+          flutter test
+      - name: l10n parity
+        run: python3 tools/check_l10n_parity.py
+
+  server:
+    name: FastAPI server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        working-directory: server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Lint + types + architecture contracts + tests
+        working-directory: server
+        run: |
+          ruff check .
+          mypy dukan
+          lint-imports
+          pytest -q

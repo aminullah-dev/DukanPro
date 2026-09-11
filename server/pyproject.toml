@@ -1,0 +1,19 @@
+[project]
+name = "dukanpro-server"
+version = "0.1.0"
+description = "DukanPro FastAPI backend (authoritative). Clean Architecture."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic>=2",
+  "sqlalchemy>=2",
+  "alembic",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx", "ruff", "mypy", "import-linter"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

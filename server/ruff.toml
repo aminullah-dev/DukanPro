@@ -1,0 +1,12 @@
+target-version = "py312"
+line-length = 100
+# Alembic-generated scaffolding is not hand-written style; exclude it.
+extend-exclude = ["migrations"]
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "A", "C4", "SIM"]
+
+# `id` is the conventional identifier field/param across the codebase
+# (matches the SQL `id` column and the Dart domain). Allow it.
+[lint.flake8-builtins]
+builtins-ignorelist = ["id"]

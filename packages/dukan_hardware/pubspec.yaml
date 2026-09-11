@@ -1,0 +1,19 @@
+name: dukan_hardware
+description: >-
+  Retail hardware ports for DukanPro — barcode scanners, ESC/POS thermal
+  printers, cash drawers. Phase 0 declares the interfaces (pure Dart); the
+  per-platform implementations (platform channels / network sockets) land in
+  Phases 2–3 and 8 behind these ports.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  dukan_core:
+    path: ../dukan_core
+
+dev_dependencies:
+  test: ">=1.24.0 <2.0.0"
+  lints: ">=4.0.0 <7.0.0"

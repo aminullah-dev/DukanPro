@@ -1,0 +1,21 @@
+# Optional monorepo orchestration. Install with:
+#   dart pub global activate melos
+# The canonical, dependency-free runner is tools/verify.sh.
+name: dukanpro
+
+packages:
+  - packages/**
+  - app
+
+scripts:
+  analyze:
+    description: Analyze all Dart/Flutter packages.
+    run: dart analyze .
+    exec:
+      concurrency: 1
+
+  test:
+    description: Run tests in packages that have a test/ directory.
+    run: dart test
+    packageFilters:
+      dirExists: test

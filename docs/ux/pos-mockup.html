@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="fa-AF" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DukanPro — POS mockup</title>
+<!-- Progressive enhancement: Perso-Arabic webfonts load when online; otherwise a system
+     Perso-Arabic stack is used. This is a DESIGN MOCKUP, not the Flutter app. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&family=Noto+Naskh+Arabic:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f2ee; --surface:#ffffff; --surface-2:#faf9f6; --ink:#1f2421; --ink-soft:#5c655e;
+    --line:#e3e0d8; --primary:#0f6b5c; --primary-ink:#ffffff; --primary-soft:#e3f1ed;
+    --accent:#c2571f; --danger:#b3261e; --ok:#1b7f4b; --warn:#b5820b;
+    --radius:14px; --radius-sm:9px; --shadow:0 1px 2px rgba(0,0,0,.06),0 6px 18px rgba(0,0,0,.06);
+    --latin:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --pa:"Vazirmatn","Noto Naskh Arabic","Geeza Pro","Baghdad","Tahoma",system-ui,sans-serif;
+    --font:var(--pa);
+  }
+  html[lang="en"]{--font:var(--latin);}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);
+       font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .num{font-family:var(--latin);font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  /* ---- app shell ---- */
+  .app{display:flex;flex-direction:column;height:100vh;max-height:100vh;overflow:hidden;}
+  header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--surface);
+         border-bottom:1px solid var(--line);box-shadow:var(--shadow);z-index:5;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--primary),#13897650);
+        display:grid;place-items:center;color:#fff;font-weight:800;}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;
+        background:var(--surface-2);border:1px solid var(--line);font-size:12.5px;color:var(--ink-soft);}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);}
+  .spacer{flex:1;}
+  .locale{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px;}
+  .locale button{padding:6px 12px;border-radius:999px;font-size:13px;color:var(--ink-soft);}
+  .locale button[aria-pressed="true"]{background:var(--primary);color:#fff;font-weight:600;}
+  /* ---- body split ---- */
+  .main{flex:1;display:flex;min-height:0;}
+  .catalog{flex:1.55;display:flex;flex-direction:column;min-width:0;padding:14px;gap:12px;}
+  .cart{flex:1;max-width:430px;min-width:360px;background:var(--surface);border-inline-start:1px solid var(--line);
+        display:flex;flex-direction:column;min-height:0;}
+  /* search + categories */
+  .searchbar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+             border-radius:var(--radius);padding:11px 14px;box-shadow:var(--shadow);}
+  .searchbar input{flex:1;border:none;outline:none;font-family:inherit;font-size:15px;background:transparent;color:var(--ink);}
+  .searchbar .scan{color:var(--primary);font-weight:600;font-size:13px;white-space:nowrap;}
+  .cats{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;}
+  .cats button{padding:7px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);
+               white-space:nowrap;font-size:13.5px;color:var(--ink-soft);}
+  .cats button[aria-pressed="true"]{background:var(--primary-soft);border-color:var(--primary);color:var(--primary);font-weight:600;}
+  /* product grid */
+  .grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));
+        gap:11px;align-content:start;padding-bottom:8px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px;
+        text-align:start;display:flex;flex-direction:column;gap:6px;transition:transform .05s,box-shadow .1s;min-height:104px;}
+  .card:hover{box-shadow:var(--shadow);} .card:active{transform:scale(.97);}
+  .card .emoji{font-size:26px;} .card .nm{font-weight:600;font-size:14px;line-height:1.25;}
+  .card .pr{margin-top:auto;font-weight:700;color:var(--primary);}
+  .card .st{font-size:11.5px;color:var(--ink-soft);}
+  .card.low .st{color:var(--warn);}
+  /* cart */
+  .cart h2{margin:0;padding:14px 16px;font-size:15px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;}
+  .cart h2 .count{margin-inline-start:auto;font-size:12.5px;color:var(--ink-soft);font-weight:500;}
+  .lines{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px;}
+  .empty{margin:auto;text-align:center;color:var(--ink-soft);padding:30px;}
+  .empty .big{font-size:34px;opacity:.5;}
+  .line{display:grid;grid-template-columns:1fr auto;gap:4px 10px;background:var(--surface-2);
+        border:1px solid var(--line);border-radius:var(--radius-sm);padding:9px 11px;align-items:center;}
+  .line .nm{font-weight:600;font-size:13.5px;}
+  .line .lt{font-weight:700;justify-self:end;}
+  .stepper{display:inline-flex;align-items:center;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:999px;}
+  .stepper button{width:28px;height:28px;border-radius:50%;font-size:17px;color:var(--primary);display:grid;place-items:center;}
+  .stepper .q{min-width:30px;text-align:center;font-weight:600;}
+  .line .unit{font-size:12px;color:var(--ink-soft);}
+  .line .rm{color:var(--danger);font-size:12px;justify-self:end;}
+  /* totals */
+  .totals{border-top:1px solid var(--line);padding:12px 16px;background:var(--surface-2);}
+  .trow{display:flex;justify-content:space-between;padding:3px 0;color:var(--ink-soft);font-size:14px;}
+  .trow.grand{color:var(--ink);font-weight:800;font-size:21px;padding-top:8px;margin-top:4px;border-top:1px dashed var(--line);}
+  .disc input{width:78px;text-align:end;border:1px solid var(--line);border-radius:8px;padding:3px 7px;font-family:var(--latin);}
+  .pay{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 16px 10px;}
+  .pay button{padding:11px;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--line);font-weight:600;font-size:13.5px;}
+  .pay button.sel{background:var(--primary-soft);border-color:var(--primary);color:var(--primary);}
+  .charge{margin:4px 16px 16px;padding:16px;border-radius:var(--radius);background:var(--primary);color:#fff;
+          font-weight:800;font-size:17px;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow);}
+  .charge:disabled{opacity:.5;}
+  /* modal */
+  .scrim{position:fixed;inset:0;background:rgba(20,24,22,.45);display:none;place-items:center;z-index:20;padding:20px;}
+  .scrim.open{display:grid;}
+  .modal{background:var(--surface);border-radius:18px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;}
+  .modal .mh{padding:16px;border-bottom:1px solid var(--line);font-weight:700;display:flex;align-items:center;}
+  .modal .mh button{margin-inline-start:auto;color:var(--ink-soft);font-size:20px;}
+  .modal .mb{padding:16px;}
+  .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
+  .numpad button{padding:15px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);font-size:18px;font-family:var(--latin);font-weight:600;}
+  .tender{font-size:30px;font-weight:800;text-align:center;padding:10px;}
+  .change{text-align:center;color:var(--ok);font-weight:700;padding-bottom:8px;}
+  .btn-primary{width:100%;margin-top:12px;padding:15px;border-radius:12px;background:var(--primary);color:#fff;font-weight:800;font-size:16px;}
+  /* receipt */
+  .receipt{font-family:var(--latin);background:#fff;border:1px dashed var(--line);border-radius:10px;padding:16px;margin-top:4px;}
+  .receipt.rtlr{font-family:var(--pa);direction:rtl;}
+  .receipt .rc{display:flex;justify-content:space-between;font-size:13px;padding:2px 0;}
+  .receipt hr{border:none;border-top:1px dashed #ccc;margin:8px 0;}
+  .watermark{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;}
+  .watermark span{transform:rotate(-24deg);font-size:42px;font-weight:800;color:rgba(179,38,30,.10);letter-spacing:4px;}
+  .pashto-test{font-family:var(--pa);background:var(--primary-soft);border:1px solid var(--primary);border-radius:10px;
+               padding:8px 12px;font-size:20px;text-align:center;color:var(--primary);}
+  .hint{font-size:11.5px;color:var(--ink-soft);text-align:center;padding:6px 16px 12px;}
+  @media(max-width:780px){.cart{max-width:none;min-width:0;} .main{flex-direction:column;} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="logo">د</div><span data-t="appName">دکان‌پرو</span></div>
+    <span class="chip"><span class="dot"></span><span data-t="branch">شعبهٔ مرکزی</span></span>
+    <span class="chip" data-t="shift">شیفت باز • احمد</span>
+    <span class="chip"><span class="dot" style="background:var(--warn)"></span><span data-t="sync">۳ در صف همگام‌سازی</span></span>
+    <div class="spacer"></div>
+    <div class="locale" role="group" aria-label="language">
+      <button data-loc="en" onclick="setLocale('en')">EN</button>
+      <button data-loc="fa-AF" onclick="setLocale('fa-AF')" aria-pressed="true">دری</button>
+      <button data-loc="ps" onclick="setLocale('ps')">پښتو</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <section class="catalog">
+      <div class="searchbar">
+        <span>🔍</span>
+        <input id="search" placeholder="جستجو یا اسکن بارکد…" oninput="renderGrid()" onkeydown="if(event.key==='Enter')quickAdd()">
+        <span class="scan" data-t="scanHint">⌁ اسکنر آماده</span>
+      </div>
+      <div class="cats" id="cats"></div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <aside class="cart">
+      <h2><span data-t="cartTitle">سبد فروش</span><span class="count" id="cartCount"></span></h2>
+      <div class="lines" id="lines"></div>
+      <div class="totals">
+        <div class="trow"><span data-t="subtotal">جمع جزء</span><span class="num" id="subtotal">0 ؋</span></div>
+        <div class="trow disc"><span data-t="discount">تخفیف</span>
+          <span><input class="num" id="discount" type="number" min="0" value="0" oninput="recalc()"> ؋</span></div>
+        <div class="trow"><span data-t="tax">مالیه (۰٪)</span><span class="num" id="tax">0 ؋</span></div>
+        <div class="trow grand"><span data-t="total">مجموع</span><span class="num" id="total">0 ؋</span></div>
+      </div>
+      <div class="pay" id="pay">
+        <button class="sel" data-m="cash" onclick="selPay('cash')" data-t="cash">نقد</button>
+        <button data-m="card" onclick="selPay('card')" data-t="card">کارت</button>
+        <button data-m="credit" onclick="selPay('credit')" data-t="credit">نسیه</button>
+      </div>
+      <button class="charge" id="charge" onclick="openPay()" disabled>
+        <span data-t="charge">پرداخت</span><span class="num" id="chargeAmt">0 ؋</span></button>
+    </aside>
+  </div>
+</div>
+
+<!-- payment modal -->
+<div class="scrim" id="payScrim">
+  <div class="modal">
+    <div class="mh"><span data-t="tenderTitle">دریافت نقد</span><button onclick="closePay()">×</button></div>
+    <div class="mb">
+      <div class="tender num" id="tenderDisp">0 ؋</div>
+      <div class="change num" id="changeDisp"></div>
+      <div class="numpad" id="numpad"></div>
+      <button class="btn-primary" onclick="settle()" data-t="settle">تکمیل فروش</button>
+    </div>
+  </div>
+</div>
+
+<!-- receipt modal -->
+<div class="scrim" id="rcScrim">
+  <div class="modal" style="position:relative;max-width:340px;">
+    <div class="watermark"><span>DEMO</span></div>
+    <div class="mh"><span data-t="receiptTitle">رسید</span><button onclick="closeRc()">×</button></div>
+    <div class="mb">
+      <div class="receipt rtlr" id="receipt"></div>
+      <div class="pashto-test" title="Pashto glyph coverage test">ټ ډ ړ ږ ښ ګ ڼ — پلور بشپړ شو</div>
+      <div class="hint" data-t="fontNote">قلم‌ها در فایل PDF جاسازی می‌شوند • تاریخ هجری و میلادی</div>
+      <button class="btn-primary" onclick="newSale()" data-t="newSale">فروش جدید</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- i18n ---------- */
+const I18N = {
+  "en":{appName:"DukanPro",branch:"Central branch",shift:"Shift open • Ahmad",sync:"3 queued to sync",
+    search:"Search or scan barcode…",scanHint:"⌁ Scanner ready",cartTitle:"Sale",subtotal:"Subtotal",
+    discount:"Discount",tax:"Tax (0%)",total:"Total",cash:"Cash",card:"Card",credit:"Credit",charge:"Charge",
+    tenderTitle:"Cash received",settle:"Complete sale",receiptTitle:"Receipt",newSale:"New sale",
+    fontNote:"Fonts embedded in PDF • Hijri + Gregorian dates",empty:"Tap a product to start",
+    cats:{all:"All",staples:"Staples",drinks:"Drinks",household:"Household",dairy:"Dairy"}},
+  "fa-AF":{appName:"دکان‌پرو",branch:"شعبهٔ مرکزی",shift:"شیفت باز • احمد",sync:"۳ در صف همگام‌سازی",
+    search:"جستجو یا اسکن بارکد…",scanHint:"⌁ اسکنر آماده",cartTitle:"سبد فروش",subtotal:"جمع جزء",
+    discount:"تخفیف",tax:"مالیه (۰٪)",total:"مجموع",cash:"نقد",card:"کارت",credit:"نسیه",charge:"پرداخت",
+    tenderTitle:"دریافت نقد",settle:"تکمیل فروش",receiptTitle:"رسید",newSale:"فروش جدید",
+    fontNote:"قلم‌ها در فایل PDF جاسازی می‌شوند • تاریخ هجری و میلادی",empty:"برای شروع یک جنس را انتخاب کنید",
+    cats:{all:"همه",staples:"مواد اساسی",drinks:"نوشیدنی",household:"خانگی",dairy:"لبنیات"}},
+  "ps":{appName:"دوکان‌پرو",branch:"مرکزي څانګه",shift:"شیفټ خلاص • احمد",sync:"۳ د همغږۍ په کتار کې",
+    search:"لټون یا د بارکوډ سکن…",scanHint:"⌁ سکنر چمتو",cartTitle:"د پلور ټوکرۍ",subtotal:"فرعي ټول",
+    discount:"تخفیف",tax:"مالیه (۰٪)",total:"ټول",cash:"نغدي",card:"کارت",credit:"اُدهار",charge:"تادیه",
+    tenderTitle:"نغدي ترلاسه شو",settle:"پلور بشپړول",receiptTitle:"رسید",newSale:"نوی پلور",
+    fontNote:"فونټونه په PDF کې ځای پرځای کیږي • هجري او میلادي نیټه",empty:"د پیل لپاره یو توکی وټاکئ",
+    cats:{all:"ټول",staples:"اساسي توکي",drinks:"څښاک",household:"کورنۍ",dairy:"لبنیات"}}
+};
+/* ---------- products (Afghan dukan) ---------- */
+const PRODUCTS = [
+  {id:"A1",bc:"4001",cat:"staples",e:"🍚",price:520,stock:40,en:"Rice (Basmati) kg","fa-AF":"برنج (باسمتی) کیلو",ps:"وریژې (باسمتي) کیلو"},
+  {id:"A2",bc:"4002",cat:"staples",e:"🛢️",price:850,stock:22,en:"Cooking oil 1L","fa-AF":"روغن ۱ لیتر",ps:"غوړي ۱ لیتر"},
+  {id:"A3",bc:"4003",cat:"staples",e:"🌾",price:900,stock:6,en:"Flour 25kg","fa-AF":"آرد ۲۵ کیلو",ps:"اوړه ۲۵ کیلو"},
+  {id:"A4",bc:"4004",cat:"staples",e:"🧂",price:30,stock:60,en:"Salt","fa-AF":"نمک",ps:"مالګه"},
+  {id:"A5",bc:"4005",cat:"staples",e:"🍬",price:95,stock:33,en:"Sugar kg","fa-AF":"بوره کیلو",ps:"بوره کیلو"},
+  {id:"D1",bc:"5001",cat:"drinks",e:"🍵",price:160,stock:28,en:"Green tea","fa-AF":"چای سبز",ps:"شین چای"},
+  {id:"D2",bc:"5002",cat:"drinks",e:"🥤",price:40,stock:80,en:"Soft drink","fa-AF":"نوشابه",ps:"یخ څښاک"},
+  {id:"D3",bc:"5003",cat:"drinks",e:"💧",price:25,stock:120,en:"Water 1.5L","fa-AF":"آب ۱.۵ لیتر",ps:"اوبه ۱.۵ لیتر"},
+  {id:"H1",bc:"6001",cat:"household",e:"🧼",price:45,stock:50,en:"Soap","fa-AF":"صابون",ps:"صابون"},
+  {id:"H2",bc:"6002",cat:"household",e:"🔥",price:10,stock:4,en:"Matches","fa-AF":"گوگرد",ps:"ګوګرد"},
+  {id:"H3",bc:"6003",cat:"household",e:"🧻",price:55,stock:35,en:"Tissue","fa-AF":"دستمال کاغذی",ps:"کاغذي دسمال"},
+  {id:"Y1",bc:"7001",cat:"dairy",e:"🥛",price:70,stock:18,en:"Milk 1L","fa-AF":"شیر ۱ لیتر",ps:"شیدې ۱ لیتر"},
+  {id:"Y2",bc:"7002",cat:"dairy",e:"🥚",price:12,stock:200,en:"Egg (each)","fa-AF":"تخم مرغ (دانه)",ps:"هګۍ (دانه)"},
+  {id:"Y3",bc:"7003",cat:"dairy",e:"🧈",price:240,stock:9,en:"Yogurt kg","fa-AF":"ماست کیلو",ps:"مستې کیلو"}
+];
+const CATS=["all","staples","drinks","household","dairy"];
+/* ---------- state ---------- */
+let loc="fa-AF", cat="all", cart=[], payMethod="cash", tender="";
+const AFN="؋";
+const fmt=n=>new Intl.NumberFormat("en-US").format(n)+" "+AFN;   // figures stay Latin per spec
+function t(k){return I18N[loc][k];}
+/* ---------- render ---------- */
+function setLocale(l){
+  loc=l;
+  document.documentElement.lang=l;
+  document.documentElement.dir = (l==="en")?"ltr":"rtl";
+  document.querySelectorAll(".locale button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.loc===l));
+  document.querySelectorAll("[data-t]").forEach(el=>{const k=el.dataset.t; if(I18N[l][k]!==undefined) el.textContent=I18N[l][k];});
+  document.getElementById("search").placeholder=t("search");
+  document.getElementById("receipt").classList.toggle("rtlr", l!=="en");
+  renderCats(); renderGrid(); renderCart();
+}
+function renderCats(){
+  document.getElementById("cats").innerHTML=CATS.map(c=>
+    `<button aria-pressed="${c===cat}" onclick="setCat('${c}')">${I18N[loc].cats[c]}</button>`).join("");
+}
+function setCat(c){cat=c;renderCats();renderGrid();}
+function renderGrid(){
+  const q=document.getElementById("search").value.trim().toLowerCase();
+  const items=PRODUCTS.filter(p=>(cat==="all"||p.cat===cat)&&
+     (!q||p[loc].toLowerCase().includes(q)||p.en.toLowerCase().includes(q)||p.bc.includes(q)||p.id.toLowerCase().includes(q)));
+  document.getElementById("grid").innerHTML=items.map(p=>{
+    const low=p.stock<=8;
+    return `<button class="card ${low?'low':''}" onclick="add('${p.id}')">
+      <div class="emoji">${p.e}</div><div class="nm">${p[loc]}</div>
+      <div class="st">${low?'⚠ ':''}<span class="num">${p.stock}</span></div>
+      <div class="pr num">${fmt(p.price)}</div></button>`;}).join("")
+    || `<div class="empty" style="grid-column:1/-1">—</div>`;
+}
+function quickAdd(){const q=document.getElementById("search").value.trim().toLowerCase();
+  const p=PRODUCTS.find(p=>p.bc===q||p.id.toLowerCase()===q)||PRODUCTS.find(p=>p[loc].toLowerCase().includes(q)||p.en.toLowerCase().includes(q));
+  if(p){add(p.id);document.getElementById("search").value="";renderGrid();}}
+function add(id){const p=PRODUCTS.find(x=>x.id===id);const l=cart.find(x=>x.id===id);
+  if(l)l.qty++;else cart.push({id,qty:1,price:p.price,name:p[loc]});renderCart();}
+function chg(id,d){const l=cart.find(x=>x.id===id);if(!l)return;l.qty+=d;if(l.qty<=0)cart=cart.filter(x=>x.id!==id);renderCart();}
+function renderCart(){
+  const box=document.getElementById("lines");
+  cart.forEach(l=>{l.name=PRODUCTS.find(p=>p.id===l.id)[loc];});
+  if(!cart.length){box.innerHTML=`<div class="empty"><div class="big">🧺</div><div>${t("empty")}</div></div>`;}
+  else{box.innerHTML=cart.map(l=>`<div class="line">
+      <div class="nm">${l.name}</div><div class="lt num">${fmt(l.price*l.qty)}</div>
+      <div class="stepper"><button onclick="chg('${l.id}',-1)">−</button>
+        <span class="q num">${l.qty}</span><button onclick="chg('${l.id}',1)">+</button>
+        <span class="unit num">× ${fmt(l.price)}</span></div>
+      <button class="rm" onclick="chg('${l.id}',-999)" title="remove">🗑</button></div>`).join("");}
+  document.getElementById("cartCount").textContent = cart.length? cart.reduce((s,l)=>s+l.qty,0)+"" : "";
+  recalc();
+}
+function recalc(){
+  const sub=cart.reduce((s,l)=>s+l.price*l.qty,0);
+  const disc=Math.min(+document.getElementById("discount").value||0,sub);
+  const tax=0; const total=sub-disc+tax;
+  document.getElementById("subtotal").textContent=fmt(sub);
+  document.getElementById("tax").textContent=fmt(tax);
+  document.getElementById("total").textContent=fmt(total);
+  document.getElementById("chargeAmt").textContent=fmt(total);
+  document.getElementById("charge").disabled=cart.length===0;
+  window._total=total;
+}
+function selPay(m){payMethod=m;document.querySelectorAll("#pay button").forEach(b=>b.classList.toggle("sel",b.dataset.m===m));}
+/* ---------- payment ---------- */
+function openPay(){
+  if(payMethod!=="cash"){settle();return;}
+  tender=""; renderNumpad(); updTender(); document.getElementById("payScrim").classList.add("open");
+}
+function closePay(){document.getElementById("payScrim").classList.remove("open");}
+function renderNumpad(){
+  const keys=["7","8","9","4","5","6","1","2","3","0","00","⌫"];
+  document.getElementById("numpad").innerHTML=keys.map(k=>`<button onclick="tap('${k}')">${k}</button>`).join("");
+}
+function tap(k){ if(k==="⌫")tender=tender.slice(0,-1); else tender=(tender+k).replace(/^0+(?=\d)/,""); updTender(); }
+function updTender(){
+  const tv=+tender||0;
+  document.getElementById("tenderDisp").textContent=fmt(tv);
+  const change=tv-window._total;
+  document.getElementById("changeDisp").textContent = change>=0 ? "↩ "+fmt(change) : "";
+}
+let lastSale=null;
+function settle(){
+  const n = 42 + Math.floor(Math.random()*900);
+  lastSale = {no:`INV-2026-${String(n).padStart(5,"0")}`, total:window._total, method:payMethod,
+              tender:+tender||window._total, items:[...cart]};
+  closePay(); renderReceipt(); document.getElementById("rcScrim").classList.add("open");
+}
+function renderReceipt(){
+  const s=lastSale, change=Math.max(0,s.tender-s.total);
+  const methodTxt={cash:t("cash"),card:t("card"),credit:t("credit")}[s.method];
+  document.getElementById("receipt").innerHTML=`
+    <div style="text-align:center;font-weight:700">${t("appName")} — ${t("branch")}</div>
+    <div style="text-align:center;font-size:12px;color:#888">${s.no}</div>
+    <div class="rc"><span>${loc==="en"?"Date":"تاریخ"}</span><span class="num">1405/06/20 (2026-09-11)</span></div>
+    <hr>
+    ${s.items.map(l=>`<div class="rc"><span>${PRODUCTS.find(p=>p.id===l.id)[loc]} ×<span class="num">${l.qty}</span></span>
+        <span class="num">${fmt(l.price*l.qty)}</span></div>`).join("")}
+    <hr>
+    <div class="rc" style="font-weight:800;font-size:15px"><span>${t("total")}</span><span class="num">${fmt(s.total)}</span></div>
+    <div class="rc"><span>${methodTxt}</span><span class="num">${fmt(s.tender)}</span></div>
+    ${change>0?`<div class="rc"><span>${loc==="en"?"Change":"باقی"}</span><span class="num">${fmt(change)}</span></div>`:""}
+    ${s.method==="credit"?`<div class="rc" style="color:var(--accent)"><span>${t("credit")}</span><span class="num">${fmt(s.total)}</span></div>`:""}`;
+}
+function closeRc(){document.getElementById("rcScrim").classList.remove("open");}
+function newSale(){cart=[];tender="";document.getElementById("discount").value=0;closeRc();renderCart();}
+/* ---------- init ---------- */
+setLocale("fa-AF");
+</script>
+</body>
+</html>
