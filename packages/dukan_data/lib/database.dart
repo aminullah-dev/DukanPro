@@ -224,19 +224,29 @@ class SyncStates extends Table {
   Set<Column> get primaryKey => {deviceId};
 }
 
+// ── Local app settings (Phase 8): device-local key/value (printer config, …) ──
+
+@DataClassName('AppSettingRow')
+class AppSettings extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
 @DriftDatabase(
   tables: [
     OutboxEntries, CachedProfiles, Units, Categories, Products, Barcodes, StockMovements,
     Sales, SaleLines, Payments, Shifts,
     Customers, CustomerLedger, Suppliers, SupplierLedger,
-    SyncStates,
+    SyncStates, AppSettings,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -263,6 +273,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 5) {
             await m.createTable(syncStates);
+          }
+          if (from < 6) {
+            await m.createTable(appSettings);
           }
         },
       );

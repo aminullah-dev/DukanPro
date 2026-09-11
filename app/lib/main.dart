@@ -7,6 +7,7 @@ import 'features/iam/iam_providers.dart';
 import 'infrastructure/auth_api.dart';
 import 'infrastructure/biometric.dart';
 import 'infrastructure/iam_api.dart';
+import 'infrastructure/keyboard_wedge_scanner.dart';
 import 'infrastructure/local_db.dart';
 import 'infrastructure/secure_store.dart';
 import 'infrastructure/sync_api.dart';
@@ -29,6 +30,7 @@ Future<void> main() async {
         syncClientProvider
             .overrideWithValue(DioSyncClient(baseUrl: apiBase, store: secureStore)),
         iamApiProvider.overrideWithValue(DioIamApi(baseUrl: apiBase, store: secureStore)),
+        scannerProvider.overrideWithValue(KeyboardWedgeScanner()),
       ],
       child: const DukanProApp(),
     ),

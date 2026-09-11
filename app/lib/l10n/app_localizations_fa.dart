@@ -364,6 +364,37 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get savedOk => 'ذخیره شد.';
+
+  @override
+  String get settings => 'تنظیمات';
+
+  @override
+  String get printerSettings => 'چاپگر رسید';
+
+  @override
+  String get enablePrinting => 'چاپ رسیدها';
+
+  @override
+  String get printerHost => 'آدرس IP چاپگر';
+
+  @override
+  String get printerPort => 'پورت';
+
+  @override
+  String get testPrint => 'چاپ آزمایشی';
+
+  @override
+  String get printReceipt => 'چاپ';
+
+  @override
+  String get printerNotConfigured =>
+      'چاپگری تنظیم نشده است. از تنظیمات یکی اضافه کنید.';
+
+  @override
+  String get printSucceeded => 'به چاپگر فرستاده شد.';
+
+  @override
+  String get printFailed => 'دسترسی به چاپگر ممکن نشد.';
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -725,4 +756,35 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get savedOk => 'ذخیره شد.';
+
+  @override
+  String get settings => 'تنظیمات';
+
+  @override
+  String get printerSettings => 'چاپگر رسید';
+
+  @override
+  String get enablePrinting => 'چاپ رسیدها';
+
+  @override
+  String get printerHost => 'آدرس IP چاپگر';
+
+  @override
+  String get printerPort => 'پورت';
+
+  @override
+  String get testPrint => 'چاپ آزمایشی';
+
+  @override
+  String get printReceipt => 'چاپ';
+
+  @override
+  String get printerNotConfigured =>
+      'چاپگری تنظیم نشده است. از تنظیمات یکی اضافه کنید.';
+
+  @override
+  String get printSucceeded => 'به چاپگر فرستاده شد.';
+
+  @override
+  String get printFailed => 'دسترسی به چاپگر ممکن نشد.';
 }

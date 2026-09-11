@@ -361,4 +361,35 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get savedOk => 'وساتل شو.';
+
+  @override
+  String get settings => 'تنظیمات';
+
+  @override
+  String get printerSettings => 'د رسید چاپګر';
+
+  @override
+  String get enablePrinting => 'د رسیدونو چاپ';
+
+  @override
+  String get printerHost => 'د چاپګر IP پته';
+
+  @override
+  String get printerPort => 'پورټ';
+
+  @override
+  String get testPrint => 'ازمایښتي چاپ';
+
+  @override
+  String get printReceipt => 'چاپ';
+
+  @override
+  String get printerNotConfigured =>
+      'هیڅ چاپګر نه دی ټاکل شوی. له تنظیماتو یو اضافه کړئ.';
+
+  @override
+  String get printSucceeded => 'چاپګر ته واستول شو.';
+
+  @override
+  String get printFailed => 'چاپګر ته لاسرسی ونشو.';
 }

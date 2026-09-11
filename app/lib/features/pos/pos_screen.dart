@@ -1,5 +1,6 @@
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
+import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,7 +9,9 @@ import '../../widgets/locale_toggle.dart';
 import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
 import '../customers/customers_providers.dart';
+import '../settings/settings_providers.dart';
 import 'pos_providers.dart';
+import 'receipt_builder.dart';
 
 String _afn(int minor) => (minor / 100).toStringAsFixed(2);
 
@@ -64,11 +67,20 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     }
   }
 
+  Future<void> _addByBarcode(String code) async {
+    final p = await ref.read(localCatalogProvider).products.findByBarcode(code.trim());
+    if (p != null) ref.read(posCartProvider.notifier).add(p, _dpFor(p));
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final actor = ref.watch(sessionActorProvider);
     final canSell = actor?.can(Permission.saleCreate) ?? false;
+    // Hands-free: a hardware scan adds the matching product to the cart.
+    ref.listen(posScanProvider, (_, next) {
+      if (canSell) next.whenData((e) => _addByBarcode(e.code));
+    });
     final productsAsync = ref.watch(productsProvider);
     final cart = ref.watch(posCartProvider);
     final total = cart.fold<int>(0, (s, l) => s + l.lineTotal);
@@ -317,13 +329,33 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   }
 }
 
-class _ReceiptDialog extends StatelessWidget {
+class _ReceiptDialog extends ConsumerWidget {
   const _ReceiptDialog({required this.sale, required this.lines});
   final SaleRow sale;
   final List<SaleLineRow> lines;
 
+  Future<void> _print(BuildContext context, WidgetRef ref, AppLocalizations l) async {
+    final printer = ref.read(receiptPrinterProvider);
+    if (printer == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.printerNotConfigured)));
+      return;
+    }
+    final data = buildReceipt(shopName: ref.read(shopNameProvider), sale: sale, lines: lines);
+    try {
+      await printer.printRaw(const EscPosEncoder().encode(data));
+      if (sale.paidMinor > 0) await printer.kickCashDrawer(); // cash sale → open drawer
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.printSucceeded)));
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.printFailed)));
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
       title: Column(children: [
@@ -357,6 +389,11 @@ class _ReceiptDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        TextButton.icon(
+          onPressed: () => _print(context, ref, l),
+          icon: const Icon(Icons.print_outlined),
+          label: Text(l.printReceipt),
+        ),
         FilledButton(onPressed: () => Navigator.pop(context), child: Text(l.newSale)),
       ],
     );

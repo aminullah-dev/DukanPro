@@ -112,5 +112,15 @@
   "errBranchLastActive": "You can't deactivate the only active branch.",
   "errUsernameTaken": "This username is already taken.",
   "errGeneric": "Something went wrong. Please try again.",
-  "savedOk": "Saved."
+  "savedOk": "Saved.",
+  "settings": "Settings",
+  "printerSettings": "Receipt printer",
+  "enablePrinting": "Print receipts",
+  "printerHost": "Printer IP address",
+  "printerPort": "Port",
+  "testPrint": "Test print",
+  "printReceipt": "Print",
+  "printerNotConfigured": "No printer configured. Set one up in Settings.",
+  "printSucceeded": "Sent to printer.",
+  "printFailed": "Couldn't reach the printer."
 }

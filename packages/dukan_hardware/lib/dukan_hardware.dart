@@ -4,6 +4,10 @@
 /// TCP :9100 (pure Dart sockets) — with Bluetooth/USB as secondary.
 library;
 
+export 'src/escpos.dart';
+export 'src/receipt.dart';
+export 'src/tcp_printer.dart';
+
 /// A decoded barcode scan.
 final class ScanEvent {
   const ScanEvent(this.code, this.symbology);

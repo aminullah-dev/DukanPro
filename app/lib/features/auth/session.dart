@@ -39,3 +39,23 @@ final sessionActorProvider = Provider<SessionActor?>((ref) {
   );
   return SessionActor(user, branchId);
 });
+
+/// The active branch's name — used as the receipt header. The bootstrap owner's
+/// default branch is the shop itself. Falls back to the app name.
+final shopNameProvider = Provider<String>((ref) {
+  final state = ref.watch(authControllerProvider);
+  if (state is! AuthLoggedIn) return 'DukanPro';
+  try {
+    final branches = (jsonDecode(state.profile.branches) as List).cast<Map<String, dynamic>>();
+    if (branches.isEmpty) return 'DukanPro';
+    final def = state.profile.defaultBranchId;
+    final match = branches.firstWhere(
+      (b) => b['branch_id'] == def,
+      orElse: () => branches.first,
+    );
+    final name = match['branch_name'] as String?;
+    return (name == null || name.isEmpty) ? 'DukanPro' : name;
+  } on Object {
+    return 'DukanPro';
+  }
+});

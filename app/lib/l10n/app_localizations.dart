@@ -742,6 +742,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saved.'**
   String get savedOk;
+
+  /// No description provided for @settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settings;
+
+  /// No description provided for @printerSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt printer'**
+  String get printerSettings;
+
+  /// No description provided for @enablePrinting.
+  ///
+  /// In en, this message translates to:
+  /// **'Print receipts'**
+  String get enablePrinting;
+
+  /// No description provided for @printerHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer IP address'**
+  String get printerHost;
+
+  /// No description provided for @printerPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get printerPort;
+
+  /// No description provided for @testPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Test print'**
+  String get testPrint;
+
+  /// No description provided for @printReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Print'**
+  String get printReceipt;
+
+  /// No description provided for @printerNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'No printer configured. Set one up in Settings.'**
+  String get printerNotConfigured;
+
+  /// No description provided for @printSucceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to printer.'**
+  String get printSucceeded;
+
+  /// No description provided for @printFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach the printer.'**
+  String get printFailed;
 }
 
 class _AppLocalizationsDelegate

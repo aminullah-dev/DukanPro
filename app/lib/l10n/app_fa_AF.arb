@@ -106,5 +106,15 @@
   "errBranchLastActive": "نمی‌توانید تنها شعبهٔ فعال را غیرفعال کنید.",
   "errUsernameTaken": "این نام کاربری قبلاً گرفته شده است.",
   "errGeneric": "مشکلی پیش آمد. دوباره تلاش کنید.",
-  "savedOk": "ذخیره شد."
+  "savedOk": "ذخیره شد.",
+  "settings": "تنظیمات",
+  "printerSettings": "چاپگر رسید",
+  "enablePrinting": "چاپ رسیدها",
+  "printerHost": "آدرس IP چاپگر",
+  "printerPort": "پورت",
+  "testPrint": "چاپ آزمایشی",
+  "printReceipt": "چاپ",
+  "printerNotConfigured": "چاپگری تنظیم نشده است. از تنظیمات یکی اضافه کنید.",
+  "printSucceeded": "به چاپگر فرستاده شد.",
+  "printFailed": "دسترسی به چاپگر ممکن نشد."
 }

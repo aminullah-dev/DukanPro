@@ -106,5 +106,15 @@
   "errBranchLastActive": "تاسو یوازینۍ فعاله څانګه نشئ غیرفعالولی.",
   "errUsernameTaken": "دا کارن نوم لا دمخه نیول شوی دی.",
   "errGeneric": "یوه ستونزه رامنځته شوه. بیا هڅه وکړئ.",
-  "savedOk": "وساتل شو."
+  "savedOk": "وساتل شو.",
+  "settings": "تنظیمات",
+  "printerSettings": "د رسید چاپګر",
+  "enablePrinting": "د رسیدونو چاپ",
+  "printerHost": "د چاپګر IP پته",
+  "printerPort": "پورټ",
+  "testPrint": "ازمایښتي چاپ",
+  "printReceipt": "چاپ",
+  "printerNotConfigured": "هیڅ چاپګر نه دی ټاکل شوی. له تنظیماتو یو اضافه کړئ.",
+  "printSucceeded": "چاپګر ته واستول شو.",
+  "printFailed": "چاپګر ته لاسرسی ونشو."
 }

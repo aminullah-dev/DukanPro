@@ -29,5 +29,12 @@ final outboxProvider = Provider<SyncOutbox>((ref) => InMemorySyncOutbox());
 final syncClientProvider = Provider<SyncClient>(
     (ref) => throw UnimplementedError('SyncClient is wired in Phase 6'));
 
-final scannerProvider = Provider<BarcodeScanner>(
-    (ref) => throw UnimplementedError('BarcodeScanner is wired in Phase 2/8'));
+/// Barcode scanner. Defaults to a no-op (no scans) so screens can always read
+/// it; main injects the real keyboard-wedge scanner (Phase 8).
+final scannerProvider = Provider<BarcodeScanner>((ref) => const _NoopScanner());
+
+class _NoopScanner implements BarcodeScanner {
+  const _NoopScanner();
+  @override
+  Stream<ScanEvent> scans() => const Stream.empty();
+}

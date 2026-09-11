@@ -1,11 +1,17 @@
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
+import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../composition.dart';
 import '../auth/providers.dart';
 import '../catalog/catalog_providers.dart';
 
 final localSalesProvider = Provider<LocalSales>((ref) => LocalSales(ref.watch(databaseProvider)));
+
+/// Hardware barcode scans (keyboard-wedge). POS listens and adds the matching
+/// product to the cart hands-free.
+final posScanProvider = StreamProvider<ScanEvent>((ref) => ref.watch(scannerProvider).scans());
 
 /// unitId → decimalPlaces, for converting cart counts to minor units.
 final unitDecimalsProvider = FutureProvider<Map<String, int>>((ref) async {

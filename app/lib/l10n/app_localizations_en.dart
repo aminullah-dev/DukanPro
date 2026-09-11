@@ -363,4 +363,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get savedOk => 'Saved.';
+
+  @override
+  String get settings => 'Settings';
+
+  @override
+  String get printerSettings => 'Receipt printer';
+
+  @override
+  String get enablePrinting => 'Print receipts';
+
+  @override
+  String get printerHost => 'Printer IP address';
+
+  @override
+  String get printerPort => 'Port';
+
+  @override
+  String get testPrint => 'Test print';
+
+  @override
+  String get printReceipt => 'Print';
+
+  @override
+  String get printerNotConfigured =>
+      'No printer configured. Set one up in Settings.';
+
+  @override
+  String get printSucceeded => 'Sent to printer.';
+
+  @override
+  String get printFailed => 'Couldn\'t reach the printer.';
 }
