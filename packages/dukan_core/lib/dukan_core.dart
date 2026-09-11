@@ -13,6 +13,7 @@ export 'shared/errors.dart';
 export 'shared/result.dart';
 
 // domain
+export 'domain/catalog.dart';
 export 'domain/identity.dart';
 export 'domain/inventory.dart';
 

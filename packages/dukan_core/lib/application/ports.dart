@@ -1,3 +1,4 @@
+import '../domain/catalog.dart';
 import '../domain/identity.dart';
 import '../domain/inventory.dart';
 
@@ -19,6 +20,19 @@ abstract interface class UserRepository {
   Future<void> save(User user);
   Future<bool> usernameTaken(String username);
   Future<int> activeOwnerCount();
+}
+
+/// Catalog persistence port. Soft-deleted rows are excluded from reads.
+abstract interface class ProductRepository {
+  Future<void> create(Product product, {List<Barcode> barcodes});
+  Future<void> update(Product product);
+  Future<Product?> findById(String id);
+  Future<Product?> findByBarcode(String code);
+  Future<List<Product>> list({String? search});
+  Future<List<Barcode>> barcodesFor(String productId);
+  Future<void> addBarcode(Barcode barcode);
+  Future<bool> skuTaken(String sku);
+  Future<bool> barcodeTaken(String code);
 }
 
 /// Status of an operation in the offline queue.

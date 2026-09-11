@@ -31,6 +31,11 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
+# ── Local databases ──────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
 # ── Secrets / local config ───────────────────────────────────────
 *.env
 .env.*

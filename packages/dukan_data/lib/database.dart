@@ -50,12 +50,82 @@ class CachedProfiles extends Table {
   Set<Column> get primaryKey => {userId};
 }
 
-@DriftDatabase(tables: [OutboxEntries, CachedProfiles])
+// ── Catalog + inventory (Phase 2) ────────────────────────────────────────────
+
+@DataClassName('UnitRow')
+class Units extends Table with RecordColumns {
+  TextColumn get name => text()();
+  IntColumn get decimalPlaces => integer().withDefault(const Constant(0))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('CategoryRow')
+class Categories extends Table with RecordColumns {
+  TextColumn get name => text()();
+  TextColumn get parentId => text().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('ProductRow')
+class Products extends Table with RecordColumns {
+  TextColumn get sku => text()();
+  TextColumn get name => text()();
+  TextColumn get unitId => text()();
+  TextColumn get categoryId => text().nullable()();
+  IntColumn get sellPriceMinor => integer().withDefault(const Constant(0))();
+  TextColumn get sellCurrency => text().withDefault(const Constant('AFN'))();
+  IntColumn get costMinor => integer().nullable()();
+  TextColumn get costCurrency => text().nullable()();
+  BoolColumn get trackStock => boolean().withDefault(const Constant(true))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('BarcodeRow')
+class Barcodes extends Table with RecordColumns {
+  TextColumn get productId => text()();
+  TextColumn get code => text()();
+  TextColumn get symbology => text().withDefault(const Constant('ean13'))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('StockMovementRow')
+class StockMovements extends Table with RecordColumns {
+  TextColumn get productId => text()();
+  TextColumn get branchId => text()();
+  IntColumn get qtyDelta => integer()();
+  TextColumn get reason => text()();
+  DateTimeColumn get occurredAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(
+  tables: [OutboxEntries, CachedProfiles, Units, Categories, Products, Barcodes, StockMovements],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(units);
+            await m.createTable(categories);
+            await m.createTable(products);
+            await m.createTable(barcodes);
+            await m.createTable(stockMovements);
+          }
+        },
+      );
 }
 
 /// Drift-backed implementation of the dukan_core [SyncOutbox] port.

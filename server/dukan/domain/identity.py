@@ -15,6 +15,7 @@ class Permission(StrEnum):
     SALE_CREATE = "sale.create"
     PRICE_CHANGE = "price.change"
     STOCK_ADJUST = "stock.adjust"
+    PRODUCT_MANAGE = "product.manage"
     USER_MANAGE = "user.manage"
     REPORT_VIEW = "report.view"
     BRANCH_MANAGE = "branch.manage"
@@ -26,7 +27,7 @@ BUILTIN_ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "owner": frozenset(Permission),
     "manager": frozenset({
         Permission.SALE_CREATE, Permission.PRICE_CHANGE, Permission.STOCK_ADJUST,
-        Permission.REPORT_VIEW, Permission.DEBT_WRITE_OFF,
+        Permission.PRODUCT_MANAGE, Permission.REPORT_VIEW, Permission.DEBT_WRITE_OFF,
     }),
     "cashier": frozenset({Permission.SALE_CREATE}),
     "stock_keeper": frozenset({Permission.STOCK_ADJUST}),

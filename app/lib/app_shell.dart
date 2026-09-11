@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_state.dart';
+import 'features/catalog/product_list_screen.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/locale_toggle.dart';
 
@@ -51,6 +52,14 @@ class AppShell extends ConsumerWidget {
                 label: Text(l.offlineMode),
               ),
             ],
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ProductListScreen()),
+              ),
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: Text(l.products),
+            ),
           ],
         ),
       ),

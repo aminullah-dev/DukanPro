@@ -9,6 +9,7 @@ enum Permission {
   saleCreate('sale.create'),
   priceChange('price.change'),
   stockAdjust('stock.adjust'),
+  productManage('product.manage'),
   userManage('user.manage'),
   reportView('report.view'),
   branchManage('branch.manage'),
@@ -45,20 +46,14 @@ enum BuiltinRole {
 }
 
 /// The built-in role → permission mapping. Single source for [PermissionPolicy].
-const Map<BuiltinRole, Set<Permission>> kBuiltinRolePermissions = {
-  BuiltinRole.owner: {
-    Permission.saleCreate,
-    Permission.priceChange,
-    Permission.stockAdjust,
-    Permission.userManage,
-    Permission.reportView,
-    Permission.branchManage,
-    Permission.debtWriteOff,
-  },
+/// Owner is every permission (so new permissions are covered automatically).
+final Map<BuiltinRole, Set<Permission>> kBuiltinRolePermissions = {
+  BuiltinRole.owner: Permission.values.toSet(),
   BuiltinRole.manager: {
     Permission.saleCreate,
     Permission.priceChange,
     Permission.stockAdjust,
+    Permission.productManage,
     Permission.reportView,
     Permission.debtWriteOff,
   },

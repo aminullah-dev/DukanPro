@@ -257,6 +257,114 @@ abstract class AppLocalizations {
   /// **'Setup failed. Please try again.'**
   String get setupFailed;
 
+  /// No description provided for @products.
+  ///
+  /// In en, this message translates to:
+  /// **'Products'**
+  String get products;
+
+  /// No description provided for @addProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Add product'**
+  String get addProduct;
+
+  /// No description provided for @editProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit product'**
+  String get editProduct;
+
+  /// No description provided for @productName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get productName;
+
+  /// No description provided for @sku.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU'**
+  String get sku;
+
+  /// No description provided for @price.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get price;
+
+  /// No description provided for @unit.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get unit;
+
+  /// No description provided for @barcodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode'**
+  String get barcodeLabel;
+
+  /// No description provided for @trackStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Track stock'**
+  String get trackStock;
+
+  /// No description provided for @adjustStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust stock'**
+  String get adjustStock;
+
+  /// No description provided for @quantityDelta.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity (+/-)'**
+  String get quantityDelta;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @onHand.
+  ///
+  /// In en, this message translates to:
+  /// **'In stock'**
+  String get onHand;
+
+  /// No description provided for @noProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'No products yet'**
+  String get noProducts;
+
+  /// No description provided for @searchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search or scan…'**
+  String get searchHint;
+
+  /// No description provided for @permissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'You don\'t have permission for this.'**
+  String get permissionDenied;
+
+  /// No description provided for @skuTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This SKU is already used.'**
+  String get skuTaken;
+
   /// No description provided for @signedInAs.
   ///
   /// In en, this message translates to:

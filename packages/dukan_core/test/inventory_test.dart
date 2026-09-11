@@ -47,5 +47,18 @@ void main() {
             .having((e) => e.code, 'code', 'STOCK_INVALID_QTY')),
       );
     });
+
+    test('adjustStock produces a signed adjustment movement', () {
+      final m = adjustStock(
+          id: newId(), productId: 'A1', branchId: 'B1', qtyDelta: -2, at: at);
+      expect(m.qtyDelta, -2);
+      expect(m.reason, StockReason.adjustment);
+      expect(
+        () => adjustStock(
+            id: newId(), productId: 'A1', branchId: 'B1', qtyDelta: 0, at: at),
+        throwsA(isA<ValidationError>()
+            .having((e) => e.code, 'code', 'STOCK_INVALID_QTY')),
+      );
+    });
   });
 }

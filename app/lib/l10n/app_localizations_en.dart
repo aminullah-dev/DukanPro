@@ -99,6 +99,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupFailed => 'Setup failed. Please try again.';
 
   @override
+  String get products => 'Products';
+
+  @override
+  String get addProduct => 'Add product';
+
+  @override
+  String get editProduct => 'Edit product';
+
+  @override
+  String get productName => 'Name';
+
+  @override
+  String get sku => 'SKU';
+
+  @override
+  String get price => 'Price';
+
+  @override
+  String get unit => 'Unit';
+
+  @override
+  String get barcodeLabel => 'Barcode';
+
+  @override
+  String get trackStock => 'Track stock';
+
+  @override
+  String get adjustStock => 'Adjust stock';
+
+  @override
+  String get quantityDelta => 'Quantity (+/-)';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get onHand => 'In stock';
+
+  @override
+  String get noProducts => 'No products yet';
+
+  @override
+  String get searchHint => 'Search or scan…';
+
+  @override
+  String get permissionDenied => 'You don\'t have permission for this.';
+
+  @override
+  String get skuTaken => 'This SKU is already used.';
+
+  @override
   String signedInAs(String user) {
     return 'Signed in as $user';
   }

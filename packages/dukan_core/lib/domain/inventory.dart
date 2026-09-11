@@ -61,3 +61,27 @@ StockMovement sellFromStock({
     occurredAt: at,
   );
 }
+
+/// Produce a manual stock adjustment movement. [qtyDelta] is signed
+/// (positive = found stock, negative = shrinkage) and must be non-zero.
+///
+/// Raises [ValidationError] `STOCK_INVALID_QTY` if qtyDelta == 0.
+StockMovement adjustStock({
+  required String id,
+  required String productId,
+  required String branchId,
+  required int qtyDelta,
+  required DateTime at,
+}) {
+  if (qtyDelta == 0) {
+    throw ValidationError('STOCK_INVALID_QTY', {'qty': qtyDelta});
+  }
+  return StockMovement(
+    id: id,
+    productId: productId,
+    branchId: branchId,
+    qtyDelta: qtyDelta,
+    reason: StockReason.adjustment,
+    occurredAt: at,
+  );
+}

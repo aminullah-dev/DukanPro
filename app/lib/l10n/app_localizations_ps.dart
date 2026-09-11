@@ -99,6 +99,60 @@ class AppLocalizationsPs extends AppLocalizations {
   String get setupFailed => 'چمتو کول ناکام شول. بیا هڅه وکړئ.';
 
   @override
+  String get products => 'محصولات';
+
+  @override
+  String get addProduct => 'محصول اضافه کول';
+
+  @override
+  String get editProduct => 'محصول سمول';
+
+  @override
+  String get productName => 'نوم';
+
+  @override
+  String get sku => 'د توکي کوډ';
+
+  @override
+  String get price => 'بیه';
+
+  @override
+  String get unit => 'واحد';
+
+  @override
+  String get barcodeLabel => 'بارکوډ';
+
+  @override
+  String get trackStock => 'د ذخیرې تعقیب';
+
+  @override
+  String get adjustStock => 'ذخیره سمول';
+
+  @override
+  String get quantityDelta => 'اندازه (+/-)';
+
+  @override
+  String get save => 'ساتل';
+
+  @override
+  String get cancel => 'لغوه';
+
+  @override
+  String get onHand => 'موجود';
+
+  @override
+  String get noProducts => 'لا تر اوسه محصول نشته';
+
+  @override
+  String get searchHint => 'لټون یا سکن…';
+
+  @override
+  String get permissionDenied => 'تاسو د دې اجازه نه لرئ.';
+
+  @override
+  String get skuTaken => 'دا کوډ دمخه کارول شوی دی.';
+
+  @override
   String signedInAs(String user) {
     return 'د $user په توګه ننوتل';
   }

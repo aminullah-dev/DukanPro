@@ -68,3 +68,27 @@ def sell_from_stock(
         reason=StockReason.SALE,
         occurred_at=at,
     )
+
+
+def adjust_stock(
+    *,
+    id: str,
+    product_id: str,
+    branch_id: str,
+    qty_delta: int,
+    at: datetime,
+) -> StockMovement:
+    """Manual stock adjustment; qty_delta is signed and must be non-zero.
+
+    Raises ValidationError(STOCK_INVALID_QTY) when qty_delta == 0.
+    """
+    if qty_delta == 0:
+        raise ValidationError("STOCK_INVALID_QTY", qty=qty_delta)
+    return StockMovement(
+        id=id,
+        product_id=product_id,
+        branch_id=branch_id,
+        qty_delta=qty_delta,
+        reason=StockReason.ADJUSTMENT,
+        occurred_at=at,
+    )

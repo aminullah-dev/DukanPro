@@ -21,3 +21,4 @@ dev = ["pytest", "httpx", "ruff", "mypy", "import-linter"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+addopts = "--import-mode=importlib"

@@ -100,6 +100,60 @@ class AppLocalizationsFa extends AppLocalizations {
   String get setupFailed => 'راه‌اندازی ناکام شد. دوباره تلاش کنید.';
 
   @override
+  String get products => 'محصولات';
+
+  @override
+  String get addProduct => 'افزودن محصول';
+
+  @override
+  String get editProduct => 'ویرایش محصول';
+
+  @override
+  String get productName => 'نام';
+
+  @override
+  String get sku => 'کد جنس';
+
+  @override
+  String get price => 'قیمت';
+
+  @override
+  String get unit => 'واحد';
+
+  @override
+  String get barcodeLabel => 'بارکد';
+
+  @override
+  String get trackStock => 'ردیابی موجودی';
+
+  @override
+  String get adjustStock => 'تنظیم موجودی';
+
+  @override
+  String get quantityDelta => 'مقدار (+/-)';
+
+  @override
+  String get save => 'ذخیره';
+
+  @override
+  String get cancel => 'لغو';
+
+  @override
+  String get onHand => 'موجود';
+
+  @override
+  String get noProducts => 'هنوز محصولی نیست';
+
+  @override
+  String get searchHint => 'جستجو یا اسکن…';
+
+  @override
+  String get permissionDenied => 'شما اجازهٔ این کار را ندارید.';
+
+  @override
+  String get skuTaken => 'این کد جنس قبلاً استفاده شده است.';
+
+  @override
   String signedInAs(String user) {
     return 'واردشده به‌عنوان $user';
   }
@@ -198,6 +252,60 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get setupFailed => 'راه‌اندازی ناکام شد. دوباره تلاش کنید.';
+
+  @override
+  String get products => 'محصولات';
+
+  @override
+  String get addProduct => 'افزودن محصول';
+
+  @override
+  String get editProduct => 'ویرایش محصول';
+
+  @override
+  String get productName => 'نام';
+
+  @override
+  String get sku => 'کد جنس';
+
+  @override
+  String get price => 'قیمت';
+
+  @override
+  String get unit => 'واحد';
+
+  @override
+  String get barcodeLabel => 'بارکد';
+
+  @override
+  String get trackStock => 'ردیابی موجودی';
+
+  @override
+  String get adjustStock => 'تنظیم موجودی';
+
+  @override
+  String get quantityDelta => 'مقدار (+/-)';
+
+  @override
+  String get save => 'ذخیره';
+
+  @override
+  String get cancel => 'لغو';
+
+  @override
+  String get onHand => 'موجود';
+
+  @override
+  String get noProducts => 'هنوز محصولی نیست';
+
+  @override
+  String get searchHint => 'جستجو یا اسکن…';
+
+  @override
+  String get permissionDenied => 'شما اجازهٔ این کار را ندارید.';
+
+  @override
+  String get skuTaken => 'این کد جنس قبلاً استفاده شده است.';
 
   @override
   String signedInAs(String user) {

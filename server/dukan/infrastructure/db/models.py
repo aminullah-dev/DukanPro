@@ -64,3 +64,50 @@ class AuditEntryModel(Base):
     before: Mapped[dict | None] = mapped_column(JSON, default=None)
     after: Mapped[dict | None] = mapped_column(JSON, default=None)
     origin: Mapped[str] = mapped_column(String(16), default="api")
+
+
+# ── Catalog + inventory (Phase 2) ────────────────────────────────────────────
+
+
+class UnitModel(RecordMixin, Base):
+    __tablename__ = "units"
+    name: Mapped[str] = mapped_column(String(48))
+    decimal_places: Mapped[int] = mapped_column(default=0)
+
+
+class CategoryModel(RecordMixin, Base):
+    __tablename__ = "categories"
+    name: Mapped[str] = mapped_column(String(128))
+    parent_id: Mapped[str | None] = mapped_column(String(36), default=None)
+
+
+class ProductModel(RecordMixin, Base):
+    __tablename__ = "products"
+    sku: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    unit_id: Mapped[str] = mapped_column(String(36))
+    category_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    sell_price_minor: Mapped[int] = mapped_column(default=0)
+    sell_currency: Mapped[str] = mapped_column(String(3), default="AFN")
+    cost_minor: Mapped[int | None] = mapped_column(default=None)
+    cost_currency: Mapped[str | None] = mapped_column(String(3), default=None)
+    track_stock: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class BarcodeModel(RecordMixin, Base):
+    __tablename__ = "barcodes"
+    product_id: Mapped[str] = mapped_column(String(36), index=True)
+    code: Mapped[str] = mapped_column(String(64), index=True)
+    symbology: Mapped[str] = mapped_column(String(16), default="ean13")
+
+
+class StockMovementModel(RecordMixin, Base):
+    """Append-only stock ledger. On-hand is derived by summing qty_delta."""
+
+    __tablename__ = "stock_movements"
+    product_id: Mapped[str] = mapped_column(String(36), index=True)
+    branch_id: Mapped[str] = mapped_column(String(36), index=True)
+    qty_delta: Mapped[int] = mapped_column()
+    reason: Mapped[str] = mapped_column(String(16))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

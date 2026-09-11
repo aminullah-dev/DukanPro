@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dukan.application.catalog import ProductView
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens
 
 
@@ -32,3 +33,19 @@ def tokens_dict(t: AuthTokens) -> dict:
 
 def auth_result(r: AuthResult) -> dict:
     return {"user": profile_dict(r.user), "tokens": tokens_dict(r.tokens)}
+
+
+def product_view_dict(v: ProductView) -> dict:
+    return {
+        "id": v.id,
+        "sku": v.sku,
+        "name": v.name,
+        "unit_id": v.unit_id,
+        "sell_price_minor": v.sell_price_minor,
+        "sell_currency": v.sell_currency,
+        "category_id": v.category_id,
+        "track_stock": v.track_stock,
+        "is_active": v.is_active,
+        "on_hand": v.on_hand,
+        "barcodes": list(v.barcodes),
+    }

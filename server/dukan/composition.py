@@ -14,12 +14,14 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from dukan.application.auth import AuthService
+from dukan.application.catalog import CatalogService
 from dukan.config import Settings, get_settings
 from dukan.infrastructure.auth_service import SqlAuthService
+from dukan.infrastructure.catalog_service import SqlCatalogService
 from dukan.infrastructure.db.session import make_engine, make_session_factory
 from dukan.shared.errors import AppError
-from dukan.ui.deps import get_auth_service
-from dukan.ui.routers import auth, health, users
+from dukan.ui.deps import get_auth_service, get_catalog_service
+from dukan.ui.routers import auth, catalog, health, users
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -35,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(users.router)
+    app.include_router(catalog.router)
 
     def provide_auth_service() -> Iterator[AuthService]:
         session = session_factory()
@@ -43,7 +46,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             session.close()
 
+    def provide_catalog_service() -> Iterator[CatalogService]:
+        session = session_factory()
+        try:
+            yield SqlCatalogService(session)
+        finally:
+            session.close()
+
     app.dependency_overrides[get_auth_service] = provide_auth_service
+    app.dependency_overrides[get_catalog_service] = provide_catalog_service
 
     @app.exception_handler(AppError)
     async def _app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
