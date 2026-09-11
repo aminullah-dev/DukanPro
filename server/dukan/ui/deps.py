@@ -13,6 +13,7 @@ from dukan.application.access import require_permission
 from dukan.application.auth import AuthService
 from dukan.application.catalog import CatalogService
 from dukan.application.customers import CustomerService
+from dukan.application.iam import IamService
 from dukan.application.purchasing import PurchasingService
 from dukan.application.reports import ReportsService
 from dukan.application.sales import SalesService
@@ -52,6 +53,10 @@ def get_reports_service() -> ReportsService:
 
 def get_sync_service() -> SyncService:
     raise NotImplementedError("sync service not wired")
+
+
+def get_iam_service() -> IamService:
+    raise NotImplementedError("iam service not wired")
 
 
 def active_branch(actor: User, x_branch_id: str | None) -> str:

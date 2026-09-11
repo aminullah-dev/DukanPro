@@ -9,18 +9,14 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from dukan.application.access import require_permission
 from dukan.application.auth import AuthService
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens, BranchRole
 from dukan.config import Settings
 from dukan.domain.identity import (
     BUILTIN_ROLE_PERMISSIONS,
     BranchAssignment,
-    Permission,
-    PermissionPolicy,
     User,
     UserStatus,
-    assert_username_available,
 )
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
@@ -33,8 +29,6 @@ from dukan.infrastructure.db.models import (
 from dukan.infrastructure.security import passwords, tokens
 from dukan.shared.errors import AuthError, ConflictError
 from dukan.shared.ids import new_id
-
-_POLICY = PermissionPolicy()
 
 
 def _as_utc(dt: datetime) -> datetime:
@@ -215,54 +209,3 @@ class SqlAuthService(AuthService):
             default_branch_id=user.default_branch_id,
             branches=branches,
         )
-
-    def create_user(
-        self,
-        *,
-        actor: User,
-        branch_id: str,
-        username: str,
-        password: str,
-        display_name: str,
-        role_name: str,
-    ) -> AuthenticatedUser:
-        require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
-        taken = (
-            self._s.scalar(
-                select(UserModel).where(
-                    UserModel.username == username, UserModel.deleted_at.is_(None)
-                )
-            )
-            is not None
-        )
-        assert_username_available(username=username, taken=taken)
-        m = UserModel(
-            id=new_id(),
-            username=username,
-            display_name=display_name,
-            password_hash=passwords.hash_password(password),
-            status="active",
-            default_branch_id=branch_id,
-            created_by=actor.id,
-            updated_by=actor.id,
-        )
-        self._s.add(m)
-        self._s.add(
-            BranchAssignmentModel(
-                id=new_id(),
-                user_id=m.id,
-                branch_id=branch_id,
-                role_name=role_name,
-                created_by=actor.id,
-            )
-        )
-        self._s.flush()
-        self._audit(
-            "user.created",
-            actor_id=actor.id,
-            entity_type="user",
-            entity_id=m.id,
-            after={"username": username, "role": role_name},
-        )
-        self._s.commit()
-        return self.profile(self._domain_user(m))

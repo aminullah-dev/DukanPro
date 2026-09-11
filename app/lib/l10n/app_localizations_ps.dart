@@ -274,4 +274,91 @@ class AppLocalizationsPs extends AppLocalizations {
   String lastSyncedAt(String time) {
     return 'وروستۍ همغږي $time';
   }
+
+  @override
+  String get employees => 'کارمندان';
+
+  @override
+  String get addEmployee => 'کارمند زیاتول';
+
+  @override
+  String get noEmployees => 'لا تر اوسه کارمند نشته';
+
+  @override
+  String get role => 'رول';
+
+  @override
+  String get enable => 'فعالول';
+
+  @override
+  String get disable => 'غیرفعالول';
+
+  @override
+  String get statusActive => 'فعال';
+
+  @override
+  String get statusDisabled => 'غیرفعال';
+
+  @override
+  String get resetPassword => 'پټنوم بیا تنظیمول';
+
+  @override
+  String get newPassword => 'نوی پټنوم';
+
+  @override
+  String get assignRole => 'رول ټاکل';
+
+  @override
+  String get removeRole => 'لرې کول';
+
+  @override
+  String get branches => 'څانګې';
+
+  @override
+  String get addBranch => 'څانګه زیاتول';
+
+  @override
+  String get noBranches => 'لا تر اوسه څانګه نشته';
+
+  @override
+  String get branchNameLabel => 'د څانګې نوم';
+
+  @override
+  String get rename => 'نوم بدلول';
+
+  @override
+  String get activate => 'فعالول';
+
+  @override
+  String get deactivate => 'غیرفعالول';
+
+  @override
+  String get roleOwner => 'مالک';
+
+  @override
+  String get roleManager => 'مدیر';
+
+  @override
+  String get roleCashier => 'صندوق‌دار';
+
+  @override
+  String get roleStockKeeper => 'ګدام‌وال';
+
+  @override
+  String get roleAccountant => 'حساب‌دار';
+
+  @override
+  String get errUserLastOwner => 'تاسو وروستی مالک نشئ غیرفعالولی.';
+
+  @override
+  String get errBranchLastActive => 'تاسو یوازینۍ فعاله څانګه نشئ غیرفعالولی.';
+
+  @override
+  String get errUsernameTaken => 'دا کارن نوم لا دمخه نیول شوی دی.';
+
+  @override
+  String get errGeneric => 'یوه ستونزه رامنځته شوه. بیا هڅه وکړئ.';
+
+  @override
+  String get savedOk => 'وساتل شو.';
 }

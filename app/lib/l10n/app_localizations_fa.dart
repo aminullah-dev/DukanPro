@@ -276,6 +276,94 @@ class AppLocalizationsFa extends AppLocalizations {
   String lastSyncedAt(String time) {
     return 'آخرین همگام‌سازی $time';
   }
+
+  @override
+  String get employees => 'کارمندان';
+
+  @override
+  String get addEmployee => 'افزودن کارمند';
+
+  @override
+  String get noEmployees => 'هنوز کارمندی نیست';
+
+  @override
+  String get role => 'نقش';
+
+  @override
+  String get enable => 'فعال کردن';
+
+  @override
+  String get disable => 'غیرفعال کردن';
+
+  @override
+  String get statusActive => 'فعال';
+
+  @override
+  String get statusDisabled => 'غیرفعال';
+
+  @override
+  String get resetPassword => 'بازنشانی رمز عبور';
+
+  @override
+  String get newPassword => 'رمز عبور جدید';
+
+  @override
+  String get assignRole => 'تعیین نقش';
+
+  @override
+  String get removeRole => 'حذف';
+
+  @override
+  String get branches => 'شعبه‌ها';
+
+  @override
+  String get addBranch => 'افزودن شعبه';
+
+  @override
+  String get noBranches => 'هنوز شعبه‌ای نیست';
+
+  @override
+  String get branchNameLabel => 'نام شعبه';
+
+  @override
+  String get rename => 'تغییر نام';
+
+  @override
+  String get activate => 'فعال کردن';
+
+  @override
+  String get deactivate => 'غیرفعال کردن';
+
+  @override
+  String get roleOwner => 'مالک';
+
+  @override
+  String get roleManager => 'مدیر';
+
+  @override
+  String get roleCashier => 'صندوق‌دار';
+
+  @override
+  String get roleStockKeeper => 'انباردار';
+
+  @override
+  String get roleAccountant => 'حسابدار';
+
+  @override
+  String get errUserLastOwner => 'نمی‌توانید تنها مالک را غیرفعال کنید.';
+
+  @override
+  String get errBranchLastActive =>
+      'نمی‌توانید تنها شعبهٔ فعال را غیرفعال کنید.';
+
+  @override
+  String get errUsernameTaken => 'این نام کاربری قبلاً گرفته شده است.';
+
+  @override
+  String get errGeneric => 'مشکلی پیش آمد. دوباره تلاش کنید.';
+
+  @override
+  String get savedOk => 'ذخیره شد.';
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -549,4 +637,92 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   String lastSyncedAt(String time) {
     return 'آخرین همگام‌سازی $time';
   }
+
+  @override
+  String get employees => 'کارمندان';
+
+  @override
+  String get addEmployee => 'افزودن کارمند';
+
+  @override
+  String get noEmployees => 'هنوز کارمندی نیست';
+
+  @override
+  String get role => 'نقش';
+
+  @override
+  String get enable => 'فعال کردن';
+
+  @override
+  String get disable => 'غیرفعال کردن';
+
+  @override
+  String get statusActive => 'فعال';
+
+  @override
+  String get statusDisabled => 'غیرفعال';
+
+  @override
+  String get resetPassword => 'بازنشانی رمز عبور';
+
+  @override
+  String get newPassword => 'رمز عبور جدید';
+
+  @override
+  String get assignRole => 'تعیین نقش';
+
+  @override
+  String get removeRole => 'حذف';
+
+  @override
+  String get branches => 'شعبه‌ها';
+
+  @override
+  String get addBranch => 'افزودن شعبه';
+
+  @override
+  String get noBranches => 'هنوز شعبه‌ای نیست';
+
+  @override
+  String get branchNameLabel => 'نام شعبه';
+
+  @override
+  String get rename => 'تغییر نام';
+
+  @override
+  String get activate => 'فعال کردن';
+
+  @override
+  String get deactivate => 'غیرفعال کردن';
+
+  @override
+  String get roleOwner => 'مالک';
+
+  @override
+  String get roleManager => 'مدیر';
+
+  @override
+  String get roleCashier => 'صندوق‌دار';
+
+  @override
+  String get roleStockKeeper => 'انباردار';
+
+  @override
+  String get roleAccountant => 'حسابدار';
+
+  @override
+  String get errUserLastOwner => 'نمی‌توانید تنها مالک را غیرفعال کنید.';
+
+  @override
+  String get errBranchLastActive =>
+      'نمی‌توانید تنها شعبهٔ فعال را غیرفعال کنید.';
+
+  @override
+  String get errUsernameTaken => 'این نام کاربری قبلاً گرفته شده است.';
+
+  @override
+  String get errGeneric => 'مشکلی پیش آمد. دوباره تلاش کنید.';
+
+  @override
+  String get savedOk => 'ذخیره شد.';
 }

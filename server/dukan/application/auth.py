@@ -30,14 +30,3 @@ class AuthService(Protocol):
     def authenticated_user(self, *, access_token: str) -> User: ...
 
     def profile(self, user: User) -> AuthenticatedUser: ...
-
-    def create_user(
-        self,
-        *,
-        actor: User,
-        branch_id: str,
-        username: str,
-        password: str,
-        display_name: str,
-        role_name: str,
-    ) -> AuthenticatedUser: ...

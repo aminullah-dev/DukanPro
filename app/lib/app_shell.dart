@@ -1,13 +1,17 @@
 import 'dart:convert';
 
+import 'package:dukan_core/dukan_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_state.dart';
+import 'features/auth/session.dart';
 import 'features/catalog/product_list_screen.dart';
 import 'features/customers/customers_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/iam/branches_screen.dart';
+import 'features/iam/employees_screen.dart';
 import 'features/pos/pos_screen.dart';
 import 'features/purchasing/receive_stock_screen.dart';
 import 'features/sync/sync_button.dart';
@@ -26,6 +30,8 @@ class AppShell extends ConsumerWidget {
     if (state is! AuthLoggedIn) return const SizedBox.shrink();
     final profile = state.profile;
     final branch = profile.branches;
+    final actor = ref.watch(sessionActorProvider);
+    bool can(Permission p) => actor?.can(p) ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -61,13 +67,14 @@ class AppShell extends ConsumerWidget {
             const SizedBox(height: 16),
             const SyncStatusCard(),
             const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const PosScreen()),
+            if (can(Permission.saleCreate))
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const PosScreen()),
+                ),
+                icon: const Icon(Icons.point_of_sale),
+                label: Text(l.pos),
               ),
-              icon: const Icon(Icons.point_of_sale),
-              label: Text(l.pos),
-            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
@@ -88,20 +95,38 @@ class AppShell extends ConsumerWidget {
                   icon: const Icon(Icons.people_outline),
                   label: Text(l.customers),
                 ),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const ReceiveStockScreen()),
+                if (can(Permission.stockAdjust))
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const ReceiveStockScreen()),
+                    ),
+                    icon: const Icon(Icons.add_box_outlined),
+                    label: Text(l.receiveStock),
                   ),
-                  icon: const Icon(Icons.add_box_outlined),
-                  label: Text(l.receiveStock),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const DashboardScreen()),
+                if (can(Permission.reportView))
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const DashboardScreen()),
+                    ),
+                    icon: const Icon(Icons.dashboard_outlined),
+                    label: Text(l.dashboard),
                   ),
-                  icon: const Icon(Icons.dashboard_outlined),
-                  label: Text(l.dashboard),
-                ),
+                if (can(Permission.userManage))
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const EmployeesScreen()),
+                    ),
+                    icon: const Icon(Icons.badge_outlined),
+                    label: Text(l.employees),
+                  ),
+                if (can(Permission.branchManage))
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const BranchesScreen()),
+                    ),
+                    icon: const Icon(Icons.store_mall_directory_outlined),
+                    label: Text(l.branches),
+                  ),
               ],
             ),
           ],

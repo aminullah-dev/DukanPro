@@ -568,6 +568,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last synced {time}'**
   String lastSyncedAt(String time);
+
+  /// No description provided for @employees.
+  ///
+  /// In en, this message translates to:
+  /// **'Employees'**
+  String get employees;
+
+  /// No description provided for @addEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Add employee'**
+  String get addEmployee;
+
+  /// No description provided for @noEmployees.
+  ///
+  /// In en, this message translates to:
+  /// **'No employees yet'**
+  String get noEmployees;
+
+  /// No description provided for @role.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get role;
+
+  /// No description provided for @enable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get enable;
+
+  /// No description provided for @disable.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get disable;
+
+  /// No description provided for @statusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get statusActive;
+
+  /// No description provided for @statusDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get statusDisabled;
+
+  /// No description provided for @resetPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get resetPassword;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get newPassword;
+
+  /// No description provided for @assignRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign role'**
+  String get assignRole;
+
+  /// No description provided for @removeRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeRole;
+
+  /// No description provided for @branches.
+  ///
+  /// In en, this message translates to:
+  /// **'Branches'**
+  String get branches;
+
+  /// No description provided for @addBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'Add branch'**
+  String get addBranch;
+
+  /// No description provided for @noBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'No branches yet'**
+  String get noBranches;
+
+  /// No description provided for @branchNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch name'**
+  String get branchNameLabel;
+
+  /// No description provided for @rename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get rename;
+
+  /// No description provided for @activate.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get activate;
+
+  /// No description provided for @deactivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate'**
+  String get deactivate;
+
+  /// No description provided for @roleOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get roleOwner;
+
+  /// No description provided for @roleManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager'**
+  String get roleManager;
+
+  /// No description provided for @roleCashier.
+  ///
+  /// In en, this message translates to:
+  /// **'Cashier'**
+  String get roleCashier;
+
+  /// No description provided for @roleStockKeeper.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock keeper'**
+  String get roleStockKeeper;
+
+  /// No description provided for @roleAccountant.
+  ///
+  /// In en, this message translates to:
+  /// **'Accountant'**
+  String get roleAccountant;
+
+  /// No description provided for @errUserLastOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'You can\'t disable the last owner.'**
+  String get errUserLastOwner;
+
+  /// No description provided for @errBranchLastActive.
+  ///
+  /// In en, this message translates to:
+  /// **'You can\'t deactivate the only active branch.'**
+  String get errBranchLastActive;
+
+  /// No description provided for @errUsernameTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This username is already taken.'**
+  String get errUsernameTaken;
+
+  /// No description provided for @errGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get errGeneric;
+
+  /// No description provided for @savedOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get savedOk;
 }
 
 class _AppLocalizationsDelegate

@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from dukan.application.auth import AuthService
 from dukan.application.catalog import CatalogService
 from dukan.application.customers import CustomerService
+from dukan.application.iam import IamService
 from dukan.application.purchasing import PurchasingService
 from dukan.application.reports import ReportsService
 from dukan.application.sales import SalesService
@@ -25,6 +26,7 @@ from dukan.infrastructure.auth_service import SqlAuthService
 from dukan.infrastructure.catalog_service import SqlCatalogService
 from dukan.infrastructure.customers_service import SqlCustomerService
 from dukan.infrastructure.db.session import make_engine, make_session_factory
+from dukan.infrastructure.iam_service import SqlIamService
 from dukan.infrastructure.purchasing_service import SqlPurchasingService
 from dukan.infrastructure.reports_service import SqlReportsService
 from dukan.infrastructure.sales_service import SqlSalesService
@@ -34,6 +36,7 @@ from dukan.ui.deps import (
     get_auth_service,
     get_catalog_service,
     get_customer_service,
+    get_iam_service,
     get_purchasing_service,
     get_reports_service,
     get_sales_service,
@@ -41,6 +44,7 @@ from dukan.ui.deps import (
 )
 from dukan.ui.routers import (
     auth,
+    branches,
     catalog,
     customers,
     health,
@@ -65,6 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(users.router)
+    app.include_router(branches.router)
     app.include_router(catalog.router)
     app.include_router(sales.router)
     app.include_router(customers.router)
@@ -121,6 +126,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             session.close()
 
+    def provide_iam_service() -> Iterator[IamService]:
+        session = session_factory()
+        try:
+            yield SqlIamService(session)
+        finally:
+            session.close()
+
     app.dependency_overrides[get_auth_service] = provide_auth_service
     app.dependency_overrides[get_catalog_service] = provide_catalog_service
     app.dependency_overrides[get_sales_service] = provide_sales_service
@@ -128,6 +140,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.dependency_overrides[get_purchasing_service] = provide_purchasing_service
     app.dependency_overrides[get_reports_service] = provide_reports_service
     app.dependency_overrides[get_sync_service] = provide_sync_service
+    app.dependency_overrides[get_iam_service] = provide_iam_service
 
     @app.exception_handler(AppError)
     async def _app_error_handler(_request: Request, exc: AppError) -> JSONResponse:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dukan.application.catalog import ProductView
 from dukan.application.customers import CustomerView
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens
+from dukan.application.iam import BranchView, EmployeeView
 from dukan.application.purchasing import GoodsReceiptView, SupplierView
 from dukan.application.reports import DashboardView
 from dukan.application.sales import SaleView, ShiftView
@@ -24,6 +25,30 @@ def profile_dict(p: AuthenticatedUser) -> dict:
             }
             for b in p.branches
         ],
+    }
+
+
+def employee_dict(v: EmployeeView) -> dict:
+    return {
+        "id": v.id,
+        "username": v.username,
+        "display_name": v.display_name,
+        "status": v.status,
+        "default_branch_id": v.default_branch_id,
+        "branches": [
+            {"branch_id": b.branch_id, "branch_name": b.branch_name, "role_name": b.role_name}
+            for b in v.branches
+        ],
+    }
+
+
+def branch_dict(v: BranchView) -> dict:
+    return {
+        "id": v.id,
+        "name": v.name,
+        "timezone": v.timezone,
+        "currency_default": v.currency_default,
+        "is_active": v.is_active,
     }
 
 

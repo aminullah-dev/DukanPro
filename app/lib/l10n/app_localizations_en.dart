@@ -275,4 +275,92 @@ class AppLocalizationsEn extends AppLocalizations {
   String lastSyncedAt(String time) {
     return 'Last synced $time';
   }
+
+  @override
+  String get employees => 'Employees';
+
+  @override
+  String get addEmployee => 'Add employee';
+
+  @override
+  String get noEmployees => 'No employees yet';
+
+  @override
+  String get role => 'Role';
+
+  @override
+  String get enable => 'Enable';
+
+  @override
+  String get disable => 'Disable';
+
+  @override
+  String get statusActive => 'Active';
+
+  @override
+  String get statusDisabled => 'Disabled';
+
+  @override
+  String get resetPassword => 'Reset password';
+
+  @override
+  String get newPassword => 'New password';
+
+  @override
+  String get assignRole => 'Assign role';
+
+  @override
+  String get removeRole => 'Remove';
+
+  @override
+  String get branches => 'Branches';
+
+  @override
+  String get addBranch => 'Add branch';
+
+  @override
+  String get noBranches => 'No branches yet';
+
+  @override
+  String get branchNameLabel => 'Branch name';
+
+  @override
+  String get rename => 'Rename';
+
+  @override
+  String get activate => 'Activate';
+
+  @override
+  String get deactivate => 'Deactivate';
+
+  @override
+  String get roleOwner => 'Owner';
+
+  @override
+  String get roleManager => 'Manager';
+
+  @override
+  String get roleCashier => 'Cashier';
+
+  @override
+  String get roleStockKeeper => 'Stock keeper';
+
+  @override
+  String get roleAccountant => 'Accountant';
+
+  @override
+  String get errUserLastOwner => 'You can\'t disable the last owner.';
+
+  @override
+  String get errBranchLastActive =>
+      'You can\'t deactivate the only active branch.';
+
+  @override
+  String get errUsernameTaken => 'This username is already taken.';
+
+  @override
+  String get errGeneric => 'Something went wrong. Please try again.';
+
+  @override
+  String get savedOk => 'Saved.';
 }

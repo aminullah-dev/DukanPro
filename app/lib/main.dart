@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'composition.dart';
 import 'features/auth/providers.dart';
+import 'features/iam/iam_providers.dart';
 import 'infrastructure/auth_api.dart';
 import 'infrastructure/biometric.dart';
+import 'infrastructure/iam_api.dart';
 import 'infrastructure/local_db.dart';
 import 'infrastructure/secure_store.dart';
 import 'infrastructure/sync_api.dart';
@@ -26,6 +28,7 @@ Future<void> main() async {
         biometricProvider.overrideWithValue(LocalAuthBiometric()),
         syncClientProvider
             .overrideWithValue(DioSyncClient(baseUrl: apiBase, store: secureStore)),
+        iamApiProvider.overrideWithValue(DioIamApi(baseUrl: apiBase, store: secureStore)),
       ],
       child: const DukanProApp(),
     ),
