@@ -23,6 +23,12 @@ class ValidationError(AppError):
     http_status = 422
 
 
+class AuthError(AppError):
+    """Authentication failed or is required (bad credentials, invalid/expired token)."""
+
+    http_status = 401
+
+
 class NotFoundError(AppError):
     http_status = 404
 

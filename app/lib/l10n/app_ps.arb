@@ -8,5 +8,20 @@
   "charge": "تادیه",
   "cash": "نغدي",
   "newSale": "نوی پلور",
-  "itemsInCart": "{count, plural, =0{هیڅ توکی نشته} =1{۱ توکی} other{{count} توکي}}"
+  "itemsInCart": "{count, plural, =0{هیڅ توکی نشته} =1{۱ توکی} other{{count} توکي}}",
+  "signIn": "ننوتل",
+  "username": "کارن نوم",
+  "password": "پټنوم",
+  "displayName": "ستاسو نوم",
+  "shopName": "د دوکان نوم",
+  "firstRunSetup": "لومړی ځل؟ خپل دوکان چمتو کړئ",
+  "unlock": "خلاصول",
+  "usePin": "د پین کارول",
+  "useBiometric": "د بیومیټریک کارول",
+  "pinLabel": "پین",
+  "logout": "وتل",
+  "offlineMode": "آفلاین",
+  "loginFailed": "ننوتل ناکام شول. کارن نوم او پټنوم وګورئ.",
+  "wrongSecret": "سم نه دی — بیا هڅه وکړئ.",
+  "signedInAs": "د {user} په توګه ننوتل"
 }

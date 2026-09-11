@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from dukan.ui.app import app
+from dukan.composition import app
 
 
 def test_health_ok() -> None:

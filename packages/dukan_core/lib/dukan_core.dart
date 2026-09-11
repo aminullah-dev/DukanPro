@@ -12,8 +12,10 @@ export 'shared/money.dart';
 export 'shared/errors.dart';
 export 'shared/result.dart';
 
-// domain (sample aggregate wired in Phase 2; present here to anchor the layer)
+// domain
+export 'domain/identity.dart';
 export 'domain/inventory.dart';
 
-// application ports (interfaces implemented outward in dukan_data / dukan_sync)
+// application ports + guards (implemented outward in dukan_data / dukan_sync)
+export 'application/access.dart';
 export 'application/ports.dart';

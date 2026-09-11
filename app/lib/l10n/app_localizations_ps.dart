@@ -44,4 +44,51 @@ class AppLocalizationsPs extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get signIn => 'ننوتل';
+
+  @override
+  String get username => 'کارن نوم';
+
+  @override
+  String get password => 'پټنوم';
+
+  @override
+  String get displayName => 'ستاسو نوم';
+
+  @override
+  String get shopName => 'د دوکان نوم';
+
+  @override
+  String get firstRunSetup => 'لومړی ځل؟ خپل دوکان چمتو کړئ';
+
+  @override
+  String get unlock => 'خلاصول';
+
+  @override
+  String get usePin => 'د پین کارول';
+
+  @override
+  String get useBiometric => 'د بیومیټریک کارول';
+
+  @override
+  String get pinLabel => 'پین';
+
+  @override
+  String get logout => 'وتل';
+
+  @override
+  String get offlineMode => 'آفلاین';
+
+  @override
+  String get loginFailed => 'ننوتل ناکام شول. کارن نوم او پټنوم وګورئ.';
+
+  @override
+  String get wrongSecret => 'سم نه دی — بیا هڅه وکړئ.';
+
+  @override
+  String signedInAs(String user) {
+    return 'د $user په توګه ننوتل';
+  }
 }

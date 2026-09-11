@@ -1,0 +1,18 @@
+# Local PostgreSQL for parity with production. Dev/tests default to SQLite.
+#   docker compose up -d
+#   export DUKAN_DATABASE_URL=postgresql+psycopg://dukan:dukan@localhost:5432/dukan
+#   alembic upgrade head
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dukan
+      POSTGRES_PASSWORD: dukan
+      POSTGRES_DB: dukan
+    ports:
+      - "5432:5432"
+    volumes:
+      - dukan_pg:/var/lib/postgresql/data
+
+volumes:
+  dukan_pg:

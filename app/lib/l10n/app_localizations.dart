@@ -101,13 +101,13 @@ abstract class AppLocalizations {
     Locale('ps'),
   ];
 
-  /// Application name shown in the title bar
+  /// Application name
   ///
   /// In en, this message translates to:
   /// **'DukanPro'**
   String get appTitle;
 
-  /// One-line product tagline
+  /// No description provided for @tagline.
   ///
   /// In en, this message translates to:
   /// **'Offline-first retail POS'**
@@ -149,11 +149,101 @@ abstract class AppLocalizations {
   /// **'New sale'**
   String get newSale;
 
-  /// Cart item count with ICU plural
+  /// No description provided for @itemsInCart.
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =0{No items} =1{1 item} other{{count} items}}'**
   String itemsInCart(int count);
+
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signIn;
+
+  /// No description provided for @username.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get username;
+
+  /// No description provided for @password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get password;
+
+  /// No description provided for @displayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name'**
+  String get displayName;
+
+  /// No description provided for @shopName.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop name'**
+  String get shopName;
+
+  /// No description provided for @firstRunSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'First time? Set up your shop'**
+  String get firstRunSetup;
+
+  /// No description provided for @unlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get unlock;
+
+  /// No description provided for @usePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Use PIN'**
+  String get usePin;
+
+  /// No description provided for @useBiometric.
+  ///
+  /// In en, this message translates to:
+  /// **'Use biometrics'**
+  String get useBiometric;
+
+  /// No description provided for @pinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get pinLabel;
+
+  /// No description provided for @logout.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get logout;
+
+  /// No description provided for @offlineMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get offlineMode;
+
+  /// No description provided for @loginFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in failed. Check your username and password.'**
+  String get loginFailed;
+
+  /// No description provided for @wrongSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect — try again.'**
+  String get wrongSecret;
+
+  /// No description provided for @signedInAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in as {user}'**
+  String signedInAs(String user);
 }
 
 class _AppLocalizationsDelegate

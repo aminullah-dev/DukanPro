@@ -1,20 +1,36 @@
+import 'package:drift/native.dart';
+import 'package:dukan_data/dukan_data.dart';
+import 'package:dukanpro/features/auth/login_screen.dart';
+import 'package:dukanpro/features/auth/providers.dart';
+import 'package:dukanpro/infrastructure/biometric.dart';
 import 'package:dukanpro/main.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-void main() {
-  testWidgets('boots in Dari (default) and renders the title', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: DukanProApp()));
-    await tester.pumpAndSettle();
-    expect(find.text('دکان‌پرو'), findsWidgets);
-  });
+import 'fakes.dart';
 
-  testWidgets('switching to English shows English strings', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: DukanProApp()));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('EN'));
-    await tester.pumpAndSettle();
-    expect(find.text('DukanPro'), findsWidgets);
-    expect(find.text('Offline-first retail POS'), findsOneWidget);
+void main() {
+  testWidgets('with no cached session the app routes to the login screen', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          secureStoreProvider.overrideWithValue(FakeSecureStore()),
+          authApiProvider.overrideWithValue(FakeAuthApi()),
+          verifierProvider.overrideWithValue(FakeVerifier()),
+          biometricProvider.overrideWithValue(const NoBiometric()),
+        ],
+        child: const DukanProApp(),
+      ),
+    );
+
+    // Let restore() run and the router redirect away from the splash.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(LoginScreen), findsOneWidget);
   });
 }

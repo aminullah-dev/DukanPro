@@ -9,6 +9,8 @@ for p in dukan_core dukan_data dukan_sync dukan_hardware; do
   echo "  • $p"
   ( cd "$ROOT/packages/$p"
     dart pub get >/dev/null
+    # dukan_data uses Drift codegen; regenerate so a clean checkout is self-sufficient.
+    if [ "$p" = "dukan_data" ]; then dart run build_runner build >/dev/null; fi
     dart analyze
     if [ -d test ]; then dart test; fi )
 done

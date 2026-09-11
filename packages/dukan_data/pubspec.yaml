@@ -10,9 +10,13 @@ environment:
   sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
+  drift: ^2.35.0
   dukan_core:
     path: ../dukan_core
+  sqlite3: ^3.5.2
 
 dev_dependencies:
   test: ">=1.24.0 <2.0.0"
   lints: ">=4.0.0 <7.0.0"
+  drift_dev: ^2.35.0
+  build_runner: ^2.16.1

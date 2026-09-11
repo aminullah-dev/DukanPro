@@ -10,3 +10,7 @@ select = ["E", "F", "I", "UP", "B", "A", "C4", "SIM"]
 # (matches the SQL `id` column and the Dart domain). Allow it.
 [lint.flake8-builtins]
 builtins-ignorelist = ["id"]
+
+[lint.per-file-ignores]
+# Test fixtures carry long inline JSON payloads.
+"tests/**" = ["E501"]

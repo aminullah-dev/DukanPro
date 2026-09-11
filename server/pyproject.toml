@@ -7,11 +7,15 @@ dependencies = [
   "fastapi",
   "uvicorn[standard]",
   "pydantic>=2",
+  "pydantic-settings>=2",
   "sqlalchemy>=2",
   "alembic",
+  "argon2-cffi>=23",
+  "pyjwt>=2",
 ]
 
 [project.optional-dependencies]
+postgres = ["psycopg[binary]>=3"]
 dev = ["pytest", "httpx", "ruff", "mypy", "import-linter"]
 
 [tool.pytest.ini_options]

@@ -1,3 +1,4 @@
+import '../domain/identity.dart';
 import '../domain/inventory.dart';
 
 /// Ports (interfaces the application layer needs) live here in `dukan_core`.
@@ -8,6 +9,16 @@ import '../domain/inventory.dart';
 abstract interface class StockMovementRepository {
   Future<void> append(StockMovement movement);
   Future<List<StockMovement>> forProduct(String productId, String branchId);
+}
+
+/// Identity persistence port. Implemented by dukan_data (Drift) on the client
+/// and by a SQLAlchemy repository on the server. Soft-deleted rows are excluded.
+abstract interface class UserRepository {
+  Future<User?> findById(String id);
+  Future<User?> findByUsername(String username);
+  Future<void> save(User user);
+  Future<bool> usernameTaken(String username);
+  Future<int> activeOwnerCount();
 }
 
 /// Status of an operation in the offline queue.

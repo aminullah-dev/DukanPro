@@ -8,5 +8,20 @@
   "charge": "پرداخت",
   "cash": "نقد",
   "newSale": "فروش جدید",
-  "itemsInCart": "{count, plural, =0{بدون قلم} =1{۱ قلم} other{{count} قلم}}"
+  "itemsInCart": "{count, plural, =0{بدون قلم} =1{۱ قلم} other{{count} قلم}}",
+  "signIn": "ورود",
+  "username": "نام کاربری",
+  "password": "رمز عبور",
+  "displayName": "نام شما",
+  "shopName": "نام دکان",
+  "firstRunSetup": "بار اول؟ دکان خود را راه‌اندازی کنید",
+  "unlock": "باز کردن",
+  "usePin": "استفاده از پین",
+  "useBiometric": "استفاده از اثر انگشت",
+  "pinLabel": "پین",
+  "logout": "خروج",
+  "offlineMode": "آفلاین",
+  "loginFailed": "ورود ناکام شد. نام کاربری و رمز عبور را بررسی کنید.",
+  "wrongSecret": "نادرست است — دوباره تلاش کنید.",
+  "signedInAs": "واردشده به‌عنوان {user}"
 }

@@ -21,10 +21,11 @@ jobs:
           dart analyze
           dart test
           ! dart pub deps --style=compact | grep -qiE '(^| )flutter( |$)'
-      - name: dukan_data / sync / hardware
+      - name: dukan_data (Drift codegen) + sync + hardware
         run: |
-          for p in dukan_data dukan_sync dukan_hardware; do
-            (cd "packages/$p" && dart pub get && dart analyze && { [ -d test ] && dart test || true; })
+          (cd packages/dukan_data && dart pub get && dart run build_runner build && dart analyze && dart test)
+          for p in dukan_sync dukan_hardware; do
+            (cd "packages/$p" && dart pub get && dart analyze)
           done
       - name: App — analyze + test
         working-directory: app

@@ -44,4 +44,51 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get signIn => 'Sign in';
+
+  @override
+  String get username => 'Username';
+
+  @override
+  String get password => 'Password';
+
+  @override
+  String get displayName => 'Your name';
+
+  @override
+  String get shopName => 'Shop name';
+
+  @override
+  String get firstRunSetup => 'First time? Set up your shop';
+
+  @override
+  String get unlock => 'Unlock';
+
+  @override
+  String get usePin => 'Use PIN';
+
+  @override
+  String get useBiometric => 'Use biometrics';
+
+  @override
+  String get pinLabel => 'PIN';
+
+  @override
+  String get logout => 'Sign out';
+
+  @override
+  String get offlineMode => 'Offline';
+
+  @override
+  String get loginFailed => 'Sign-in failed. Check your username and password.';
+
+  @override
+  String get wrongSecret => 'Incorrect — try again.';
+
+  @override
+  String signedInAs(String user) {
+    return 'Signed in as $user';
+  }
 }

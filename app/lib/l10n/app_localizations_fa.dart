@@ -44,6 +44,54 @@ class AppLocalizationsFa extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get signIn => 'ورود';
+
+  @override
+  String get username => 'نام کاربری';
+
+  @override
+  String get password => 'رمز عبور';
+
+  @override
+  String get displayName => 'نام شما';
+
+  @override
+  String get shopName => 'نام دکان';
+
+  @override
+  String get firstRunSetup => 'بار اول؟ دکان خود را راه‌اندازی کنید';
+
+  @override
+  String get unlock => 'باز کردن';
+
+  @override
+  String get usePin => 'استفاده از پین';
+
+  @override
+  String get useBiometric => 'استفاده از اثر انگشت';
+
+  @override
+  String get pinLabel => 'پین';
+
+  @override
+  String get logout => 'خروج';
+
+  @override
+  String get offlineMode => 'آفلاین';
+
+  @override
+  String get loginFailed =>
+      'ورود ناکام شد. نام کاربری و رمز عبور را بررسی کنید.';
+
+  @override
+  String get wrongSecret => 'نادرست است — دوباره تلاش کنید.';
+
+  @override
+  String signedInAs(String user) {
+    return 'واردشده به‌عنوان $user';
+  }
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -84,5 +132,53 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
       zero: 'بدون قلم',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get signIn => 'ورود';
+
+  @override
+  String get username => 'نام کاربری';
+
+  @override
+  String get password => 'رمز عبور';
+
+  @override
+  String get displayName => 'نام شما';
+
+  @override
+  String get shopName => 'نام دکان';
+
+  @override
+  String get firstRunSetup => 'بار اول؟ دکان خود را راه‌اندازی کنید';
+
+  @override
+  String get unlock => 'باز کردن';
+
+  @override
+  String get usePin => 'استفاده از پین';
+
+  @override
+  String get useBiometric => 'استفاده از اثر انگشت';
+
+  @override
+  String get pinLabel => 'پین';
+
+  @override
+  String get logout => 'خروج';
+
+  @override
+  String get offlineMode => 'آفلاین';
+
+  @override
+  String get loginFailed =>
+      'ورود ناکام شد. نام کاربری و رمز عبور را بررسی کنید.';
+
+  @override
+  String get wrongSecret => 'نادرست است — دوباره تلاش کنید.';
+
+  @override
+  String signedInAs(String user) {
+    return 'واردشده به‌عنوان $user';
   }
 }
