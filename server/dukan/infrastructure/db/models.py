@@ -254,3 +254,21 @@ class ChangeLogModel(Base):
     op: Mapped[str] = mapped_column(String(8))
     data: Mapped[dict] = mapped_column(JSON)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# ── Notifications (Phase 9) ──────────────────────────────────────────────────
+
+
+class NotificationModel(Base):
+    """Persisted insight/alert feed. `dedupe_key` keeps refresh idempotent
+    within a branch and day (branch/code/entity/day)."""
+
+    __tablename__ = "notifications"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    branch_id: Mapped[str] = mapped_column(String(36), index=True)
+    code: Mapped[str] = mapped_column(String(48))
+    severity: Mapped[str] = mapped_column(String(8), default="info")
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    dedupe_key: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

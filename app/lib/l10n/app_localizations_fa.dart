@@ -395,6 +395,44 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get printFailed => 'دسترسی به چاپگر ممکن نشد.';
+
+  @override
+  String get notifications => 'اعلان‌ها';
+
+  @override
+  String get insightsTitle => 'بینش‌ها';
+
+  @override
+  String get noNotifications => 'همه‌چیز بررسی شده است';
+
+  @override
+  String get refreshInsights => 'به‌روزرسانی';
+
+  @override
+  String get markReadAction => 'خوانده‌شده';
+
+  @override
+  String insightReorder(String product) {
+    return 'موجودی $product رو به اتمام است';
+  }
+
+  @override
+  String insightDeadStock(String product, String days) {
+    return '$product در $days روز فروش نداشته';
+  }
+
+  @override
+  String insightDebtRisk(String customer) {
+    return '$customer به سقف اعتبار نزدیک است';
+  }
+
+  @override
+  String insightDigest(String count) {
+    return '$count فروش امروز';
+  }
+
+  @override
+  String get insightUnknown => 'بینش جدید';
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -787,4 +825,42 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get printFailed => 'دسترسی به چاپگر ممکن نشد.';
+
+  @override
+  String get notifications => 'اعلان‌ها';
+
+  @override
+  String get insightsTitle => 'بینش‌ها';
+
+  @override
+  String get noNotifications => 'همه‌چیز بررسی شده است';
+
+  @override
+  String get refreshInsights => 'به‌روزرسانی';
+
+  @override
+  String get markReadAction => 'خوانده‌شده';
+
+  @override
+  String insightReorder(String product) {
+    return 'موجودی $product رو به اتمام است';
+  }
+
+  @override
+  String insightDeadStock(String product, String days) {
+    return '$product در $days روز فروش نداشته';
+  }
+
+  @override
+  String insightDebtRisk(String customer) {
+    return '$customer به سقف اعتبار نزدیک است';
+  }
+
+  @override
+  String insightDigest(String count) {
+    return '$count فروش امروز';
+  }
+
+  @override
+  String get insightUnknown => 'بینش جدید';
 }

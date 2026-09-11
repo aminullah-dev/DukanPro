@@ -394,4 +394,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get printFailed => 'Couldn\'t reach the printer.';
+
+  @override
+  String get notifications => 'Notifications';
+
+  @override
+  String get insightsTitle => 'Insights';
+
+  @override
+  String get noNotifications => 'You\'re all caught up';
+
+  @override
+  String get refreshInsights => 'Refresh';
+
+  @override
+  String get markReadAction => 'Mark read';
+
+  @override
+  String insightReorder(String product) {
+    return 'Restock $product — running low';
+  }
+
+  @override
+  String insightDeadStock(String product, String days) {
+    return '$product hasn\'t sold in $days days';
+  }
+
+  @override
+  String insightDebtRisk(String customer) {
+    return '$customer is near their credit limit';
+  }
+
+  @override
+  String insightDigest(String count) {
+    return '$count sales today';
+  }
+
+  @override
+  String get insightUnknown => 'New insight';
 }

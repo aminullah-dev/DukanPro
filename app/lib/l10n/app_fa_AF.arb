@@ -116,5 +116,15 @@
   "printReceipt": "چاپ",
   "printerNotConfigured": "چاپگری تنظیم نشده است. از تنظیمات یکی اضافه کنید.",
   "printSucceeded": "به چاپگر فرستاده شد.",
-  "printFailed": "دسترسی به چاپگر ممکن نشد."
+  "printFailed": "دسترسی به چاپگر ممکن نشد.",
+  "notifications": "اعلان‌ها",
+  "insightsTitle": "بینش‌ها",
+  "noNotifications": "همه‌چیز بررسی شده است",
+  "refreshInsights": "به‌روزرسانی",
+  "markReadAction": "خوانده‌شده",
+  "insightReorder": "موجودی {product} رو به اتمام است",
+  "insightDeadStock": "{product} در {days} روز فروش نداشته",
+  "insightDebtRisk": "{customer} به سقف اعتبار نزدیک است",
+  "insightDigest": "{count} فروش امروز",
+  "insightUnknown": "بینش جدید"
 }

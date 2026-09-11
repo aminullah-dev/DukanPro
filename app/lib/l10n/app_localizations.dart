@@ -802,6 +802,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t reach the printer.'**
   String get printFailed;
+
+  /// No description provided for @notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notifications;
+
+  /// No description provided for @insightsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Insights'**
+  String get insightsTitle;
+
+  /// No description provided for @noNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re all caught up'**
+  String get noNotifications;
+
+  /// No description provided for @refreshInsights.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refreshInsights;
+
+  /// No description provided for @markReadAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark read'**
+  String get markReadAction;
+
+  /// No description provided for @insightReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Restock {product} — running low'**
+  String insightReorder(String product);
+
+  /// No description provided for @insightDeadStock.
+  ///
+  /// In en, this message translates to:
+  /// **'{product} hasn\'t sold in {days} days'**
+  String insightDeadStock(String product, String days);
+
+  /// No description provided for @insightDebtRisk.
+  ///
+  /// In en, this message translates to:
+  /// **'{customer} is near their credit limit'**
+  String insightDebtRisk(String customer);
+
+  /// No description provided for @insightDigest.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sales today'**
+  String insightDigest(String count);
+
+  /// No description provided for @insightUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'New insight'**
+  String get insightUnknown;
 }
 
 class _AppLocalizationsDelegate

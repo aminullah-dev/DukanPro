@@ -17,6 +17,7 @@ from dukan.application.auth import AuthService
 from dukan.application.catalog import CatalogService
 from dukan.application.customers import CustomerService
 from dukan.application.iam import IamService
+from dukan.application.insights import InsightService
 from dukan.application.purchasing import PurchasingService
 from dukan.application.reports import ReportsService
 from dukan.application.sales import SalesService
@@ -27,6 +28,7 @@ from dukan.infrastructure.catalog_service import SqlCatalogService
 from dukan.infrastructure.customers_service import SqlCustomerService
 from dukan.infrastructure.db.session import make_engine, make_session_factory
 from dukan.infrastructure.iam_service import SqlIamService
+from dukan.infrastructure.insight_service import SqlInsightService
 from dukan.infrastructure.purchasing_service import SqlPurchasingService
 from dukan.infrastructure.reports_service import SqlReportsService
 from dukan.infrastructure.sales_service import SqlSalesService
@@ -37,6 +39,7 @@ from dukan.ui.deps import (
     get_catalog_service,
     get_customer_service,
     get_iam_service,
+    get_insight_service,
     get_purchasing_service,
     get_reports_service,
     get_sales_service,
@@ -48,6 +51,7 @@ from dukan.ui.routers import (
     catalog,
     customers,
     health,
+    insights,
     purchasing,
     reports,
     sales,
@@ -76,6 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(purchasing.router)
     app.include_router(reports.router)
     app.include_router(sync.router)
+    app.include_router(insights.router)
 
     def provide_auth_service() -> Iterator[AuthService]:
         session = session_factory()
@@ -133,6 +138,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             session.close()
 
+    def provide_insight_service() -> Iterator[InsightService]:
+        session = session_factory()
+        try:
+            yield SqlInsightService(session)
+        finally:
+            session.close()
+
     app.dependency_overrides[get_auth_service] = provide_auth_service
     app.dependency_overrides[get_catalog_service] = provide_catalog_service
     app.dependency_overrides[get_sales_service] = provide_sales_service
@@ -141,6 +153,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.dependency_overrides[get_reports_service] = provide_reports_service
     app.dependency_overrides[get_sync_service] = provide_sync_service
     app.dependency_overrides[get_iam_service] = provide_iam_service
+    app.dependency_overrides[get_insight_service] = provide_insight_service
 
     @app.exception_handler(AppError)
     async def _app_error_handler(_request: Request, exc: AppError) -> JSONResponse:

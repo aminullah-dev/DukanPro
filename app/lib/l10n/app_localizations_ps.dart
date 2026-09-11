@@ -392,4 +392,42 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get printFailed => 'چاپګر ته لاسرسی ونشو.';
+
+  @override
+  String get notifications => 'خبرتیاوې';
+
+  @override
+  String get insightsTitle => 'کتنې';
+
+  @override
+  String get noNotifications => 'هرڅه کتل شوي دي';
+
+  @override
+  String get refreshInsights => 'تازه کول';
+
+  @override
+  String get markReadAction => 'لوستل شوی';
+
+  @override
+  String insightReorder(String product) {
+    return 'د $product ذخیره پای ته رسیږي';
+  }
+
+  @override
+  String insightDeadStock(String product, String days) {
+    return '$product په $days ورځو کې نه دی خرڅ شوی';
+  }
+
+  @override
+  String insightDebtRisk(String customer) {
+    return '$customer د پور سقف ته نږدې دی';
+  }
+
+  @override
+  String insightDigest(String count) {
+    return '$count نن پلورونه';
+  }
+
+  @override
+  String get insightUnknown => 'نوې کتنه';
 }

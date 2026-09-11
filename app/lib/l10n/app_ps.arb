@@ -116,5 +116,15 @@
   "printReceipt": "چاپ",
   "printerNotConfigured": "هیڅ چاپګر نه دی ټاکل شوی. له تنظیماتو یو اضافه کړئ.",
   "printSucceeded": "چاپګر ته واستول شو.",
-  "printFailed": "چاپګر ته لاسرسی ونشو."
+  "printFailed": "چاپګر ته لاسرسی ونشو.",
+  "notifications": "خبرتیاوې",
+  "insightsTitle": "کتنې",
+  "noNotifications": "هرڅه کتل شوي دي",
+  "refreshInsights": "تازه کول",
+  "markReadAction": "لوستل شوی",
+  "insightReorder": "د {product} ذخیره پای ته رسیږي",
+  "insightDeadStock": "{product} په {days} ورځو کې نه دی خرڅ شوی",
+  "insightDebtRisk": "{customer} د پور سقف ته نږدې دی",
+  "insightDigest": "{count} نن پلورونه",
+  "insightUnknown": "نوې کتنه"
 }

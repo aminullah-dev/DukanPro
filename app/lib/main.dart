@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'composition.dart';
 import 'features/auth/providers.dart';
 import 'features/iam/iam_providers.dart';
+import 'features/insights/insights_providers.dart';
 import 'infrastructure/auth_api.dart';
 import 'infrastructure/biometric.dart';
 import 'infrastructure/iam_api.dart';
+import 'infrastructure/insights_api.dart';
 import 'infrastructure/keyboard_wedge_scanner.dart';
 import 'infrastructure/local_db.dart';
 import 'infrastructure/secure_store.dart';
@@ -30,6 +32,7 @@ Future<void> main() async {
         syncClientProvider
             .overrideWithValue(DioSyncClient(baseUrl: apiBase, store: secureStore)),
         iamApiProvider.overrideWithValue(DioIamApi(baseUrl: apiBase, store: secureStore)),
+        insightsApiProvider.overrideWithValue(DioInsightsApi(baseUrl: apiBase, store: secureStore)),
         scannerProvider.overrideWithValue(KeyboardWedgeScanner()),
       ],
       child: const DukanProApp(),

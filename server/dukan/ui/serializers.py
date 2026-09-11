@@ -6,6 +6,7 @@ from dukan.application.catalog import ProductView
 from dukan.application.customers import CustomerView
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens
 from dukan.application.iam import BranchView, EmployeeView
+from dukan.application.insights import Insight, Notification
 from dukan.application.purchasing import GoodsReceiptView, SupplierView
 from dukan.application.reports import DashboardView
 from dukan.application.sales import SaleView, ShiftView
@@ -144,6 +145,27 @@ def goods_receipt_view_dict(v: GoodsReceiptView) -> dict:
         "number": v.number,
         "supplier_id": v.supplier_id,
         "total_cost_minor": v.total_cost_minor,
+    }
+
+
+def insight_dict(v: Insight) -> dict:
+    return {
+        "code": v.code,
+        "severity": v.severity,
+        "data": v.data,
+        "entity_type": v.entity_type,
+        "entity_id": v.entity_id,
+    }
+
+
+def notification_dict(v: Notification) -> dict:
+    return {
+        "id": v.id,
+        "code": v.code,
+        "severity": v.severity,
+        "data": v.data,
+        "read": v.read,
+        "created_at": v.created_at.isoformat(),
     }
 
 

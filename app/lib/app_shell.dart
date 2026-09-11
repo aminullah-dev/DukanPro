@@ -12,6 +12,7 @@ import 'features/customers/customers_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/iam/branches_screen.dart';
 import 'features/iam/employees_screen.dart';
+import 'features/insights/notifications_bell.dart';
 import 'features/pos/pos_screen.dart';
 import 'features/purchasing/receive_stock_screen.dart';
 import 'features/settings/printer_settings_screen.dart';
@@ -61,18 +62,22 @@ class AppShell extends ConsumerWidget {
       _Destination(Icons.settings_outlined, l.settings, const PrinterSettingsScreen()),
     ];
 
+    final showBell = can(Permission.reportView);
     if (isWideLayout(MediaQuery.sizeOf(context).width)) {
-      return _WideShell(features: features);
+      return _WideShell(features: features, showBell: showBell);
     }
-    return _HomePane(features: features, showTiles: true, showShellActions: true);
+    return _HomePane(
+      features: features, showTiles: true, showShellActions: true, showBell: showBell,
+    );
   }
 }
 
 /// Wide layout: a navigation rail beside the selected destination. The rail's
 /// trailing area carries the shell actions (sync / locale / sign-out).
 class _WideShell extends ConsumerStatefulWidget {
-  const _WideShell({required this.features});
+  const _WideShell({required this.features, required this.showBell});
   final List<_Destination> features;
+  final bool showBell;
   @override
   ConsumerState<_WideShell> createState() => _WideShellState();
 }
@@ -84,7 +89,9 @@ class _WideShellState extends ConsumerState<_WideShell> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     // Index 0 is Home; the rest are the feature destinations.
-    final home = _HomePane(features: widget.features, showTiles: false, showShellActions: false);
+    final home = _HomePane(
+      features: widget.features, showTiles: false, showShellActions: false, showBell: false,
+    );
     final panes = <Widget>[home, for (final d in widget.features) d.screen];
     final extended = MediaQuery.sizeOf(context).width >= 1200;
 
@@ -106,6 +113,7 @@ class _WideShellState extends ConsumerState<_WideShell> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (widget.showBell) const NotificationsBell(),
                           const SyncAction(),
                           const LocaleToggle(),
                           IconButton(
@@ -141,10 +149,12 @@ class _HomePane extends ConsumerWidget {
     required this.features,
     required this.showTiles,
     required this.showShellActions,
+    required this.showBell,
   });
   final List<_Destination> features;
   final bool showTiles;
   final bool showShellActions;
+  final bool showBell;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -158,6 +168,7 @@ class _HomePane extends ConsumerWidget {
         title: Text(l.appTitle),
         actions: showShellActions
             ? [
+                if (showBell) const NotificationsBell(),
                 const SyncAction(),
                 const LocaleToggle(),
                 IconButton(

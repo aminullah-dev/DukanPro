@@ -122,5 +122,19 @@
   "printReceipt": "Print",
   "printerNotConfigured": "No printer configured. Set one up in Settings.",
   "printSucceeded": "Sent to printer.",
-  "printFailed": "Couldn't reach the printer."
+  "printFailed": "Couldn't reach the printer.",
+  "notifications": "Notifications",
+  "insightsTitle": "Insights",
+  "noNotifications": "You're all caught up",
+  "refreshInsights": "Refresh",
+  "markReadAction": "Mark read",
+  "insightReorder": "Restock {product} — running low",
+  "@insightReorder": { "placeholders": { "product": { "type": "String" } } },
+  "insightDeadStock": "{product} hasn't sold in {days} days",
+  "@insightDeadStock": { "placeholders": { "product": { "type": "String" }, "days": { "type": "String" } } },
+  "insightDebtRisk": "{customer} is near their credit limit",
+  "@insightDebtRisk": { "placeholders": { "customer": { "type": "String" } } },
+  "insightDigest": "{count} sales today",
+  "@insightDigest": { "placeholders": { "count": { "type": "String" } } },
+  "insightUnknown": "New insight"
 }

@@ -17,6 +17,7 @@ export 'domain/branches.dart';
 export 'domain/catalog.dart';
 export 'domain/customers.dart';
 export 'domain/identity.dart';
+export 'domain/insights.dart';
 export 'domain/inventory.dart';
 export 'domain/purchasing.dart';
 export 'domain/sales.dart';

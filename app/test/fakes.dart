@@ -2,6 +2,7 @@ import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_sync/dukan_sync.dart';
 import 'package:dukanpro/infrastructure/auth_api.dart';
 import 'package:dukanpro/infrastructure/iam_api.dart';
+import 'package:dukanpro/infrastructure/insights_api.dart';
 import 'package:dukanpro/infrastructure/secure_store.dart';
 import 'package:dukanpro/infrastructure/verifier.dart';
 
@@ -187,6 +188,58 @@ class FakeIamApi implements IamApi {
     final b = _branches[i];
     return _branches[i] = BranchDto(
       id: b.id, name: b.name, timezone: b.timezone, currencyDefault: b.currencyDefault, isActive: active,
+    );
+  }
+}
+
+/// In-memory [InsightsApi]: a fixed set of insights + a notification feed.
+class FakeInsightsApi implements InsightsApi {
+  FakeInsightsApi({List<InsightDto>? insights}) : _insights = insights ?? _defaults;
+  final List<InsightDto> _insights;
+  final List<NotificationDto> _feed = [];
+  int _seq = 0;
+
+  static final _defaults = [
+    const InsightDto(
+      code: 'insight.reorder', severity: 'warning',
+      data: {'product': 'Soap', 'suggested_minor': 15}, entityType: 'product', entityId: 'p1',
+    ),
+    const InsightDto(
+      code: 'insight.debt_risk', severity: 'critical',
+      data: {'customer': 'Karim'}, entityType: 'customer', entityId: 'c1',
+    ),
+    const InsightDto(code: 'insight.digest', severity: 'info', data: {'count': 3}),
+  ];
+
+  @override
+  Future<List<InsightDto>> listInsights() async => List.of(_insights);
+
+  @override
+  Future<List<NotificationDto>> listNotifications({bool unreadOnly = false}) async =>
+      _feed.where((n) => !unreadOnly || !n.read).toList();
+
+  @override
+  Future<int> refresh() async {
+    var created = 0;
+    for (final i in _insights) {
+      if (i.code == 'insight.digest') continue;
+      if (_feed.any((n) => n.code == i.code && n.data['entity'] == i.entityId)) continue;
+      _feed.add(NotificationDto(
+        id: 'n${++_seq}', code: i.code, severity: i.severity,
+        data: {...i.data, 'entity': i.entityId}, read: false, createdAt: DateTime.now(),
+      ));
+      created++;
+    }
+    return created;
+  }
+
+  @override
+  Future<void> markRead(String id) async {
+    final idx = _feed.indexWhere((n) => n.id == id);
+    if (idx < 0) return;
+    final n = _feed[idx];
+    _feed[idx] = NotificationDto(
+      id: n.id, code: n.code, severity: n.severity, data: n.data, read: true, createdAt: n.createdAt,
     );
   }
 }
