@@ -88,6 +88,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wrongSecret => 'Incorrect — try again.';
 
   @override
+  String get errNetwork =>
+      'Can\'t reach the server. Make sure it\'s running, then try again.';
+
+  @override
+  String get errBootstrapDone =>
+      'This server already has a shop set up. Sign in instead.';
+
+  @override
+  String get setupFailed => 'Setup failed. Please try again.';
+
+  @override
   String signedInAs(String user) {
     return 'Signed in as $user';
   }

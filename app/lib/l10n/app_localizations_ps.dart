@@ -88,6 +88,17 @@ class AppLocalizationsPs extends AppLocalizations {
   String get wrongSecret => 'سم نه دی — بیا هڅه وکړئ.';
 
   @override
+  String get errNetwork =>
+      'سرور ته لاسرسی ونشو. ډاډ ترلاسه کړئ چې چلیږي، بیا هڅه وکړئ.';
+
+  @override
+  String get errBootstrapDone =>
+      'دا سرور له مخکې دوکان لري. مهرباني وکړئ ننوځئ.';
+
+  @override
+  String get setupFailed => 'چمتو کول ناکام شول. بیا هڅه وکړئ.';
+
+  @override
   String signedInAs(String user) {
     return 'د $user په توګه ننوتل';
   }

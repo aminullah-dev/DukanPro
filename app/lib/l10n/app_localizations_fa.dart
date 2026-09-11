@@ -89,6 +89,17 @@ class AppLocalizationsFa extends AppLocalizations {
   String get wrongSecret => 'نادرست است — دوباره تلاش کنید.';
 
   @override
+  String get errNetwork =>
+      'دسترسی به سرور ممکن نشد. مطمئن شوید که در حال اجراست و دوباره تلاش کنید.';
+
+  @override
+  String get errBootstrapDone =>
+      'این سرور از قبل یک دکان دارد. لطفاً وارد شوید.';
+
+  @override
+  String get setupFailed => 'راه‌اندازی ناکام شد. دوباره تلاش کنید.';
+
+  @override
   String signedInAs(String user) {
     return 'واردشده به‌عنوان $user';
   }
@@ -176,6 +187,17 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get wrongSecret => 'نادرست است — دوباره تلاش کنید.';
+
+  @override
+  String get errNetwork =>
+      'دسترسی به سرور ممکن نشد. مطمئن شوید که در حال اجراست و دوباره تلاش کنید.';
+
+  @override
+  String get errBootstrapDone =>
+      'این سرور از قبل یک دکان دارد. لطفاً وارد شوید.';
+
+  @override
+  String get setupFailed => 'راه‌اندازی ناکام شد. دوباره تلاش کنید.';
 
   @override
   String signedInAs(String user) {

@@ -46,6 +46,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  void _toggleMode() {
+    ref.read(authControllerProvider.notifier).clearError();
+    setState(() => _setup = !_setup);
+  }
+
+  /// Map a server/transport error code to a message that fits the situation.
+  String _errorText(AppLocalizations l, String code) => switch (code) {
+        'NETWORK' => l.errNetwork,
+        'INVALID_CREDENTIALS' => l.loginFailed,
+        'BOOTSTRAP_ALREADY_DONE' => l.errBootstrapDone,
+        _ => _setup ? l.setupFailed : l.loginFailed,
+      };
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -88,7 +101,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ],
               if (error != null) ...[
                 const SizedBox(height: 12),
-                Text(l.loginFailed, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _errorText(l, error),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: 20),
               FilledButton(
@@ -98,7 +114,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     : Text(_setup ? l.firstRunSetup : l.signIn),
               ),
               TextButton(
-                onPressed: _busy ? null : () => setState(() => _setup = !_setup),
+                onPressed: _busy ? null : _toggleMode,
                 child: Text(_setup ? l.signIn : l.firstRunSetup),
               ),
             ],

@@ -239,6 +239,24 @@ abstract class AppLocalizations {
   /// **'Incorrect — try again.'**
   String get wrongSecret;
 
+  /// No description provided for @errNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach the server. Make sure it\'s running, then try again.'**
+  String get errNetwork;
+
+  /// No description provided for @errBootstrapDone.
+  ///
+  /// In en, this message translates to:
+  /// **'This server already has a shop set up. Sign in instead.'**
+  String get errBootstrapDone;
+
+  /// No description provided for @setupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup failed. Please try again.'**
+  String get setupFailed;
+
   /// No description provided for @signedInAs.
   ///
   /// In en, this message translates to:

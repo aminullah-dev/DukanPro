@@ -25,6 +25,9 @@
   "offlineMode": "Offline",
   "loginFailed": "Sign-in failed. Check your username and password.",
   "wrongSecret": "Incorrect — try again.",
+  "errNetwork": "Can't reach the server. Make sure it's running, then try again.",
+  "errBootstrapDone": "This server already has a shop set up. Sign in instead.",
+  "setupFailed": "Setup failed. Please try again.",
   "signedInAs": "Signed in as {user}",
   "@signedInAs": { "placeholders": { "user": { "type": "String" } } }
 }

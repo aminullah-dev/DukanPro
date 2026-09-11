@@ -19,6 +19,12 @@ class AuthController extends Notifier<AuthState> {
   PasswordVerifier get _verifier => ref.read(verifierProvider);
   ProfileStore get _profiles => ProfileStore(ref.read(databaseProvider));
 
+  /// Dismiss a lingering sign-in error (e.g. when switching to setup mode).
+  void clearError() {
+    final s = state;
+    if (s is AuthLoggedOut && s.error != null) state = const AuthLoggedOut();
+  }
+
   /// Restore from cache on startup: locked if a cached profile + password
   /// verifier exist, otherwise logged out.
   Future<void> restore() async {
