@@ -430,4 +430,10 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get insightUnknown => 'نوې کتنه';
+
+  @override
+  String get auditLog => 'د پلټنې لاګ';
+
+  @override
+  String get noAuditEntries => 'لا تر اوسه کومه فعالیت نه دی ثبت شوی';
 }

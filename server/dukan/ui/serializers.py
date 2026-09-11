@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dukan.application.audit import AuditEntryView
 from dukan.application.catalog import ProductView
 from dukan.application.customers import CustomerView
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens
@@ -145,6 +146,18 @@ def goods_receipt_view_dict(v: GoodsReceiptView) -> dict:
         "number": v.number,
         "supplier_id": v.supplier_id,
         "total_cost_minor": v.total_cost_minor,
+    }
+
+
+def audit_entry_dict(v: AuditEntryView) -> dict:
+    return {
+        "id": v.id,
+        "occurred_at": v.occurred_at.isoformat(),
+        "actor_id": v.actor_id,
+        "action": v.action,
+        "entity_type": v.entity_type,
+        "entity_id": v.entity_id,
+        "after": v.after,
     }
 
 

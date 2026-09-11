@@ -862,6 +862,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New insight'**
   String get insightUnknown;
+
+  /// No description provided for @auditLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit log'**
+  String get auditLog;
+
+  /// No description provided for @noAuditEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'No activity recorded yet'**
+  String get noAuditEntries;
 }
 
 class _AppLocalizationsDelegate

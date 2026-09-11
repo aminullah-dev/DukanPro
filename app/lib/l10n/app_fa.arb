@@ -126,5 +126,7 @@
   "insightDeadStock": "{product} در {days} روز فروش نداشته",
   "insightDebtRisk": "{customer} به سقف اعتبار نزدیک است",
   "insightDigest": "{count} فروش امروز",
-  "insightUnknown": "بینش جدید"
+  "insightUnknown": "بینش جدید",
+  "auditLog": "گزارش ممیزی",
+  "noAuditEntries": "هنوز فعالیتی ثبت نشده است"
 }

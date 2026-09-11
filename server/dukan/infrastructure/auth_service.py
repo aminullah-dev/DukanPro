@@ -17,6 +17,7 @@ from dukan.domain.identity import (
     BranchAssignment,
     User,
     UserStatus,
+    assert_password_strong,
 )
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
@@ -109,6 +110,7 @@ class SqlAuthService(AuthService):
     ) -> AuthResult:
         if self._s.scalar(select(UserModel).limit(1)) is not None:
             raise ConflictError("BOOTSTRAP_ALREADY_DONE")
+        assert_password_strong(password=password)
         for name, perms in BUILTIN_ROLE_PERMISSIONS.items():
             self._s.add(RoleModel(id=new_id(), name=name, permissions=[p.value for p in perms]))
         branch = BranchModel(id=new_id(), name=shop_name)
@@ -141,6 +143,15 @@ class SqlAuthService(AuthService):
             )
         )
         if m is None or not passwords.verify_password(m.password_hash, password):
+            # Audit the failed attempt for security visibility, then reject.
+            self._audit(
+                "user.login_failed",
+                actor_id=m.id if m is not None else None,
+                entity_type="user",
+                entity_id=m.id if m is not None else None,
+                after={"username": username},
+            )
+            self._s.commit()
             raise AuthError("INVALID_CREDENTIALS")
         if m.status != "active":
             raise AuthError("USER_DISABLED")

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_state.dart';
+import 'features/audit/audit_log_screen.dart';
 import 'features/auth/session.dart';
 import 'features/catalog/product_list_screen.dart';
 import 'features/customers/customers_screen.dart';
@@ -59,6 +60,8 @@ class AppShell extends ConsumerWidget {
         _Destination(Icons.badge_outlined, l.employees, const EmployeesScreen()),
       if (can(Permission.branchManage))
         _Destination(Icons.store_mall_directory_outlined, l.branches, const BranchesScreen()),
+      if (can(Permission.auditView))
+        _Destination(Icons.history, l.auditLog, const AuditLogScreen()),
       _Destination(Icons.settings_outlined, l.settings, const PrinterSettingsScreen()),
     ];
 

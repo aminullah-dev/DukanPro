@@ -11,10 +11,11 @@ from dukan.domain.identity import (
     User,
     UserStatus,
     assert_not_last_owner,
+    assert_password_strong,
     assert_role_mutable,
     assert_username_available,
 )
-from dukan.shared.errors import ConflictError, PermissionDeniedError
+from dukan.shared.errors import ConflictError, PermissionDeniedError, ValidationError
 
 POLICY = PermissionPolicy()
 
@@ -66,3 +67,17 @@ def test_builtin_role_immutable() -> None:
     with pytest.raises(ConflictError) as e:
         assert_role_mutable(role_name="cashier")
     assert e.value.code == "ROLE_BUILTIN_IMMUTABLE"
+
+
+def test_only_owner_can_view_audit() -> None:
+    owner = _user([BranchAssignment("B1", "owner")])
+    manager = _user([BranchAssignment("B1", "manager")])
+    assert POLICY.can(owner, Permission.AUDIT_VIEW, "B1") is True
+    assert POLICY.can(manager, Permission.AUDIT_VIEW, "B1") is False
+
+
+def test_weak_password_rejected() -> None:
+    with pytest.raises(ValidationError) as e:
+        assert_password_strong(password="short")
+    assert e.value.code == "WEAK_PASSWORD"
+    assert_password_strong(password="longenough")  # no raise

@@ -8,11 +8,12 @@ uvicorn entrypoint: `dukan.composition:app`.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Iterator
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
+from dukan.application.audit import AuditService
 from dukan.application.auth import AuthService
 from dukan.application.catalog import CatalogService
 from dukan.application.customers import CustomerService
@@ -23,6 +24,7 @@ from dukan.application.reports import ReportsService
 from dukan.application.sales import SalesService
 from dukan.application.sync import SyncService
 from dukan.config import Settings, get_settings
+from dukan.infrastructure.audit_service import SqlAuditService
 from dukan.infrastructure.auth_service import SqlAuthService
 from dukan.infrastructure.catalog_service import SqlCatalogService
 from dukan.infrastructure.customers_service import SqlCustomerService
@@ -35,6 +37,7 @@ from dukan.infrastructure.sales_service import SqlSalesService
 from dukan.infrastructure.sync_service import SqlSyncService
 from dukan.shared.errors import AppError
 from dukan.ui.deps import (
+    get_audit_service,
     get_auth_service,
     get_catalog_service,
     get_customer_service,
@@ -46,6 +49,7 @@ from dukan.ui.deps import (
     get_sync_service,
 )
 from dukan.ui.routers import (
+    audit,
     auth,
     branches,
     catalog,
@@ -81,6 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(reports.router)
     app.include_router(sync.router)
     app.include_router(insights.router)
+    app.include_router(audit.router)
 
     def provide_auth_service() -> Iterator[AuthService]:
         session = session_factory()
@@ -145,6 +150,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             session.close()
 
+    def provide_audit_service() -> Iterator[AuditService]:
+        session = session_factory()
+        try:
+            yield SqlAuditService(session)
+        finally:
+            session.close()
+
     app.dependency_overrides[get_auth_service] = provide_auth_service
     app.dependency_overrides[get_catalog_service] = provide_catalog_service
     app.dependency_overrides[get_sales_service] = provide_sales_service
@@ -154,6 +166,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.dependency_overrides[get_sync_service] = provide_sync_service
     app.dependency_overrides[get_iam_service] = provide_iam_service
     app.dependency_overrides[get_insight_service] = provide_insight_service
+    app.dependency_overrides[get_audit_service] = provide_audit_service
 
     @app.exception_handler(AppError)
     async def _app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
@@ -161,6 +174,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status_code=exc.http_status,
             content={"error": {"code": exc.code, "context": exc.context}},
         )
+
+    @app.middleware("http")
+    async def _security_headers(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        return response
 
     return app
 

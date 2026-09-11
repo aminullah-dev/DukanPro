@@ -22,6 +22,7 @@ from dukan.domain.identity import (
     User,
     UserStatus,
     assert_not_last_owner,
+    assert_password_strong,
     assert_username_available,
 )
 from dukan.infrastructure.db.models import (
@@ -185,6 +186,7 @@ class SqlIamService(IamService):
         role_name: str,
     ) -> EmployeeView:
         require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
+        assert_password_strong(password=password)
         taken = (
             self._s.scalar(
                 select(UserModel).where(
@@ -322,6 +324,7 @@ class SqlIamService(IamService):
         self, *, actor: User, branch_id: str, user_id: str, new_password: str
     ) -> None:
         require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
+        assert_password_strong(password=new_password)
         m = self._require_user(user_id)
         m.password_hash = passwords.hash_password(new_password)
         m.updated_by = actor.id

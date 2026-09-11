@@ -433,6 +433,12 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get insightUnknown => 'بینش جدید';
+
+  @override
+  String get auditLog => 'گزارش ممیزی';
+
+  @override
+  String get noAuditEntries => 'هنوز فعالیتی ثبت نشده است';
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -863,4 +869,10 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get insightUnknown => 'بینش جدید';
+
+  @override
+  String get auditLog => 'گزارش ممیزی';
+
+  @override
+  String get noAuditEntries => 'هنوز فعالیتی ثبت نشده است';
 }

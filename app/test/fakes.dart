@@ -1,5 +1,6 @@
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_sync/dukan_sync.dart';
+import 'package:dukanpro/infrastructure/audit_api.dart';
 import 'package:dukanpro/infrastructure/auth_api.dart';
 import 'package:dukanpro/infrastructure/iam_api.dart';
 import 'package:dukanpro/infrastructure/insights_api.dart';
@@ -242,4 +243,14 @@ class FakeInsightsApi implements InsightsApi {
       id: n.id, code: n.code, severity: n.severity, data: n.data, read: true, createdAt: n.createdAt,
     );
   }
+}
+
+/// In-memory [AuditApi] for tests.
+class FakeAuditApi implements AuditApi {
+  FakeAuditApi(this.entries);
+  final List<AuditEntryDto> entries;
+
+  @override
+  Future<List<AuditEntryDto>> list({String? action, int limit = 100}) async =>
+      entries.where((e) => action == null || e.action == action).take(limit).toList();
 }

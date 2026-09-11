@@ -136,5 +136,7 @@
   "@insightDebtRisk": { "placeholders": { "customer": { "type": "String" } } },
   "insightDigest": "{count} sales today",
   "@insightDigest": { "placeholders": { "count": { "type": "String" } } },
-  "insightUnknown": "New insight"
+  "insightUnknown": "New insight",
+  "auditLog": "Audit log",
+  "noAuditEntries": "No activity recorded yet"
 }

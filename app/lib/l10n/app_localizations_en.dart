@@ -432,4 +432,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get insightUnknown => 'New insight';
+
+  @override
+  String get auditLog => 'Audit log';
+
+  @override
+  String get noAuditEntries => 'No activity recorded yet';
 }

@@ -13,7 +13,8 @@ enum Permission {
   userManage('user.manage'),
   reportView('report.view'),
   branchManage('branch.manage'),
-  debtWriteOff('debt.write_off');
+  debtWriteOff('debt.write_off'),
+  auditView('audit.view');
 
   const Permission(this.code);
   final String code;
@@ -140,5 +141,13 @@ void assertUsernameAvailable({
 void assertRoleMutable({required String roleName}) {
   if (BuiltinRole.fromName(roleName) != null) {
     throw ConflictError('ROLE_BUILTIN_IMMUTABLE', {'role': roleName});
+  }
+}
+
+/// Security invariant: a password must meet the minimum strength before it is
+/// hashed. Raises [ValidationError] `WEAK_PASSWORD`.
+void assertPasswordStrong({required String password, int minLength = 8}) {
+  if (password.length < minLength) {
+    throw ValidationError('WEAK_PASSWORD', {'min_length': minLength});
   }
 }

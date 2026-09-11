@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from dukan.shared.errors import ConflictError
+from dukan.shared.errors import ConflictError, ValidationError
 
 
 class Permission(StrEnum):
@@ -20,6 +20,7 @@ class Permission(StrEnum):
     REPORT_VIEW = "report.view"
     BRANCH_MANAGE = "branch.manage"
     DEBT_WRITE_OFF = "debt.write_off"
+    AUDIT_VIEW = "audit.view"
 
 
 # Built-in role name -> permission set. Single source for PermissionPolicy.
@@ -95,3 +96,10 @@ def assert_username_available(*, username: str, taken: bool) -> None:
 def assert_role_mutable(*, role_name: str) -> None:
     if role_name in BUILTIN_ROLE_PERMISSIONS:
         raise ConflictError("ROLE_BUILTIN_IMMUTABLE", role=role_name)
+
+
+def assert_password_strong(*, password: str, min_length: int = 8) -> None:
+    """A password must meet the minimum strength before it is hashed.
+    Raises ValidationError WEAK_PASSWORD."""
+    if len(password) < min_length:
+        raise ValidationError("WEAK_PASSWORD", min_length=min_length)

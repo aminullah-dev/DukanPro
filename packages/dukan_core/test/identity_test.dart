@@ -45,6 +45,13 @@ void main() {
       );
       expect(policy.can(u, Permission.saleCreate, 'B1'), isFalse);
     });
+
+    test('only owner can view the audit trail', () {
+      final owner = userWith([const BranchAssignment(branchId: 'B1', roleName: 'owner')]);
+      final manager = userWith([const BranchAssignment(branchId: 'B1', roleName: 'manager')]);
+      expect(policy.can(owner, Permission.auditView, 'B1'), isTrue);
+      expect(policy.can(manager, Permission.auditView, 'B1'), isFalse);
+    });
   });
 
   group('invariants', () {
@@ -71,6 +78,14 @@ void main() {
         () => assertRoleMutable(roleName: 'cashier'),
         throwsA(isA<ConflictError>().having((e) => e.code, 'code', 'ROLE_BUILTIN_IMMUTABLE')),
       );
+    });
+
+    test('weak password is rejected', () {
+      expect(
+        () => assertPasswordStrong(password: 'short'),
+        throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'WEAK_PASSWORD')),
+      );
+      assertPasswordStrong(password: 'longenough'); // no throw
     });
   });
 }

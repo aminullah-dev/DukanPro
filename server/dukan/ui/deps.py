@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import Depends, Header
 
 from dukan.application.access import require_permission
+from dukan.application.audit import AuditService
 from dukan.application.auth import AuthService
 from dukan.application.catalog import CatalogService
 from dukan.application.customers import CustomerService
@@ -62,6 +63,10 @@ def get_iam_service() -> IamService:
 
 def get_insight_service() -> InsightService:
     raise NotImplementedError("insight service not wired")
+
+
+def get_audit_service() -> AuditService:
+    raise NotImplementedError("audit service not wired")
 
 
 def active_branch(actor: User, x_branch_id: str | None) -> str:

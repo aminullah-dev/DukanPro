@@ -126,5 +126,7 @@
   "insightDeadStock": "{product} په {days} ورځو کې نه دی خرڅ شوی",
   "insightDebtRisk": "{customer} د پور سقف ته نږدې دی",
   "insightDigest": "{count} نن پلورونه",
-  "insightUnknown": "نوې کتنه"
+  "insightUnknown": "نوې کتنه",
+  "auditLog": "د پلټنې لاګ",
+  "noAuditEntries": "لا تر اوسه کومه فعالیت نه دی ثبت شوی"
 }
