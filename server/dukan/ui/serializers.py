@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dukan.application.catalog import ProductView
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens
+from dukan.application.sales import SaleView, ShiftView
 
 
 def profile_dict(p: AuthenticatedUser) -> dict:
@@ -48,4 +49,41 @@ def product_view_dict(v: ProductView) -> dict:
         "is_active": v.is_active,
         "on_hand": v.on_hand,
         "barcodes": list(v.barcodes),
+    }
+
+
+def sale_view_dict(v: SaleView) -> dict:
+    return {
+        "id": v.id,
+        "number": v.number,
+        "branch_id": v.branch_id,
+        "status": v.status,
+        "currency": v.currency,
+        "subtotal_minor": v.subtotal_minor,
+        "discount_minor": v.discount_minor,
+        "total_minor": v.total_minor,
+        "paid_minor": v.paid_minor,
+        "change_minor": v.change_minor,
+        "customer_id": v.customer_id,
+        "lines": [
+            {
+                "product_id": l.product_id,
+                "name": l.name,
+                "qty_minor": l.qty_minor,
+                "unit_price_minor": l.unit_price_minor,
+                "line_total_minor": l.line_total_minor,
+            }
+            for l in v.lines
+        ],
+    }
+
+
+def shift_view_dict(v: ShiftView) -> dict:
+    return {
+        "id": v.id,
+        "status": v.status,
+        "opening_float_minor": v.opening_float_minor,
+        "expected_cash_minor": v.expected_cash_minor,
+        "counted_cash_minor": v.counted_cash_minor,
+        "variance_minor": v.variance_minor,
     }

@@ -365,6 +365,42 @@ abstract class AppLocalizations {
   /// **'This SKU is already used.'**
   String get skuTaken;
 
+  /// No description provided for @pos.
+  ///
+  /// In en, this message translates to:
+  /// **'Point of sale'**
+  String get pos;
+
+  /// No description provided for @cartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cart'**
+  String get cartTitle;
+
+  /// No description provided for @emptyCart.
+  ///
+  /// In en, this message translates to:
+  /// **'Cart is empty'**
+  String get emptyCart;
+
+  /// No description provided for @tendered.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash received'**
+  String get tendered;
+
+  /// No description provided for @change.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get change;
+
+  /// No description provided for @receipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt'**
+  String get receipt;
+
   /// No description provided for @signedInAs.
   ///
   /// In en, this message translates to:

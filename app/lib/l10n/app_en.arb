@@ -46,6 +46,12 @@
   "searchHint": "Search or scan…",
   "permissionDenied": "You don't have permission for this.",
   "skuTaken": "This SKU is already used.",
+  "pos": "Point of sale",
+  "cartTitle": "Cart",
+  "emptyCart": "Cart is empty",
+  "tendered": "Cash received",
+  "change": "Change",
+  "receipt": "Receipt",
   "signedInAs": "Signed in as {user}",
   "@signedInAs": { "placeholders": { "user": { "type": "String" } } }
 }

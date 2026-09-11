@@ -110,4 +110,62 @@ class StockMovementModel(RecordMixin, Base):
     branch_id: Mapped[str] = mapped_column(String(36), index=True)
     qty_delta: Mapped[int] = mapped_column()
     reason: Mapped[str] = mapped_column(String(16))
+    ref_type: Mapped[str | None] = mapped_column(String(16), default=None)
+    ref_id: Mapped[str | None] = mapped_column(String(36), default=None)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# ── Sales / POS (Phase 3) ────────────────────────────────────────────────────
+
+
+class ShiftModel(RecordMixin, Base):
+    __tablename__ = "shifts"
+    branch_id: Mapped[str] = mapped_column(String(36), index=True)
+    user_id: Mapped[str] = mapped_column(String(36))
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    opening_float_minor: Mapped[int] = mapped_column(default=0)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    counted_cash_minor: Mapped[int | None] = mapped_column(default=None)
+    expected_cash_minor: Mapped[int | None] = mapped_column(default=None)
+    variance_minor: Mapped[int | None] = mapped_column(default=None)
+    status: Mapped[str] = mapped_column(String(8), default="open")
+
+
+class SaleModel(RecordMixin, Base):
+    __tablename__ = "sales"
+    number: Mapped[str] = mapped_column(String(32), index=True)
+    branch_id: Mapped[str] = mapped_column(String(36), index=True)
+    shift_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    customer_id: Mapped[str | None] = mapped_column(String(36), default=None)  # Phase 4
+    status: Mapped[str] = mapped_column(String(8), default="settled")
+    currency: Mapped[str] = mapped_column(String(3), default="AFN")
+    discount_minor: Mapped[int] = mapped_column(default=0)
+    subtotal_minor: Mapped[int] = mapped_column(default=0)
+    tax_minor: Mapped[int] = mapped_column(default=0)
+    total_minor: Mapped[int] = mapped_column(default=0)
+    paid_minor: Mapped[int] = mapped_column(default=0)
+    change_minor: Mapped[int] = mapped_column(default=0)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SaleLineModel(RecordMixin, Base):
+    __tablename__ = "sale_lines"
+    sale_id: Mapped[str] = mapped_column(String(36), index=True)
+    product_id: Mapped[str] = mapped_column(String(36))
+    name: Mapped[str] = mapped_column(String(200))
+    qty_minor: Mapped[int] = mapped_column()
+    decimal_places: Mapped[int] = mapped_column(default=0)
+    unit_price_minor: Mapped[int] = mapped_column()
+    unit_cost_minor: Mapped[int] = mapped_column(default=0)
+    line_total_minor: Mapped[int] = mapped_column()
+    currency: Mapped[str] = mapped_column(String(3), default="AFN")
+
+
+class PaymentModel(RecordMixin, Base):
+    __tablename__ = "payments"
+    sale_id: Mapped[str] = mapped_column(String(36), index=True)
+    method: Mapped[str] = mapped_column(String(8))
+    amount_minor: Mapped[int] = mapped_column()
+    currency: Mapped[str] = mapped_column(String(3), default="AFN")
+    tendered_minor: Mapped[int | None] = mapped_column(default=None)
+    change_minor: Mapped[int | None] = mapped_column(default=None)

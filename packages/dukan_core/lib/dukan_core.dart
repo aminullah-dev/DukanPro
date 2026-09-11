@@ -16,6 +16,7 @@ export 'shared/result.dart';
 export 'domain/catalog.dart';
 export 'domain/identity.dart';
 export 'domain/inventory.dart';
+export 'domain/sales.dart';
 
 // application ports + guards (implemented outward in dukan_data / dukan_sync)
 export 'application/access.dart';

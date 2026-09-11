@@ -44,5 +44,11 @@
   "searchHint": "جستجو یا اسکن…",
   "permissionDenied": "شما اجازهٔ این کار را ندارید.",
   "skuTaken": "این کد جنس قبلاً استفاده شده است.",
+  "pos": "صندوق فروش",
+  "cartTitle": "سبد",
+  "emptyCart": "سبد خالی است",
+  "tendered": "نقد دریافتی",
+  "change": "باقی",
+  "receipt": "رسید",
   "signedInAs": "واردشده به‌عنوان {user}"
 }

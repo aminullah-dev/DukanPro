@@ -153,6 +153,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skuTaken => 'This SKU is already used.';
 
   @override
+  String get pos => 'Point of sale';
+
+  @override
+  String get cartTitle => 'Cart';
+
+  @override
+  String get emptyCart => 'Cart is empty';
+
+  @override
+  String get tendered => 'Cash received';
+
+  @override
+  String get change => 'Change';
+
+  @override
+  String get receipt => 'Receipt';
+
+  @override
   String signedInAs(String user) {
     return 'Signed in as $user';
   }

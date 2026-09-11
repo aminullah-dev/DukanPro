@@ -5,6 +5,8 @@ extend-exclude = ["migrations"]
 
 [lint]
 select = ["E", "F", "I", "UP", "B", "A", "C4", "SIM"]
+# `l` as a loop variable for "line" is conventional and readable in context.
+ignore = ["E741"]
 
 # `id` is the conventional identifier field/param across the codebase
 # (matches the SQL `id` column and the Dart domain). Allow it.

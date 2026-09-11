@@ -154,6 +154,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get skuTaken => 'این کد جنس قبلاً استفاده شده است.';
 
   @override
+  String get pos => 'صندوق فروش';
+
+  @override
+  String get cartTitle => 'سبد';
+
+  @override
+  String get emptyCart => 'سبد خالی است';
+
+  @override
+  String get tendered => 'نقد دریافتی';
+
+  @override
+  String get change => 'باقی';
+
+  @override
+  String get receipt => 'رسید';
+
+  @override
   String signedInAs(String user) {
     return 'واردشده به‌عنوان $user';
   }
@@ -306,6 +324,24 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get skuTaken => 'این کد جنس قبلاً استفاده شده است.';
+
+  @override
+  String get pos => 'صندوق فروش';
+
+  @override
+  String get cartTitle => 'سبد';
+
+  @override
+  String get emptyCart => 'سبد خالی است';
+
+  @override
+  String get tendered => 'نقد دریافتی';
+
+  @override
+  String get change => 'باقی';
+
+  @override
+  String get receipt => 'رسید';
 
   @override
   String signedInAs(String user) {

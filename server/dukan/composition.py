@@ -15,13 +15,15 @@ from fastapi.responses import JSONResponse
 
 from dukan.application.auth import AuthService
 from dukan.application.catalog import CatalogService
+from dukan.application.sales import SalesService
 from dukan.config import Settings, get_settings
 from dukan.infrastructure.auth_service import SqlAuthService
 from dukan.infrastructure.catalog_service import SqlCatalogService
 from dukan.infrastructure.db.session import make_engine, make_session_factory
+from dukan.infrastructure.sales_service import SqlSalesService
 from dukan.shared.errors import AppError
-from dukan.ui.deps import get_auth_service, get_catalog_service
-from dukan.ui.routers import auth, catalog, health, users
+from dukan.ui.deps import get_auth_service, get_catalog_service, get_sales_service
+from dukan.ui.routers import auth, catalog, health, sales, users
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -38,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(catalog.router)
+    app.include_router(sales.router)
 
     def provide_auth_service() -> Iterator[AuthService]:
         session = session_factory()
@@ -53,8 +56,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             session.close()
 
+    def provide_sales_service() -> Iterator[SalesService]:
+        session = session_factory()
+        try:
+            yield SqlSalesService(session)
+        finally:
+            session.close()
+
     app.dependency_overrides[get_auth_service] = provide_auth_service
     app.dependency_overrides[get_catalog_service] = provide_catalog_service
+    app.dependency_overrides[get_sales_service] = provide_sales_service
 
     @app.exception_handler(AppError)
     async def _app_error_handler(_request: Request, exc: AppError) -> JSONResponse:

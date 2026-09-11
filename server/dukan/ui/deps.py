@@ -12,6 +12,7 @@ from fastapi import Depends, Header
 from dukan.application.access import require_permission
 from dukan.application.auth import AuthService
 from dukan.application.catalog import CatalogService
+from dukan.application.sales import SalesService
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.shared.errors import AuthError, ValidationError
 
@@ -26,6 +27,11 @@ def get_auth_service() -> AuthService:
 def get_catalog_service() -> CatalogService:
     # Replaced in composition.py with a request-scoped, DB-backed implementation.
     raise NotImplementedError("catalog service not wired")
+
+
+def get_sales_service() -> SalesService:
+    # Replaced in composition.py with a request-scoped, DB-backed implementation.
+    raise NotImplementedError("sales service not wired")
 
 
 def active_branch(actor: User, x_branch_id: str | None) -> str:

@@ -104,14 +104,80 @@ class StockMovements extends Table with RecordColumns {
   Set<Column> get primaryKey => {id};
 }
 
+// ── Sales / POS (Phase 3) ────────────────────────────────────────────────────
+
+@DataClassName('SaleRow')
+class Sales extends Table with RecordColumns {
+  TextColumn get number => text()();
+  TextColumn get branchId => text()();
+  TextColumn get shiftId => text().nullable()();
+  TextColumn get customerId => text().nullable()();
+  TextColumn get status => text().withDefault(const Constant('settled'))();
+  TextColumn get currency => text().withDefault(const Constant('AFN'))();
+  IntColumn get discountMinor => integer().withDefault(const Constant(0))();
+  IntColumn get subtotalMinor => integer().withDefault(const Constant(0))();
+  IntColumn get taxMinor => integer().withDefault(const Constant(0))();
+  IntColumn get totalMinor => integer().withDefault(const Constant(0))();
+  IntColumn get paidMinor => integer().withDefault(const Constant(0))();
+  IntColumn get changeMinor => integer().withDefault(const Constant(0))();
+  DateTimeColumn get occurredAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('SaleLineRow')
+class SaleLines extends Table with RecordColumns {
+  TextColumn get saleId => text()();
+  TextColumn get productId => text()();
+  TextColumn get name => text()();
+  IntColumn get qtyMinor => integer()();
+  IntColumn get decimalPlaces => integer().withDefault(const Constant(0))();
+  IntColumn get unitPriceMinor => integer()();
+  IntColumn get unitCostMinor => integer().withDefault(const Constant(0))();
+  IntColumn get lineTotalMinor => integer()();
+  TextColumn get currency => text().withDefault(const Constant('AFN'))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('PaymentRow')
+class Payments extends Table with RecordColumns {
+  TextColumn get saleId => text()();
+  TextColumn get method => text()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get currency => text().withDefault(const Constant('AFN'))();
+  IntColumn get tenderedMinor => integer().nullable()();
+  IntColumn get changeMinor => integer().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('ShiftRow')
+class Shifts extends Table with RecordColumns {
+  TextColumn get branchId => text()();
+  TextColumn get userId => text()();
+  DateTimeColumn get openedAt => dateTime().withDefault(currentDateAndTime)();
+  IntColumn get openingFloatMinor => integer().withDefault(const Constant(0))();
+  DateTimeColumn get closedAt => dateTime().nullable()();
+  IntColumn get countedCashMinor => integer().nullable()();
+  IntColumn get expectedCashMinor => integer().nullable()();
+  IntColumn get varianceMinor => integer().nullable()();
+  TextColumn get status => text().withDefault(const Constant('open'))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(
-  tables: [OutboxEntries, CachedProfiles, Units, Categories, Products, Barcodes, StockMovements],
+  tables: [
+    OutboxEntries, CachedProfiles, Units, Categories, Products, Barcodes, StockMovements,
+    Sales, SaleLines, Payments, Shifts,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -123,6 +189,12 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(products);
             await m.createTable(barcodes);
             await m.createTable(stockMovements);
+          }
+          if (from < 3) {
+            await m.createTable(sales);
+            await m.createTable(saleLines);
+            await m.createTable(payments);
+            await m.createTable(shifts);
           }
         },
       );

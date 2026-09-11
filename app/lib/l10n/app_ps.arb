@@ -44,5 +44,11 @@
   "searchHint": "لټون یا سکن…",
   "permissionDenied": "تاسو د دې اجازه نه لرئ.",
   "skuTaken": "دا کوډ دمخه کارول شوی دی.",
+  "pos": "د پلور صندوق",
+  "cartTitle": "ټوکرۍ",
+  "emptyCart": "ټوکرۍ خالي ده",
+  "tendered": "ترلاسه شوي نغدي",
+  "change": "بیرته",
+  "receipt": "رسید",
   "signedInAs": "د {user} په توګه ننوتل"
 }

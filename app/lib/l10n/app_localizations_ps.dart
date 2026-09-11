@@ -153,6 +153,24 @@ class AppLocalizationsPs extends AppLocalizations {
   String get skuTaken => 'دا کوډ دمخه کارول شوی دی.';
 
   @override
+  String get pos => 'د پلور صندوق';
+
+  @override
+  String get cartTitle => 'ټوکرۍ';
+
+  @override
+  String get emptyCart => 'ټوکرۍ خالي ده';
+
+  @override
+  String get tendered => 'ترلاسه شوي نغدي';
+
+  @override
+  String get change => 'بیرته';
+
+  @override
+  String get receipt => 'رسید';
+
+  @override
   String signedInAs(String user) {
     return 'د $user په توګه ننوتل';
   }
