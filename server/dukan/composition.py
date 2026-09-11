@@ -19,6 +19,7 @@ from dukan.application.customers import CustomerService
 from dukan.application.purchasing import PurchasingService
 from dukan.application.reports import ReportsService
 from dukan.application.sales import SalesService
+from dukan.application.sync import SyncService
 from dukan.config import Settings, get_settings
 from dukan.infrastructure.auth_service import SqlAuthService
 from dukan.infrastructure.catalog_service import SqlCatalogService
@@ -27,6 +28,7 @@ from dukan.infrastructure.db.session import make_engine, make_session_factory
 from dukan.infrastructure.purchasing_service import SqlPurchasingService
 from dukan.infrastructure.reports_service import SqlReportsService
 from dukan.infrastructure.sales_service import SqlSalesService
+from dukan.infrastructure.sync_service import SqlSyncService
 from dukan.shared.errors import AppError
 from dukan.ui.deps import (
     get_auth_service,
@@ -35,6 +37,7 @@ from dukan.ui.deps import (
     get_purchasing_service,
     get_reports_service,
     get_sales_service,
+    get_sync_service,
 )
 from dukan.ui.routers import (
     auth,
@@ -44,6 +47,7 @@ from dukan.ui.routers import (
     purchasing,
     reports,
     sales,
+    sync,
     users,
 )
 
@@ -66,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(customers.router)
     app.include_router(purchasing.router)
     app.include_router(reports.router)
+    app.include_router(sync.router)
 
     def provide_auth_service() -> Iterator[AuthService]:
         session = session_factory()
@@ -109,12 +114,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             session.close()
 
+    def provide_sync_service() -> Iterator[SyncService]:
+        session = session_factory()
+        try:
+            yield SqlSyncService(session)
+        finally:
+            session.close()
+
     app.dependency_overrides[get_auth_service] = provide_auth_service
     app.dependency_overrides[get_catalog_service] = provide_catalog_service
     app.dependency_overrides[get_sales_service] = provide_sales_service
     app.dependency_overrides[get_customer_service] = provide_customer_service
     app.dependency_overrides[get_purchasing_service] = provide_purchasing_service
     app.dependency_overrides[get_reports_service] = provide_reports_service
+    app.dependency_overrides[get_sync_service] = provide_sync_service
 
     @app.exception_handler(AppError)
     async def _app_error_handler(_request: Request, exc: AppError) -> JSONResponse:

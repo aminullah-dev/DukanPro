@@ -9492,6 +9492,201 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
   }
 }
 
+class $SyncStatesTable extends SyncStates
+    with TableInfo<$SyncStatesTable, SyncStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _lastPulledSeqMeta =
+      const VerificationMeta('lastPulledSeq');
+  @override
+  late final GeneratedColumn<int> lastPulledSeq = GeneratedColumn<int>(
+      'last_pulled_seq', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns => [deviceId, lastPulledSeq];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_states';
+  @override
+  VerificationContext validateIntegrity(Insertable<SyncStateRow> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('last_pulled_seq')) {
+      context.handle(
+          _lastPulledSeqMeta,
+          lastPulledSeq.isAcceptableOrUnknown(
+              data['last_pulled_seq']!, _lastPulledSeqMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {deviceId};
+  @override
+  SyncStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncStateRow(
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+      lastPulledSeq: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}last_pulled_seq'])!,
+    );
+  }
+
+  @override
+  $SyncStatesTable createAlias(String alias) {
+    return $SyncStatesTable(attachedDatabase, alias);
+  }
+}
+
+class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
+  final String deviceId;
+  final int lastPulledSeq;
+  const SyncStateRow({required this.deviceId, required this.lastPulledSeq});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['device_id'] = Variable<String>(deviceId);
+    map['last_pulled_seq'] = Variable<int>(lastPulledSeq);
+    return map;
+  }
+
+  SyncStatesCompanion toCompanion(bool nullToAbsent) {
+    return SyncStatesCompanion(
+      deviceId: Value(deviceId),
+      lastPulledSeq: Value(lastPulledSeq),
+    );
+  }
+
+  factory SyncStateRow.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncStateRow(
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      lastPulledSeq: serializer.fromJson<int>(json['lastPulledSeq']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'deviceId': serializer.toJson<String>(deviceId),
+      'lastPulledSeq': serializer.toJson<int>(lastPulledSeq),
+    };
+  }
+
+  SyncStateRow copyWith({String? deviceId, int? lastPulledSeq}) => SyncStateRow(
+        deviceId: deviceId ?? this.deviceId,
+        lastPulledSeq: lastPulledSeq ?? this.lastPulledSeq,
+      );
+  SyncStateRow copyWithCompanion(SyncStatesCompanion data) {
+    return SyncStateRow(
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      lastPulledSeq: data.lastPulledSeq.present
+          ? data.lastPulledSeq.value
+          : this.lastPulledSeq,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncStateRow(')
+          ..write('deviceId: $deviceId, ')
+          ..write('lastPulledSeq: $lastPulledSeq')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(deviceId, lastPulledSeq);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncStateRow &&
+          other.deviceId == this.deviceId &&
+          other.lastPulledSeq == this.lastPulledSeq);
+}
+
+class SyncStatesCompanion extends UpdateCompanion<SyncStateRow> {
+  final Value<String> deviceId;
+  final Value<int> lastPulledSeq;
+  final Value<int> rowid;
+  const SyncStatesCompanion({
+    this.deviceId = const Value.absent(),
+    this.lastPulledSeq = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncStatesCompanion.insert({
+    required String deviceId,
+    this.lastPulledSeq = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : deviceId = Value(deviceId);
+  static Insertable<SyncStateRow> custom({
+    Expression<String>? deviceId,
+    Expression<int>? lastPulledSeq,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (deviceId != null) 'device_id': deviceId,
+      if (lastPulledSeq != null) 'last_pulled_seq': lastPulledSeq,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncStatesCompanion copyWith(
+      {Value<String>? deviceId, Value<int>? lastPulledSeq, Value<int>? rowid}) {
+    return SyncStatesCompanion(
+      deviceId: deviceId ?? this.deviceId,
+      lastPulledSeq: lastPulledSeq ?? this.lastPulledSeq,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (lastPulledSeq.present) {
+      map['last_pulled_seq'] = Variable<int>(lastPulledSeq.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncStatesCompanion(')
+          ..write('deviceId: $deviceId, ')
+          ..write('lastPulledSeq: $lastPulledSeq, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -9510,6 +9705,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CustomerLedgerTable customerLedger = $CustomerLedgerTable(this);
   late final $SuppliersTable suppliers = $SuppliersTable(this);
   late final $SupplierLedgerTable supplierLedger = $SupplierLedgerTable(this);
+  late final $SyncStatesTable syncStates = $SyncStatesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -9529,7 +9725,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         customers,
         customerLedger,
         suppliers,
-        supplierLedger
+        supplierLedger,
+        syncStates
       ];
 }
 
@@ -13900,6 +14097,137 @@ typedef $$SupplierLedgerTableProcessedTableManager = ProcessedTableManager<
     ),
     SupplierLedgerRow,
     PrefetchHooks Function()>;
+typedef $$SyncStatesTableCreateCompanionBuilder = SyncStatesCompanion Function({
+  required String deviceId,
+  Value<int> lastPulledSeq,
+  Value<int> rowid,
+});
+typedef $$SyncStatesTableUpdateCompanionBuilder = SyncStatesCompanion Function({
+  Value<String> deviceId,
+  Value<int> lastPulledSeq,
+  Value<int> rowid,
+});
+
+class $$SyncStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncStatesTable> {
+  $$SyncStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get lastPulledSeq => $composableBuilder(
+      column: $table.lastPulledSeq, builder: (column) => ColumnFilters(column));
+}
+
+class $$SyncStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncStatesTable> {
+  $$SyncStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get lastPulledSeq => $composableBuilder(
+      column: $table.lastPulledSeq,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$SyncStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncStatesTable> {
+  $$SyncStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<int> get lastPulledSeq => $composableBuilder(
+      column: $table.lastPulledSeq, builder: (column) => column);
+}
+
+class $$SyncStatesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SyncStatesTable,
+    SyncStateRow,
+    $$SyncStatesTableFilterComposer,
+    $$SyncStatesTableOrderingComposer,
+    $$SyncStatesTableAnnotationComposer,
+    $$SyncStatesTableCreateCompanionBuilder,
+    $$SyncStatesTableUpdateCompanionBuilder,
+    (
+      SyncStateRow,
+      BaseReferences<_$AppDatabase, $SyncStatesTable, SyncStateRow>
+    ),
+    SyncStateRow,
+    PrefetchHooks Function()> {
+  $$SyncStatesTableTableManager(_$AppDatabase db, $SyncStatesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncStatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncStatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncStatesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> deviceId = const Value.absent(),
+            Value<int> lastPulledSeq = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SyncStatesCompanion(
+            deviceId: deviceId,
+            lastPulledSeq: lastPulledSeq,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String deviceId,
+            Value<int> lastPulledSeq = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SyncStatesCompanion.insert(
+            deviceId: deviceId,
+            lastPulledSeq: lastPulledSeq,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$SyncStatesTable, SyncStateRow>(table),
+                    BaseReferences<_$AppDatabase, $SyncStatesTable,
+                        SyncStateRow>(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SyncStatesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SyncStatesTable,
+    SyncStateRow,
+    $$SyncStatesTableFilterComposer,
+    $$SyncStatesTableOrderingComposer,
+    $$SyncStatesTableAnnotationComposer,
+    $$SyncStatesTableCreateCompanionBuilder,
+    $$SyncStatesTableUpdateCompanionBuilder,
+    (
+      SyncStateRow,
+      BaseReferences<_$AppDatabase, $SyncStatesTable, SyncStateRow>
+    ),
+    SyncStateRow,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -13934,4 +14262,6 @@ class $AppDatabaseManager {
       $$SuppliersTableTableManager(_db, _db.suppliers);
   $$SupplierLedgerTableTableManager get supplierLedger =>
       $$SupplierLedgerTableTableManager(_db, _db.supplierLedger);
+  $$SyncStatesTableTableManager get syncStates =>
+      $$SyncStatesTableTableManager(_db, _db.syncStates);
 }

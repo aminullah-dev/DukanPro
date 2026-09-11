@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, String
+from sqlalchemy import JSON, Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from dukan.infrastructure.db.base import Base, RecordMixin, utcnow
@@ -230,3 +230,27 @@ class GoodsReceiptLineModel(RecordMixin, Base):
     product_id: Mapped[str] = mapped_column(String(36))
     qty_minor: Mapped[int] = mapped_column()
     unit_cost_minor: Mapped[int] = mapped_column()
+
+
+# ── Sync (Phase 6) ───────────────────────────────────────────────────────────
+
+
+class ProcessedOpModel(Base):
+    """Idempotency ledger: an op_id is applied at most once."""
+
+    __tablename__ = "processed_ops"
+    op_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    result: Mapped[str] = mapped_column(String(12))
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ChangeLogModel(Base):
+    """Monotonic feed of applied row changes; drives pull."""
+
+    __tablename__ = "change_log"
+    seq: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    table_name: Mapped[str] = mapped_column(String(32), index=True)
+    row_id: Mapped[str] = mapped_column(String(36))
+    op: Mapped[str] = mapped_column(String(8))
+    data: Mapped[dict] = mapped_column(JSON)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

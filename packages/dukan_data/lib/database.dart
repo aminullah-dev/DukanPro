@@ -214,18 +214,29 @@ class SupplierLedger extends Table with RecordColumns {
   Set<Column> get primaryKey => {id};
 }
 
+// ── Sync (Phase 6) ───────────────────────────────────────────────────────────
+
+@DataClassName('SyncStateRow')
+class SyncStates extends Table {
+  TextColumn get deviceId => text()();
+  IntColumn get lastPulledSeq => integer().withDefault(const Constant(0))();
+  @override
+  Set<Column> get primaryKey => {deviceId};
+}
+
 @DriftDatabase(
   tables: [
     OutboxEntries, CachedProfiles, Units, Categories, Products, Barcodes, StockMovements,
     Sales, SaleLines, Payments, Shifts,
     Customers, CustomerLedger, Suppliers, SupplierLedger,
+    SyncStates,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -249,6 +260,9 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(customerLedger);
             await m.createTable(suppliers);
             await m.createTable(supplierLedger);
+          }
+          if (from < 5) {
+            await m.createTable(syncStates);
           }
         },
       );

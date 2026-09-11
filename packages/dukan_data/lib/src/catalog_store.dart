@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:dukan_core/dukan_core.dart';
 
 import '../database.dart';
+import 'sync_recorder.dart';
 
 /// Drift-backed [ProductRepository].
 final class ProductDao implements ProductRepository {
@@ -156,31 +157,52 @@ final class DriftStockRepository implements StockMovementRepository {
 }
 
 /// Local, offline-first catalog orchestration: every write is committed to
-/// SQLite AND enqueued in the outbox in the same transaction (sync-shaped).
+/// SQLite AND enqueued as a row-level op in the outbox, in one transaction
+/// (sync-shaped). See docs/sync-protocol.md.
 final class LocalCatalog {
   LocalCatalog(this._db)
       : products = ProductDao(_db),
         stock = DriftStockRepository(_db),
-        _outbox = DriftSyncOutbox(_db);
+        _rec = SyncRecorder(_db);
 
   final AppDatabase _db;
   final ProductDao products;
   final DriftStockRepository stock;
-  final DriftSyncOutbox _outbox;
+  final SyncRecorder _rec;
 
-  Future<List<UnitRow>> listUnits() async {
+  Future<List<UnitRow>> listUnits({String actorId = 'system', String deviceId = 'app'}) async {
     var rows = await (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
     if (rows.isEmpty) {
       const defaults = [('piece', 0), ('kg', 3), ('litre', 3), ('dozen', 0), ('meter', 2)];
-      for (final u in defaults) {
-        await _db.into(_db.units).insert(
-              UnitsCompanion.insert(id: newId(), name: u.$1, decimalPlaces: Value(u.$2)),
-            );
-      }
+      await _db.transaction(() async {
+        for (final u in defaults) {
+          final id = newId();
+          await _db.into(_db.units).insert(
+                UnitsCompanion.insert(id: id, name: u.$1, decimalPlaces: Value(u.$2)),
+              );
+          await _rec.record(
+            table: 'units', rowId: id, op: 'insert',
+            data: {'name': u.$1, 'decimal_places': u.$2}, actorId: actorId, deviceId: deviceId,
+          );
+        }
+      });
       rows = await (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
     }
     return rows;
   }
+
+  Map<String, Object?> _productData(Product p) => {
+        'sku': p.sku,
+        'name': p.name,
+        'unit_id': p.unitId,
+        'category_id': p.categoryId,
+        'sell_price_minor': p.sellPrice.amountMinor,
+        'sell_currency': p.sellPrice.currency,
+        'cost_minor': p.cost?.amountMinor,
+        'cost_currency': p.cost?.currency,
+        'track_stock': p.trackStock,
+        'is_active': p.isActive,
+      };
 
   Future<void> createProduct(
     Product product, {
@@ -190,15 +212,17 @@ final class LocalCatalog {
   }) async {
     await _db.transaction(() async {
       await products.create(product, barcodes: barcodes);
-      await _enqueue('product', product.id, 'create', {
-        'sku': product.sku,
-        'name': product.name,
-        'unit_id': product.unitId,
-        'sell_price_minor': product.sellPrice.amountMinor,
-        'currency': product.sellPrice.currency,
-        'track_stock': product.trackStock,
-        'barcodes': barcodes.map((b) => b.code).toList(),
-      }, actorId, deviceId);
+      await _rec.record(
+        table: 'products', rowId: product.id, op: 'insert',
+        data: _productData(product), actorId: actorId, deviceId: deviceId,
+      );
+      for (final b in barcodes) {
+        await _rec.record(
+          table: 'barcodes', rowId: b.id, op: 'insert',
+          data: {'product_id': b.productId, 'code': b.code, 'symbology': b.symbology},
+          actorId: actorId, deviceId: deviceId,
+        );
+      }
     });
   }
 
@@ -209,12 +233,16 @@ final class LocalCatalog {
   }) async {
     await _db.transaction(() async {
       await products.update(product);
-      await _enqueue('product', product.id, 'update', {
-        'name': product.name,
-        'sell_price_minor': product.sellPrice.amountMinor,
-        'currency': product.sellPrice.currency,
-        'is_active': product.isActive,
-      }, actorId, deviceId);
+      await _rec.record(
+        table: 'products', rowId: product.id, op: 'update', baseVersion: product.version,
+        data: {
+          'name': product.name,
+          'sell_price_minor': product.sellPrice.amountMinor,
+          'sell_currency': product.sellPrice.currency,
+          'is_active': product.isActive,
+        },
+        actorId: actorId, deviceId: deviceId,
+      );
     });
   }
 
@@ -231,38 +259,13 @@ final class LocalCatalog {
     );
     await _db.transaction(() async {
       await stock.append(movement);
-      await _enqueue('stock_movement', movement.id, 'append', {
-        'product_id': productId,
-        'branch_id': branchId,
-        'qty_delta': qtyDelta,
-        'reason': 'adjustment',
-      }, actorId, deviceId);
+      await _rec.record(
+        table: 'stock_movements', rowId: movement.id, op: 'insert',
+        data: {'product_id': productId, 'branch_id': branchId, 'qty_delta': qtyDelta, 'reason': 'adjustment'},
+        actorId: actorId, deviceId: deviceId,
+      );
     });
   }
 
   Future<int> onHand(String productId, String branchId) => stock.onHand(productId, branchId);
-
-  Future<void> _enqueue(
-    String aggregateType,
-    String aggregateId,
-    String opType,
-    Map<String, Object?> payload,
-    String actorId,
-    String deviceId,
-  ) async {
-    final maxCol = _db.outboxEntries.localSeq.max();
-    final row = await (_db.selectOnly(_db.outboxEntries)..addColumns([maxCol])).getSingle();
-    final nextSeq = (row.read(maxCol) ?? 0) + 1;
-    await _outbox.enqueue(OutboxOp(
-      opId: newId(),
-      aggregateType: aggregateType,
-      aggregateId: aggregateId,
-      opType: opType,
-      payload: payload,
-      localSeq: nextSeq,
-      deviceId: deviceId,
-      actorId: actorId,
-      createdAt: DateTime.now().toUtc(),
-    ));
-  }
 }

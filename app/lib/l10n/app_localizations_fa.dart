@@ -235,6 +235,47 @@ class AppLocalizationsFa extends AppLocalizations {
   String signedInAs(String user) {
     return 'واردشده به‌عنوان $user';
   }
+
+  @override
+  String get syncNow => 'همگام‌سازی';
+
+  @override
+  String get syncing => 'در حال همگام‌سازی…';
+
+  @override
+  String get syncUpToDate => 'به‌روز';
+
+  @override
+  String syncPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تغییر برای ارسال',
+      one: '۱ تغییر برای ارسال',
+      zero: 'همه‌چیز همگام است',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncFailed =>
+      'همگام‌سازی ناکام شد. اتصال را بررسی کنید و دوباره تلاش کنید.';
+
+  @override
+  String syncConflicts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مورد نیاز به بازبینی دارند',
+      one: '۱ مورد نیاز به بازبینی دارد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String lastSyncedAt(String time) {
+    return 'آخرین همگام‌سازی $time';
+  }
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -466,5 +507,46 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String signedInAs(String user) {
     return 'واردشده به‌عنوان $user';
+  }
+
+  @override
+  String get syncNow => 'همگام‌سازی';
+
+  @override
+  String get syncing => 'در حال همگام‌سازی…';
+
+  @override
+  String get syncUpToDate => 'به‌روز';
+
+  @override
+  String syncPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تغییر برای ارسال',
+      one: '۱ تغییر برای ارسال',
+      zero: 'همه‌چیز همگام است',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncFailed =>
+      'همگام‌سازی ناکام شد. اتصال را بررسی کنید و دوباره تلاش کنید.';
+
+  @override
+  String syncConflicts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مورد نیاز به بازبینی دارند',
+      one: '۱ مورد نیاز به بازبینی دارد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String lastSyncedAt(String time) {
+    return 'آخرین همگام‌سازی $time';
   }
 }

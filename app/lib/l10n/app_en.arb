@@ -73,5 +73,15 @@
   "lowStock": "Low stock",
   "topSellers": "Top sellers",
   "signedInAs": "Signed in as {user}",
-  "@signedInAs": { "placeholders": { "user": { "type": "String" } } }
+  "@signedInAs": { "placeholders": { "user": { "type": "String" } } },
+  "syncNow": "Sync now",
+  "syncing": "Syncing…",
+  "syncUpToDate": "Up to date",
+  "syncPending": "{count, plural, =0{All changes synced} =1{1 change to sync} other{{count} changes to sync}}",
+  "@syncPending": { "placeholders": { "count": { "type": "int" } } },
+  "syncFailed": "Couldn't sync. Check your connection and try again.",
+  "syncConflicts": "{count, plural, =1{1 item needs review} other{{count} items need review}}",
+  "@syncConflicts": { "placeholders": { "count": { "type": "int" } } },
+  "lastSyncedAt": "Last synced {time}",
+  "@lastSyncedAt": { "placeholders": { "time": { "type": "String" } } }
 }

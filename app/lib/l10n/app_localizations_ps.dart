@@ -234,4 +234,44 @@ class AppLocalizationsPs extends AppLocalizations {
   String signedInAs(String user) {
     return 'د $user په توګه ننوتل';
   }
+
+  @override
+  String get syncNow => 'همغږي کول';
+
+  @override
+  String get syncing => 'همغږي کیږي…';
+
+  @override
+  String get syncUpToDate => 'تازه دی';
+
+  @override
+  String syncPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count بدلونونه د لیږلو لپاره',
+      one: '۱ بدلون د لیږلو لپاره',
+      zero: 'ټول بدلونونه همغږي شوي',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncFailed => 'همغږي ونشوه. خپل پیوستون وګورئ او بیا هڅه وکړئ.';
+
+  @override
+  String syncConflicts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count توکي بیاکتنې ته اړتیا لري',
+      one: '۱ توکی بیاکتنې ته اړتیا لري',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String lastSyncedAt(String time) {
+    return 'وروستۍ همغږي $time';
+  }
 }

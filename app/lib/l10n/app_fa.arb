@@ -70,5 +70,12 @@
   "outstandingDebt": "طلب‌های معوق",
   "lowStock": "کم‌موجودی",
   "topSellers": "پرفروش‌ها",
-  "signedInAs": "واردشده به‌عنوان {user}"
+  "signedInAs": "واردشده به‌عنوان {user}",
+  "syncNow": "همگام‌سازی",
+  "syncing": "در حال همگام‌سازی…",
+  "syncUpToDate": "به‌روز",
+  "syncPending": "{count, plural, =0{همه‌چیز همگام است} =1{۱ تغییر برای ارسال} other{{count} تغییر برای ارسال}}",
+  "syncFailed": "همگام‌سازی ناکام شد. اتصال را بررسی کنید و دوباره تلاش کنید.",
+  "syncConflicts": "{count, plural, =1{۱ مورد نیاز به بازبینی دارد} other{{count} مورد نیاز به بازبینی دارند}}",
+  "lastSyncedAt": "آخرین همگام‌سازی {time}"
 }

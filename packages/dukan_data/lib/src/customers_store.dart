@@ -2,13 +2,14 @@ import 'package:drift/drift.dart';
 import 'package:dukan_core/dukan_core.dart';
 
 import '../database.dart';
+import 'sync_recorder.dart';
 
 /// Local, offline-first customers & debt. Writes go to SQLite and enqueue
-/// outbox ops in one transaction.
+/// row-level outbox ops in one transaction.
 final class LocalCustomers {
-  LocalCustomers(this._db) : _outbox = DriftSyncOutbox(_db);
+  LocalCustomers(this._db) : _rec = SyncRecorder(_db);
   final AppDatabase _db;
-  final DriftSyncOutbox _outbox;
+  final SyncRecorder _rec;
 
   Customer _toCustomer(CustomerRow r) => Customer(
         id: r.id, name: r.name, phone: r.phone, creditLimitMinor: r.creditLimitMinor,
@@ -22,9 +23,10 @@ final class LocalCustomers {
             creditLimitMinor: Value(c.creditLimitMinor), currency: Value(c.currency),
             createdBy: Value(actorId), updatedBy: Value(actorId),
           ));
-      await _enqueue('customer', c.id, 'create', {
+      await _rec.record(table: 'customers', rowId: c.id, op: 'insert', data: {
         'name': c.name, 'phone': c.phone, 'credit_limit_minor': c.creditLimitMinor,
-      }, actorId, deviceId);
+        'currency': c.currency, 'is_active': c.isActive,
+      }, actorId: actorId, deviceId: deviceId);
     });
   }
 
@@ -73,32 +75,21 @@ final class LocalCustomers {
             id: ledgerId, customerId: customerId, type: 'payment', amountMinor: amountMinor,
             currency: Value(currency), refType: const Value('manual'), createdBy: Value(actorId),
           ));
-      await _enqueue('customer_ledger', ledgerId, 'append', {
+      await _rec.record(table: 'customer_ledger', rowId: ledgerId, op: 'insert', data: {
         'customer_id': customerId, 'type': 'payment', 'amount_minor': amountMinor,
-      }, actorId, deviceId);
+        'currency': currency, 'ref_type': 'manual',
+      }, actorId: actorId, deviceId: deviceId);
     });
-  }
-
-  Future<void> _enqueue(
-    String aggregateType, String aggregateId, String opType,
-    Map<String, Object?> payload, String actorId, String deviceId,
-  ) async {
-    final maxCol = _db.outboxEntries.localSeq.max();
-    final row = await (_db.selectOnly(_db.outboxEntries)..addColumns([maxCol])).getSingle();
-    await _outbox.enqueue(OutboxOp(
-      opId: newId(), aggregateType: aggregateType, aggregateId: aggregateId, opType: opType,
-      payload: payload, localSeq: (row.read(maxCol) ?? 0) + 1, deviceId: deviceId, actorId: actorId,
-      createdAt: DateTime.now().toUtc(),
-    ));
   }
 }
 
 /// Local, offline-first purchasing. A goods receipt increments stock at cost,
-/// updates the product's last cost, and bills the supplier.
+/// updates the product's last cost, and bills the supplier. Phase 6 syncs the
+/// effects (stock movements + supplier bill); the receipt header stays local.
 final class LocalPurchasing {
-  LocalPurchasing(this._db) : _outbox = DriftSyncOutbox(_db);
+  LocalPurchasing(this._db) : _rec = SyncRecorder(_db);
   final AppDatabase _db;
-  final DriftSyncOutbox _outbox;
+  final SyncRecorder _rec;
 
   Supplier _toSupplier(SupplierRow r) => Supplier(
         id: r.id, name: r.name, phone: r.phone, currency: r.currency, isActive: r.isActive,
@@ -111,7 +102,9 @@ final class LocalPurchasing {
             id: s.id, name: s.name, phone: Value(s.phone), currency: Value(s.currency),
             createdBy: Value(actorId), updatedBy: Value(actorId),
           ));
-      await _enqueue('supplier', s.id, 'create', {'name': s.name, 'phone': s.phone}, actorId, deviceId);
+      await _rec.record(table: 'suppliers', rowId: s.id, op: 'insert', data: {
+        'name': s.name, 'phone': s.phone, 'currency': s.currency, 'is_active': s.isActive,
+      }, actorId: actorId, deviceId: deviceId);
     });
   }
 
@@ -152,10 +145,9 @@ final class LocalPurchasing {
             updatedAt: Value(DateTime.now().toUtc()),
           ),
         );
-        await _enqueue('stock_movement', movementId, 'append', {
-          'product_id': l.productId, 'branch_id': branchId,
-          'qty_delta': l.qtyMinor, 'reason': 'purchase',
-        }, actorId, deviceId);
+        await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
+          'product_id': l.productId, 'branch_id': branchId, 'qty_delta': l.qtyMinor, 'reason': 'purchase',
+        }, actorId: actorId, deviceId: deviceId);
       }
       if (supplierId != null) {
         final ledgerId = newId();
@@ -163,23 +155,10 @@ final class LocalPurchasing {
               id: ledgerId, supplierId: supplierId, type: 'bill', amountMinor: total,
               createdBy: Value(actorId),
             ));
-        await _enqueue('supplier_ledger', ledgerId, 'append', {
-          'supplier_id': supplierId, 'type': 'bill', 'amount_minor': total,
-        }, actorId, deviceId);
+        await _rec.record(table: 'supplier_ledger', rowId: ledgerId, op: 'insert', data: {
+          'supplier_id': supplierId, 'type': 'bill', 'amount_minor': total, 'currency': 'AFN',
+        }, actorId: actorId, deviceId: deviceId);
       }
     });
-  }
-
-  Future<void> _enqueue(
-    String aggregateType, String aggregateId, String opType,
-    Map<String, Object?> payload, String actorId, String deviceId,
-  ) async {
-    final maxCol = _db.outboxEntries.localSeq.max();
-    final row = await (_db.selectOnly(_db.outboxEntries)..addColumns([maxCol])).getSingle();
-    await _outbox.enqueue(OutboxOp(
-      opId: newId(), aggregateType: aggregateType, aggregateId: aggregateId, opType: opType,
-      payload: payload, localSeq: (row.read(maxCol) ?? 0) + 1, deviceId: deviceId, actorId: actorId,
-      createdAt: DateTime.now().toUtc(),
-    ));
   }
 }

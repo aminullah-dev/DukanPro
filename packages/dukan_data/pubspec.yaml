@@ -13,6 +13,8 @@ dependencies:
   drift: ^2.35.0
   dukan_core:
     path: ../dukan_core
+  dukan_sync:
+    path: ../dukan_sync
   sqlite3: ^3.5.2
 
 dev_dependencies:

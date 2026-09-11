@@ -526,6 +526,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Signed in as {user}'**
   String signedInAs(String user);
+
+  /// No description provided for @syncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get syncNow;
+
+  /// No description provided for @syncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing…'**
+  String get syncing;
+
+  /// No description provided for @syncUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get syncUpToDate;
+
+  /// No description provided for @syncPending.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{All changes synced} =1{1 change to sync} other{{count} changes to sync}}'**
+  String syncPending(int count);
+
+  /// No description provided for @syncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t sync. Check your connection and try again.'**
+  String get syncFailed;
+
+  /// No description provided for @syncConflicts.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item needs review} other{{count} items need review}}'**
+  String syncConflicts(int count);
+
+  /// No description provided for @lastSyncedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced {time}'**
+  String lastSyncedAt(String time);
 }
 
 class _AppLocalizationsDelegate

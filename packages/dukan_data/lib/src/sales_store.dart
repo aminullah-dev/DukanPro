@@ -2,14 +2,16 @@ import 'package:drift/drift.dart';
 import 'package:dukan_core/dukan_core.dart';
 
 import '../database.dart';
+import 'sync_recorder.dart';
 
 /// Local, offline-first sales. Settling writes the sale + lines + payment +
 /// stock movements (+ a customer-ledger charge for credit) to SQLite AND
-/// enqueues outbox ops, all in one transaction. See docs/domain/sales.md.
+/// enqueues one row-level outbox op per row, all in one transaction.
+/// See docs/domain/sales.md and docs/sync-protocol.md.
 final class LocalSales {
-  LocalSales(this._db) : _outbox = DriftSyncOutbox(_db);
+  LocalSales(this._db) : _rec = SyncRecorder(_db);
   final AppDatabase _db;
-  final DriftSyncOutbox _outbox;
+  final SyncRecorder _rec;
 
   /// Cash-only settle (no customer).
   Future<SaleRow> settleCash({
@@ -71,29 +73,47 @@ final class LocalSales {
             totalMinor: Value(totals.totalMinor), paidMinor: Value(paid), changeMinor: Value(change),
             shiftId: Value(shiftId), createdBy: Value(actorId), updatedBy: Value(actorId),
           ));
+      await _rec.record(table: 'sales', rowId: saleId, op: 'insert', data: {
+        'number': number, 'branch_id': branchId, 'shift_id': shiftId, 'customer_id': customerId,
+        'status': 'settled', 'currency': currency, 'discount_minor': discountMinor,
+        'subtotal_minor': totals.subtotalMinor, 'tax_minor': totals.taxMinor,
+        'total_minor': totals.totalMinor, 'paid_minor': paid, 'change_minor': change,
+      }, actorId: actorId, deviceId: deviceId);
+
       for (final l in lines) {
+        final lineId = newId();
         await _db.into(_db.saleLines).insert(SaleLinesCompanion.insert(
-              id: newId(), saleId: saleId, productId: l.productId, name: l.name,
+              id: lineId, saleId: saleId, productId: l.productId, name: l.name,
               qtyMinor: l.qtyMinor, decimalPlaces: Value(l.decimalPlaces),
               unitPriceMinor: l.unitPriceMinor, unitCostMinor: Value(l.unitCostMinor),
               lineTotalMinor: l.lineTotal, currency: Value(l.currency), createdBy: Value(actorId),
             ));
+        await _rec.record(table: 'sale_lines', rowId: lineId, op: 'insert', data: {
+          'sale_id': saleId, 'product_id': l.productId, 'name': l.name, 'qty_minor': l.qtyMinor,
+          'decimal_places': l.decimalPlaces, 'unit_price_minor': l.unitPriceMinor,
+          'unit_cost_minor': l.unitCostMinor, 'line_total_minor': l.lineTotal, 'currency': l.currency,
+        }, actorId: actorId, deviceId: deviceId);
+
         final movementId = newId();
         await _db.into(_db.stockMovements).insert(StockMovementsCompanion.insert(
               id: movementId, productId: l.productId, branchId: branchId,
               qtyDelta: -l.qtyMinor, reason: 'sale', createdBy: Value(actorId),
             ));
-        await _enqueue('stock_movement', movementId, 'append', {
-          'product_id': l.productId, 'branch_id': branchId,
-          'qty_delta': -l.qtyMinor, 'reason': 'sale',
-        }, actorId, deviceId);
+        await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
+          'product_id': l.productId, 'branch_id': branchId, 'qty_delta': -l.qtyMinor, 'reason': 'sale',
+        }, actorId: actorId, deviceId: deviceId);
       }
       if (paid > 0) {
+        final paymentId = newId();
         await _db.into(_db.payments).insert(PaymentsCompanion.insert(
-              id: newId(), saleId: saleId, method: 'cash', amountMinor: paid, currency: Value(currency),
+              id: paymentId, saleId: saleId, method: 'cash', amountMinor: paid, currency: Value(currency),
               tenderedMinor: Value(onCredit ? null : tendered), changeMinor: Value(change),
               createdBy: Value(actorId),
             ));
+        await _rec.record(table: 'payments', rowId: paymentId, op: 'insert', data: {
+          'sale_id': saleId, 'method': 'cash', 'amount_minor': paid, 'currency': currency,
+          'tendered_minor': onCredit ? null : tendered, 'change_minor': change,
+        }, actorId: actorId, deviceId: deviceId);
       }
       if (onCredit && remainder > 0) {
         final ledgerId = newId();
@@ -102,16 +122,11 @@ final class LocalSales {
               currency: Value(currency), refType: const Value('sale'), refId: Value(saleId),
               createdBy: Value(actorId),
             ));
-        await _enqueue('customer_ledger', ledgerId, 'append', {
-          'customer_id': customerId, 'type': 'charge', 'amount_minor': remainder,
+        await _rec.record(table: 'customer_ledger', rowId: ledgerId, op: 'insert', data: {
+          'customer_id': customerId, 'type': 'charge', 'amount_minor': remainder, 'currency': currency,
           'ref_type': 'sale', 'ref_id': saleId,
-        }, actorId, deviceId);
+        }, actorId: actorId, deviceId: deviceId);
       }
-      await _enqueue('sale', saleId, 'settle', {
-        'number': number, 'total_minor': totals.totalMinor, 'customer_id': customerId,
-        'cash_minor': paid,
-        'lines': lines.map((l) => {'product_id': l.productId, 'qty_minor': l.qtyMinor}).toList(),
-      }, actorId, deviceId);
 
       saved = await (_db.select(_db.sales)..where((t) => t.id.equals(saleId))).getSingle();
     });
@@ -139,23 +154,5 @@ final class LocalSales {
     final now = DateTime.now();
     String two(int x) => x.toString().padLeft(2, '0');
     return 'INV-${now.year}${two(now.month)}${two(now.day)}-${n.toString().padLeft(4, '0')}';
-  }
-
-  Future<void> _enqueue(
-    String aggregateType,
-    String aggregateId,
-    String opType,
-    Map<String, Object?> payload,
-    String actorId,
-    String deviceId,
-  ) async {
-    final maxCol = _db.outboxEntries.localSeq.max();
-    final row = await (_db.selectOnly(_db.outboxEntries)..addColumns([maxCol])).getSingle();
-    final nextSeq = (row.read(maxCol) ?? 0) + 1;
-    await _outbox.enqueue(OutboxOp(
-      opId: newId(), aggregateType: aggregateType, aggregateId: aggregateId, opType: opType,
-      payload: payload, localSeq: nextSeq, deviceId: deviceId, actorId: actorId,
-      createdAt: DateTime.now().toUtc(),
-    ));
   }
 }

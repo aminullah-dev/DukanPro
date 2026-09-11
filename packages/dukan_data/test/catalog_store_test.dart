@@ -24,8 +24,9 @@ void main() {
     expect(found?.sellPrice, Money(52000, 'AFN'));
 
     final pending = await DriftSyncOutbox(db).pending();
-    expect(pending.length, 1);
-    expect(pending.first.aggregateType, 'product');
+    expect(pending.length, 2); // product + its barcode
+    expect(pending.first.aggregateType, 'products');
+    expect(pending.where((o) => o.aggregateType == 'barcodes').length, 1);
     expect(pending.first.localSeq, 1);
   });
 
@@ -40,7 +41,7 @@ void main() {
     final ops = await DriftSyncOutbox(db).pending();
     expect(ops.length, 3); // 1 product create + 2 stock movements
     expect(ops.map((o) => o.localSeq).toList(), [1, 2, 3]);
-    expect(ops.where((o) => o.aggregateType == 'stock_movement').length, 2);
+    expect(ops.where((o) => o.aggregateType == 'stock_movements').length, 2);
   });
 
   test('listUnits seeds defaults and is idempotent', () async {

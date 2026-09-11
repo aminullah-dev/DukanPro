@@ -10,6 +10,7 @@ import 'features/customers/customers_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/pos/pos_screen.dart';
 import 'features/purchasing/receive_stock_screen.dart';
+import 'features/sync/sync_button.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/locale_toggle.dart';
 
@@ -30,6 +31,7 @@ class AppShell extends ConsumerWidget {
       appBar: AppBar(
         title: Text(l.appTitle),
         actions: [
+          const SyncAction(),
           const LocaleToggle(),
           IconButton(
             tooltip: l.logout,
@@ -56,6 +58,8 @@ class AppShell extends ConsumerWidget {
                 label: Text(l.offlineMode),
               ),
             ],
+            const SizedBox(height: 16),
+            const SyncStatusCard(),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: () => Navigator.of(context).push(

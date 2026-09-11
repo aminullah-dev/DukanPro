@@ -36,8 +36,10 @@ void main() {
     expect((await sales.saleLinesFor(sale.id)).length, 1);
 
     final ops = await DriftSyncOutbox(db).pending();
-    expect(ops.where((o) => o.aggregateType == 'sale').length, 1);
-    expect(ops.where((o) => o.aggregateType == 'stock_movement').length, 2); // adjust + sale
+    expect(ops.where((o) => o.aggregateType == 'sales').length, 1);
+    expect(ops.where((o) => o.aggregateType == 'sale_lines').length, 1);
+    expect(ops.where((o) => o.aggregateType == 'payments').length, 1);
+    expect(ops.where((o) => o.aggregateType == 'stock_movements').length, 2); // adjust + sale
   });
 
   test('underpaid cash throws SALE_UNDERPAID', () async {

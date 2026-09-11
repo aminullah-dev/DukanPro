@@ -1,3 +1,5 @@
+import 'package:dukan_core/dukan_core.dart';
+import 'package:dukan_sync/dukan_sync.dart';
 import 'package:dukanpro/infrastructure/auth_api.dart';
 import 'package:dukanpro/infrastructure/secure_store.dart';
 import 'package:dukanpro/infrastructure/verifier.dart';
@@ -68,4 +70,19 @@ class FakeAuthApi implements AuthApi {
 
   @override
   Future<ApiProfile> me(String accessToken) async => _profile('owner');
+}
+
+/// In-memory [SyncClient]: records pushed ops (all applied) and pulls nothing.
+class FakeSyncClient implements SyncClient {
+  final List<OutboxOp> pushed = [];
+
+  @override
+  Future<List<PushResult>> push(List<OutboxOp> ops) async {
+    pushed.addAll(ops);
+    return [for (final o in ops) PushResult(o.opId, OpOutcome.applied)];
+  }
+
+  @override
+  Future<PullResult> pull({required int sinceWatermark}) async =>
+      const PullResult(watermark: 0, changed: [], tombstones: []);
 }

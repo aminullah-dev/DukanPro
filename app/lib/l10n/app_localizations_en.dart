@@ -234,4 +234,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String signedInAs(String user) {
     return 'Signed in as $user';
   }
+
+  @override
+  String get syncNow => 'Sync now';
+
+  @override
+  String get syncing => 'Syncing…';
+
+  @override
+  String get syncUpToDate => 'Up to date';
+
+  @override
+  String syncPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes to sync',
+      one: '1 change to sync',
+      zero: 'All changes synced',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncFailed =>
+      'Couldn\'t sync. Check your connection and try again.';
+
+  @override
+  String syncConflicts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items need review',
+      one: '1 item needs review',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String lastSyncedAt(String time) {
+    return 'Last synced $time';
+  }
 }

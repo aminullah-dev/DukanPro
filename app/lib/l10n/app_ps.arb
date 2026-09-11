@@ -70,5 +70,12 @@
   "outstandingDebt": "پاتې پورونه",
   "lowStock": "کمه ذخیره",
   "topSellers": "ډیر پلورل شوي",
-  "signedInAs": "د {user} په توګه ننوتل"
+  "signedInAs": "د {user} په توګه ننوتل",
+  "syncNow": "همغږي کول",
+  "syncing": "همغږي کیږي…",
+  "syncUpToDate": "تازه دی",
+  "syncPending": "{count, plural, =0{ټول بدلونونه همغږي شوي} =1{۱ بدلون د لیږلو لپاره} other{{count} بدلونونه د لیږلو لپاره}}",
+  "syncFailed": "همغږي ونشوه. خپل پیوستون وګورئ او بیا هڅه وکړئ.",
+  "syncConflicts": "{count, plural, =1{۱ توکی بیاکتنې ته اړتیا لري} other{{count} توکي بیاکتنې ته اړتیا لري}}",
+  "lastSyncedAt": "وروستۍ همغږي {time}"
 }
