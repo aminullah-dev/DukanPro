@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dukan.application.catalog import ProductView
+from dukan.application.customers import CustomerView
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens
+from dukan.application.purchasing import GoodsReceiptView, SupplierView
 from dukan.application.sales import SaleView, ShiftView
 
 
@@ -86,4 +88,34 @@ def shift_view_dict(v: ShiftView) -> dict:
         "expected_cash_minor": v.expected_cash_minor,
         "counted_cash_minor": v.counted_cash_minor,
         "variance_minor": v.variance_minor,
+    }
+
+
+def customer_view_dict(v: CustomerView) -> dict:
+    return {
+        "id": v.id,
+        "name": v.name,
+        "phone": v.phone,
+        "credit_limit_minor": v.credit_limit_minor,
+        "currency": v.currency,
+        "balance_minor": v.balance_minor,
+    }
+
+
+def supplier_view_dict(v: SupplierView) -> dict:
+    return {
+        "id": v.id,
+        "name": v.name,
+        "phone": v.phone,
+        "currency": v.currency,
+        "balance_minor": v.balance_minor,
+    }
+
+
+def goods_receipt_view_dict(v: GoodsReceiptView) -> dict:
+    return {
+        "id": v.id,
+        "number": v.number,
+        "supplier_id": v.supplier_id,
+        "total_cost_minor": v.total_cost_minor,
     }

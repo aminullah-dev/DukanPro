@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_state.dart';
 import 'features/catalog/product_list_screen.dart';
+import 'features/customers/customers_screen.dart';
 import 'features/pos/pos_screen.dart';
+import 'features/purchasing/receive_stock_screen.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/locale_toggle.dart';
 
@@ -62,12 +64,33 @@ class AppShell extends ConsumerWidget {
               label: Text(l.pos),
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const ProductListScreen()),
-              ),
-              icon: const Icon(Icons.inventory_2_outlined),
-              label: Text(l.products),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const ProductListScreen()),
+                  ),
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: Text(l.products),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const CustomersScreen()),
+                  ),
+                  icon: const Icon(Icons.people_outline),
+                  label: Text(l.customers),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const ReceiveStockScreen()),
+                  ),
+                  icon: const Icon(Icons.add_box_outlined),
+                  label: Text(l.receiveStock),
+                ),
+              ],
             ),
           ],
         ),

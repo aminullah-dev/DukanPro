@@ -169,3 +169,64 @@ class PaymentModel(RecordMixin, Base):
     currency: Mapped[str] = mapped_column(String(3), default="AFN")
     tendered_minor: Mapped[int | None] = mapped_column(default=None)
     change_minor: Mapped[int | None] = mapped_column(default=None)
+
+
+# ── Customers, debt, purchasing (Phase 4) ────────────────────────────────────
+
+
+class CustomerModel(RecordMixin, Base):
+    __tablename__ = "customers"
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    phone: Mapped[str | None] = mapped_column(String(32), default=None)
+    credit_limit_minor: Mapped[int | None] = mapped_column(default=None)
+    currency: Mapped[str] = mapped_column(String(3), default="AFN")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class CustomerLedgerModel(RecordMixin, Base):
+    """Append-only customer ledger. Balance = Σ charges − Σ payments."""
+
+    __tablename__ = "customer_ledger"
+    customer_id: Mapped[str] = mapped_column(String(36), index=True)
+    type: Mapped[str] = mapped_column(String(12))
+    amount_minor: Mapped[int] = mapped_column()
+    currency: Mapped[str] = mapped_column(String(3), default="AFN")
+    ref_type: Mapped[str | None] = mapped_column(String(16), default=None)
+    ref_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SupplierModel(RecordMixin, Base):
+    __tablename__ = "suppliers"
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    phone: Mapped[str | None] = mapped_column(String(32), default=None)
+    currency: Mapped[str] = mapped_column(String(3), default="AFN")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class SupplierLedgerModel(RecordMixin, Base):
+    __tablename__ = "supplier_ledger"
+    supplier_id: Mapped[str] = mapped_column(String(36), index=True)
+    type: Mapped[str] = mapped_column(String(12))
+    amount_minor: Mapped[int] = mapped_column()
+    currency: Mapped[str] = mapped_column(String(3), default="AFN")
+    ref_type: Mapped[str | None] = mapped_column(String(16), default=None)
+    ref_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GoodsReceiptModel(RecordMixin, Base):
+    __tablename__ = "goods_receipts"
+    number: Mapped[str] = mapped_column(String(32), index=True)
+    supplier_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    branch_id: Mapped[str] = mapped_column(String(36), index=True)
+    total_cost_minor: Mapped[int] = mapped_column(default=0)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GoodsReceiptLineModel(RecordMixin, Base):
+    __tablename__ = "goods_receipt_lines"
+    receipt_id: Mapped[str] = mapped_column(String(36), index=True)
+    product_id: Mapped[str] = mapped_column(String(36))
+    qty_minor: Mapped[int] = mapped_column()
+    unit_cost_minor: Mapped[int] = mapped_column()

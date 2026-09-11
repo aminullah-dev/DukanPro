@@ -4,5 +4,6 @@ library;
 
 export 'database.dart';
 export 'src/catalog_store.dart';
+export 'src/customers_store.dart';
 export 'src/in_memory.dart';
 export 'src/sales_store.dart';

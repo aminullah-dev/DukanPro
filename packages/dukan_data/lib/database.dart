@@ -167,17 +167,65 @@ class Shifts extends Table with RecordColumns {
   Set<Column> get primaryKey => {id};
 }
 
+// ── Customers, debt, suppliers (Phase 4) ─────────────────────────────────────
+
+@DataClassName('CustomerRow')
+class Customers extends Table with RecordColumns {
+  TextColumn get name => text()();
+  TextColumn get phone => text().nullable()();
+  IntColumn get creditLimitMinor => integer().nullable()();
+  TextColumn get currency => text().withDefault(const Constant('AFN'))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('CustomerLedgerRow')
+class CustomerLedger extends Table with RecordColumns {
+  TextColumn get customerId => text()();
+  TextColumn get type => text()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get currency => text().withDefault(const Constant('AFN'))();
+  TextColumn get refType => text().nullable()();
+  TextColumn get refId => text().nullable()();
+  DateTimeColumn get occurredAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('SupplierRow')
+class Suppliers extends Table with RecordColumns {
+  TextColumn get name => text()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get currency => text().withDefault(const Constant('AFN'))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('SupplierLedgerRow')
+class SupplierLedger extends Table with RecordColumns {
+  TextColumn get supplierId => text()();
+  TextColumn get type => text()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get currency => text().withDefault(const Constant('AFN'))();
+  DateTimeColumn get occurredAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     OutboxEntries, CachedProfiles, Units, Categories, Products, Barcodes, StockMovements,
     Sales, SaleLines, Payments, Shifts,
+    Customers, CustomerLedger, Suppliers, SupplierLedger,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -195,6 +243,12 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(saleLines);
             await m.createTable(payments);
             await m.createTable(shifts);
+          }
+          if (from < 4) {
+            await m.createTable(customers);
+            await m.createTable(customerLedger);
+            await m.createTable(suppliers);
+            await m.createTable(supplierLedger);
           }
         },
       );

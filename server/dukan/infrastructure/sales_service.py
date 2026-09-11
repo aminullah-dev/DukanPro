@@ -16,10 +16,18 @@ from dukan.application.sales import (
     SaleView,
     ShiftView,
 )
+from dukan.domain.customers import (
+    CustomerLedgerEntry,
+    LedgerEntryType,
+    assert_within_credit_limit,
+    ledger_balance,
+)
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.domain.sales import SaleLine, assert_settleable, compute_totals
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
+    CustomerLedgerModel,
+    CustomerModel,
     PaymentModel,
     ProductModel,
     SaleLineModel,
@@ -54,6 +62,21 @@ class SqlSalesService(SalesService):
     def _decimal_places(self, unit_id: str) -> int:
         u = self._s.get(UnitModel, unit_id)
         return u.decimal_places if u else 0
+
+    def _customer_balance(self, customer_id: str) -> int:
+        rows = self._s.scalars(
+            select(CustomerLedgerModel).where(
+                CustomerLedgerModel.customer_id == customer_id,
+                CustomerLedgerModel.deleted_at.is_(None),
+            )
+        ).all()
+        return ledger_balance(
+            CustomerLedgerEntry(
+                id=r.id, customer_id=r.customer_id, type=LedgerEntryType(r.type),
+                amount_minor=r.amount_minor, currency=r.currency, occurred_at=r.occurred_at,
+            )
+            for r in rows
+        )
 
     def _view(self, sale: SaleModel) -> SaleView:
         lines = self._s.scalars(
@@ -152,6 +175,30 @@ class SqlSalesService(SalesService):
                     id=new_id(), sale_id=sale.id, method=p.method, amount_minor=p.amount_minor,
                     currency=currency, tendered_minor=p.tendered_minor, created_by=actor.id,
                 )
+            )
+        # Credit sale: the unpaid remainder goes to the customer ledger (Phase 4).
+        if customer_id is not None and paid < totals.total_minor:
+            remainder = totals.total_minor - paid
+            customer = self._s.scalar(
+                select(CustomerModel).where(
+                    CustomerModel.id == customer_id, CustomerModel.deleted_at.is_(None)
+                )
+            )
+            if customer is None:
+                raise NotFoundError("CUSTOMER_NOT_FOUND", customer_id=customer_id)
+            assert_within_credit_limit(
+                balance_minor=self._customer_balance(customer_id), charge_minor=remainder,
+                credit_limit_minor=customer.credit_limit_minor,
+            )
+            self._s.add(
+                CustomerLedgerModel(
+                    id=new_id(), customer_id=customer_id, type="charge", amount_minor=remainder,
+                    currency=currency, ref_type="sale", ref_id=sale.id, created_by=actor.id,
+                )
+            )
+            self._audit(
+                "debt.charge_posted", actor.id, sale.id,
+                {"customer_id": customer_id, "amount": remainder},
             )
         self._audit(
             "sale.settled", actor.id, sale.id,

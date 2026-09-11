@@ -1,0 +1,192 @@
+import 'package:dukan_core/dukan_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../l10n/app_localizations.dart';
+import '../auth/session.dart';
+import 'customers_providers.dart';
+
+String _afn(int minor) => (minor / 100).toStringAsFixed(2);
+
+class CustomersScreen extends ConsumerWidget {
+  const CustomersScreen({super.key});
+
+  Future<void> _add(BuildContext context, WidgetRef ref) async {
+    final actor = ref.read(sessionActorProvider);
+    if (actor == null) return;
+    final created = await showDialog<Customer>(context: context, builder: (_) => const _AddCustomerDialog());
+    if (created == null) return;
+    await ref.read(localCustomersProvider).createCustomer(created, actorId: actor.user.id, deviceId: 'app');
+    ref.invalidate(customersProvider);
+  }
+
+  Future<void> _pay(BuildContext context, WidgetRef ref, Customer c) async {
+    final actor = ref.read(sessionActorProvider);
+    if (actor == null) return;
+    final amount = await showDialog<int>(context: context, builder: (_) => _PaymentDialog(customer: c));
+    if (amount == null) return;
+    try {
+      await ref.read(localCustomersProvider).recordPayment(
+            customerId: c.id, amountMinor: amount, actorId: actor.user.id, deviceId: 'app');
+      ref
+        ..invalidate(customersProvider)
+        ..invalidate(customerBalanceProvider(c.id));
+    } on AppError catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.code)));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final canManage = ref.watch(sessionActorProvider)?.can(Permission.saleCreate) ?? false;
+    final async = ref.watch(customersProvider);
+    return Scaffold(
+      appBar: AppBar(title: Text(l.customers)),
+      floatingActionButton: canManage
+          ? FloatingActionButton.extended(
+              onPressed: () => _add(context, ref), icon: const Icon(Icons.person_add), label: Text(l.addCustomer))
+          : null,
+      body: async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('$e')),
+        data: (customers) => customers.isEmpty
+            ? Center(child: Text(l.noCustomers))
+            : ListView.separated(
+                itemCount: customers.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, i) {
+                  final c = customers[i];
+                  return ListTile(
+                    title: Text(c.name),
+                    subtitle: c.phone != null ? Text(c.phone!) : null,
+                    trailing: _BalanceChip(customerId: c.id),
+                    onTap: canManage ? () => _pay(context, ref, c) : null,
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}
+
+class _BalanceChip extends ConsumerWidget {
+  const _BalanceChip({required this.customerId});
+  final String customerId;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final async = ref.watch(customerBalanceProvider(customerId));
+    return async.maybeWhen(
+      data: (b) => Text('${l.balance}: ${_afn(b)}',
+          style: TextStyle(fontWeight: FontWeight.w600, color: b > 0 ? Theme.of(context).colorScheme.error : null)),
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _AddCustomerDialog extends StatefulWidget {
+  const _AddCustomerDialog();
+  @override
+  State<_AddCustomerDialog> createState() => _AddCustomerDialogState();
+}
+
+class _AddCustomerDialogState extends State<_AddCustomerDialog> {
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _limit = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _limit.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l.addCustomer),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: _name, decoration: InputDecoration(labelText: l.customerName)),
+        TextField(controller: _phone, decoration: InputDecoration(labelText: l.phone)),
+        TextField(
+          controller: _limit,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: l.creditLimit, suffixText: 'AFN'),
+        ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        FilledButton(
+          onPressed: () {
+            if (_name.text.trim().isEmpty) return;
+            final limit = double.tryParse(_limit.text);
+            Navigator.pop(
+              context,
+              Customer(
+                id: newId(), name: _name.text.trim(),
+                phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+                creditLimitMinor: limit == null ? null : (limit * 100).round(),
+              ),
+            );
+          },
+          child: Text(l.save),
+        ),
+      ],
+    );
+  }
+}
+
+class _PaymentDialog extends ConsumerStatefulWidget {
+  const _PaymentDialog({required this.customer});
+  final Customer customer;
+  @override
+  ConsumerState<_PaymentDialog> createState() => _PaymentDialogState();
+}
+
+class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
+  final _amount = TextEditingController();
+  @override
+  void dispose() {
+    _amount.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final balance = ref.watch(customerBalanceProvider(widget.customer.id));
+    return AlertDialog(
+      title: Text('${l.recordPayment} · ${widget.customer.name}'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text(l.balance),
+          Text(balance.maybeWhen(data: (b) => _afn(b), orElse: () => '…'), style: const TextStyle(fontWeight: FontWeight.bold)),
+        ]),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _amount,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: l.amount, suffixText: 'AFN'),
+        ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        FilledButton(
+          onPressed: () {
+            final v = double.tryParse(_amount.text);
+            if (v == null || v <= 0) return;
+            Navigator.pop(context, (v * 100).round());
+          },
+          child: Text(l.save),
+        ),
+      ],
+    );
+  }
+}

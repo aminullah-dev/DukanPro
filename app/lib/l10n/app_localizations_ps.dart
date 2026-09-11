@@ -171,6 +171,48 @@ class AppLocalizationsPs extends AppLocalizations {
   String get receipt => 'رسید';
 
   @override
+  String get customers => 'پیرودونکي';
+
+  @override
+  String get addCustomer => 'پیرودونکی اضافه کول';
+
+  @override
+  String get customerName => 'نوم';
+
+  @override
+  String get phone => 'تلیفون';
+
+  @override
+  String get creditLimit => 'د پور حد';
+
+  @override
+  String get recordPayment => 'د تادیې ثبت';
+
+  @override
+  String get amount => 'اندازه';
+
+  @override
+  String get balance => 'بیلانس';
+
+  @override
+  String get credit => 'اُدهار';
+
+  @override
+  String get receiveStock => 'توکي ترلاسه کول';
+
+  @override
+  String get supplier => 'عرضه‌کوونکی';
+
+  @override
+  String get unitCost => 'د پیرود بیه';
+
+  @override
+  String get receive => 'ترلاسه کول';
+
+  @override
+  String get noCustomers => 'لا تر اوسه پیرودونکی نشته';
+
+  @override
   String signedInAs(String user) {
     return 'د $user په توګه ننوتل';
   }

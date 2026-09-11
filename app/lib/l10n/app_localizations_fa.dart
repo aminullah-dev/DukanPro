@@ -172,6 +172,48 @@ class AppLocalizationsFa extends AppLocalizations {
   String get receipt => 'رسید';
 
   @override
+  String get customers => 'مشتریان';
+
+  @override
+  String get addCustomer => 'افزودن مشتری';
+
+  @override
+  String get customerName => 'نام';
+
+  @override
+  String get phone => 'تلفن';
+
+  @override
+  String get creditLimit => 'سقف اعتبار';
+
+  @override
+  String get recordPayment => 'ثبت پرداخت';
+
+  @override
+  String get amount => 'مبلغ';
+
+  @override
+  String get balance => 'بیلانس';
+
+  @override
+  String get credit => 'نسیه';
+
+  @override
+  String get receiveStock => 'ورود جنس';
+
+  @override
+  String get supplier => 'تأمین‌کننده';
+
+  @override
+  String get unitCost => 'قیمت خرید';
+
+  @override
+  String get receive => 'دریافت';
+
+  @override
+  String get noCustomers => 'هنوز مشتری‌ای نیست';
+
+  @override
   String signedInAs(String user) {
     return 'واردشده به‌عنوان $user';
   }
@@ -342,6 +384,48 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get receipt => 'رسید';
+
+  @override
+  String get customers => 'مشتریان';
+
+  @override
+  String get addCustomer => 'افزودن مشتری';
+
+  @override
+  String get customerName => 'نام';
+
+  @override
+  String get phone => 'تلفن';
+
+  @override
+  String get creditLimit => 'سقف اعتبار';
+
+  @override
+  String get recordPayment => 'ثبت پرداخت';
+
+  @override
+  String get amount => 'مبلغ';
+
+  @override
+  String get balance => 'بیلانس';
+
+  @override
+  String get credit => 'نسیه';
+
+  @override
+  String get receiveStock => 'ورود جنس';
+
+  @override
+  String get supplier => 'تأمین‌کننده';
+
+  @override
+  String get unitCost => 'قیمت خرید';
+
+  @override
+  String get receive => 'دریافت';
+
+  @override
+  String get noCustomers => 'هنوز مشتری‌ای نیست';
 
   @override
   String signedInAs(String user) {

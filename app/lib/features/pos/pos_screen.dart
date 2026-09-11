@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/locale_toggle.dart';
 import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
+import '../customers/customers_providers.dart';
 import 'pos_providers.dart';
 
 String _afn(int minor) => (minor / 100).toStringAsFixed(2);
@@ -27,21 +28,29 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final actor = ref.read(sessionActorProvider);
     final l = AppLocalizations.of(context);
     if (actor == null) return;
-    final tendered = await showDialog<int>(
+    final result = await showDialog<_PayResult>(
       context: context,
       builder: (_) => _PaymentDialog(totalMinor: total),
     );
-    if (tendered == null) return;
+    if (result == null) return;
     try {
       final lines = ref.read(posCartProvider.notifier).toSaleLines();
       final sales = ref.read(localSalesProvider);
-      final sale = await sales.settleCash(
-        lines: lines, tenderedMinor: tendered, branchId: actor.branchId,
-        actorId: actor.user.id, deviceId: 'app',
-      );
+      final sale = result.credit
+          ? await sales.settle(
+              lines: lines, cashMinor: result.cashMinor, tenderedMinor: result.tenderedMinor,
+              customerId: result.customerId, customerCreditLimitMinor: result.creditLimit,
+              branchId: actor.branchId, actorId: actor.user.id, deviceId: 'app',
+            )
+          : await sales.settleCash(
+              lines: lines, tenderedMinor: result.tenderedMinor, branchId: actor.branchId,
+              actorId: actor.user.id, deviceId: 'app',
+            );
       final saleLines = await sales.saleLinesFor(sale.id);
       ref.read(posCartProvider.notifier).clear();
-      ref.invalidate(productsProvider);
+      ref
+        ..invalidate(productsProvider)
+        ..invalidate(customersProvider);
       if (mounted) {
         await showDialog<void>(
           context: context,
@@ -199,16 +208,32 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 }
 
-class _PaymentDialog extends StatefulWidget {
+class _PayResult {
+  const _PayResult({
+    required this.credit,
+    required this.cashMinor,
+    required this.tenderedMinor,
+    this.customerId,
+    this.creditLimit,
+  });
+  final bool credit;
+  final int cashMinor;
+  final int tenderedMinor;
+  final String? customerId;
+  final int? creditLimit;
+}
+
+class _PaymentDialog extends ConsumerStatefulWidget {
   const _PaymentDialog({required this.totalMinor});
   final int totalMinor;
   @override
-  State<_PaymentDialog> createState() => _PaymentDialogState();
+  ConsumerState<_PaymentDialog> createState() => _PaymentDialogState();
 }
 
-class _PaymentDialogState extends State<_PaymentDialog> {
+class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   late final TextEditingController _tendered =
       TextEditingController(text: _afn(widget.totalMinor));
+  Customer? _customer;
 
   @override
   void dispose() {
@@ -222,8 +247,9 @@ class _PaymentDialogState extends State<_PaymentDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final change = _tenderedMinor - widget.totalMinor;
+    final customersAsync = ref.watch(customersProvider);
     return AlertDialog(
-      title: Text(l.cash),
+      title: Text(l.charge),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -245,13 +271,46 @@ class _PaymentDialogState extends State<_PaymentDialog> {
             Text(change >= 0 ? '${_afn(change)} AFN' : '—',
                 style: TextStyle(color: change >= 0 ? Colors.green.shade700 : Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
           ]),
+          const SizedBox(height: 8),
+          customersAsync.maybeWhen(
+            data: (customers) => DropdownButtonFormField<String?>(
+              initialValue: _customer?.id,
+              decoration: InputDecoration(labelText: l.credit, isDense: true),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('—')),
+                for (final c in customers) DropdownMenuItem(value: c.id, child: Text(c.name)),
+              ],
+              onChanged: (id) => setState(
+                  () => _customer = id == null ? null : customers.firstWhere((c) => c.id == id)),
+            ),
+            orElse: () => const SizedBox.shrink(),
+          ),
         ],
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        if (_customer != null)
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(
+              context,
+              _PayResult(
+                credit: true,
+                cashMinor: _tenderedMinor > widget.totalMinor ? widget.totalMinor : _tenderedMinor,
+                tenderedMinor: _tenderedMinor,
+                customerId: _customer!.id,
+                creditLimit: _customer!.creditLimitMinor,
+              ),
+            ),
+            child: Text(l.credit),
+          ),
         FilledButton(
-          onPressed: _tenderedMinor >= widget.totalMinor ? () => Navigator.pop(context, _tenderedMinor) : null,
-          child: Text(l.charge),
+          onPressed: _tenderedMinor >= widget.totalMinor
+              ? () => Navigator.pop(
+                    context,
+                    _PayResult(credit: false, cashMinor: widget.totalMinor, tenderedMinor: _tenderedMinor),
+                  )
+              : null,
+          child: Text(l.cash),
         ),
       ],
     );

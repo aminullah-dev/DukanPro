@@ -171,6 +171,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get receipt => 'Receipt';
 
   @override
+  String get customers => 'Customers';
+
+  @override
+  String get addCustomer => 'Add customer';
+
+  @override
+  String get customerName => 'Name';
+
+  @override
+  String get phone => 'Phone';
+
+  @override
+  String get creditLimit => 'Credit limit';
+
+  @override
+  String get recordPayment => 'Record payment';
+
+  @override
+  String get amount => 'Amount';
+
+  @override
+  String get balance => 'Balance';
+
+  @override
+  String get credit => 'Credit';
+
+  @override
+  String get receiveStock => 'Receive stock';
+
+  @override
+  String get supplier => 'Supplier';
+
+  @override
+  String get unitCost => 'Unit cost';
+
+  @override
+  String get receive => 'Receive';
+
+  @override
+  String get noCustomers => 'No customers yet';
+
+  @override
   String signedInAs(String user) {
     return 'Signed in as $user';
   }
