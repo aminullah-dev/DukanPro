@@ -17,11 +17,39 @@ enum NumberProblem { notANumber, tooPrecise, tooLarge }
 
 final _grammar = RegExp(r'^(-)?([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)?(?:\.([0-9]+))?$');
 
+/// What both parsers trim: Unicode white space, spelled out because Dart's trim
+/// and Python's strip disagree on U+FEFF and U+001C–U+001F. All in the BMP.
+bool _isSpace(int c) =>
+    (c >= 0x09 && c <= 0x0D) ||
+    (c >= 0x1C && c <= 0x20) ||
+    c == 0x85 ||
+    c == 0xA0 ||
+    c == 0x1680 ||
+    (c >= 0x2000 && c <= 0x200A) ||
+    c == 0x2028 ||
+    c == 0x2029 ||
+    c == 0x202F ||
+    c == 0x205F ||
+    c == 0x3000 ||
+    c == 0xFEFF;
+
+String _trim(String s) {
+  var start = 0;
+  var end = s.length;
+  while (start < end && _isSpace(s.codeUnitAt(start))) {
+    start++;
+  }
+  while (end > start && _isSpace(s.codeUnitAt(end - 1))) {
+    end--;
+  }
+  return s.substring(start, end);
+}
+
 /// [input] trimmed, with Persian and Arabic-Indic digits, `٫`, `٬` and the
 /// minus sign made ASCII.
 String normalizeDigits(String input) {
   final out = StringBuffer();
-  for (final rune in input.trim().runes) {
+  for (final rune in _trim(input).runes) {
     if (rune >= 0x06F0 && rune <= 0x06F9) {
       out.writeCharCode(0x30 + rune - 0x06F0);
     } else if (rune >= 0x0660 && rune <= 0x0669) {

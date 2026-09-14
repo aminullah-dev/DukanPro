@@ -248,7 +248,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -286,8 +286,65 @@ class AppDatabase extends _$AppDatabase {
           if (from < 7) {
             await _refLegacySaleMovements();
           }
+          if (from < 9) {
+            await _mergeUnitCopies();
+          }
         },
       );
+
+  /// Before the built-in units had fixed ids (dukan_core `builtInUnits`), every
+  /// device seeded the five with ids of its own and queued them, so a device
+  /// that synced held several "kg". Products move to the fixed unit and the
+  /// copies are set aside; queued ops follow (a copy's own insert is set aside,
+  /// a product op names the fixed unit). The server merges its copies the same
+  /// way (migration 0012).
+  Future<void> _mergeUnitCopies() async {
+    final now = DateTime.now().toUtc();
+    final fixedOf = <String, String>{}; // copy id -> fixed id
+    for (final u in builtInUnits) {
+      await into(units).insert(
+        UnitsCompanion.insert(id: u.id, name: u.name, decimalPlaces: Value(u.decimalPlaces)),
+        mode: InsertMode.insertOrIgnore,
+      );
+      final copies = await (select(units)
+            ..where((t) =>
+                t.name.equals(u.name) &
+                t.decimalPlaces.equals(u.decimalPlaces) &
+                t.id.equals(u.id).not() &
+                t.deletedAt.isNull()))
+          .get();
+      for (final c in copies) {
+        fixedOf[c.id] = u.id;
+      }
+    }
+    if (fixedOf.isEmpty) return;
+    for (final MapEntry(key: copy, value: fixed) in fixedOf.entries) {
+      await (update(products)..where((t) => t.unitId.equals(copy)))
+          .write(ProductsCompanion(unitId: Value(fixed)));
+    }
+    await (update(units)..where((t) => t.id.isIn(fixedOf.keys)))
+        .write(UnitsCompanion(deletedAt: Value(now), updatedAt: Value(now)));
+    final queued = await (select(outboxEntries)
+          ..where((t) =>
+              t.status.equals(OutboxStatus.pending.name) &
+              t.aggregateType.isIn(const ['units', 'products'])))
+        .get();
+    for (final op in queued) {
+      if (op.aggregateType == 'units') {
+        if (fixedOf.containsKey(op.aggregateId)) {
+          await (update(outboxEntries)..where((t) => t.id.equals(op.id)))
+              .write(const OutboxEntriesCompanion(status: Value('dismissed')));
+        }
+        continue;
+      }
+      final data = (jsonDecode(op.payload) as Map).cast<String, Object?>();
+      final fixed = fixedOf[data['unit_id']];
+      if (fixed != null) {
+        await (update(outboxEntries)..where((t) => t.id.equals(op.id)))
+            .write(OutboxEntriesCompanion(payload: Value(jsonEncode({...data, 'unit_id': fixed}))));
+      }
+    }
+  }
 
   Future<bool> _hasColumn(String table, String column) async {
     final rows = await customSelect('PRAGMA table_info("$table")').get();

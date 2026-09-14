@@ -28,12 +28,18 @@ _ASCII = {
     "\u066c": ",",  # ARABIC THOUSANDS SEPARATOR
     "\u2212": "-",  # MINUS SIGN
 }
+# What both parsers trim: Unicode white space, spelled out because Python's
+# strip and Dart's trim disagree on U+FEFF and U+001C-U+001F.
+_SPACE = (
+    "\t\n\v\f\r\x1c\x1d\x1e\x1f \x85\xa0       "
+    "         　﻿"
+)
 
 
 def normalize_digits(text: str) -> str:
     """text stripped, with Persian and Arabic-Indic digits, "٫", "٬" and the
     minus sign made ASCII."""
-    return "".join(_ASCII.get(ch, ch) for ch in text.strip())
+    return "".join(_ASCII.get(ch, ch) for ch in text.strip(_SPACE))
 
 
 def parse_scaled(text: str, decimal_places: int) -> tuple[int | None, NumberProblem | None]:

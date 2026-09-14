@@ -10,7 +10,7 @@ Create Date: 2026-09-11
 """
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0005"
 down_revision = "0004"
@@ -21,6 +21,8 @@ _TABLES = ["change_log", "processed_ops"]
 
 
 def _tables() -> set[str]:
+    if context.is_offline_mode():
+        return set()  # alembic --sql: the script is for an empty database
     return set(sa.inspect(op.get_bind()).get_table_names())
 
 

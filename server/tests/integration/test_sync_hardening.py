@@ -581,16 +581,17 @@ def test_pull_limit_is_bounded_and_pages_monotonically(client: TestClient) -> No
     for params in ({"limit": 0}, {"limit": 1001}, {"limit": -1}, {"since": -1}):
         r = client.get("/sync/pull", headers=shop.owner, params=params)
         assert r.status_code == 422 and r.json()["error"]["code"] == "REQUEST_INVALID"
-    seen: list[str] = []
+    seen: list[tuple[str, str]] = []
     since = 0
     while True:
         page = shop.pull(shop.owner, since=since, limit=1)
         if not page["changes"]:
             break
         assert page["watermark"] == page["changes"][0]["seq"]
-        seen.append(page["changes"][0]["row_id"])
+        seen.append((page["changes"][0]["table"], page["changes"][0]["row_id"]))
         since = page["watermark"]
-    assert len(seen) == len(set(seen)) == 3
+    assert len(seen) == len(set(seen))
+    assert sum(table == "products" for table, _ in seen) == 3  # after the built-in units
 
 
 # ── R1-104 (REST side): DTO bounds give a coded 422, never a DB 500 ─────────

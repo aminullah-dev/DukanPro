@@ -30,6 +30,7 @@ from dukan.domain.sales import (
     assert_sale_lines_valid,
     assert_sale_not_overpaid,
     assert_settleable,
+    assert_shift_cash_valid,
     compute_totals,
 )
 from dukan.infrastructure.change_feed import record_change
@@ -290,6 +291,7 @@ class SqlSalesService(SalesService):
     def open_shift(self, *, actor: User, branch_id: str, opening_float_minor: int) -> ShiftView:
         require_permission(_POLICY, actor, Permission.SALE_CREATE, branch_id)
         require_active_branch(self._s, branch_id)
+        assert_shift_cash_valid(amount_minor=opening_float_minor)
         shift = ShiftModel(
             id=new_id(), branch_id=branch_id, user_id=actor.id,
             opening_float_minor=opening_float_minor, status="open", created_by=actor.id,
@@ -311,6 +313,7 @@ class SqlSalesService(SalesService):
         require_permission(_POLICY, actor, needed, shift.branch_id)
         if shift.status != "open":
             raise ConflictError("SHIFT_ALREADY_CLOSED", shift_id=shift.id)
+        assert_shift_cash_valid(amount_minor=counted_cash_minor)
         cash_sales = self._s.scalar(
             select(func.coalesce(func.sum(PaymentModel.amount_minor), 0))
             .select_from(PaymentModel)

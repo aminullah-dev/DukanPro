@@ -20,6 +20,7 @@ from dukan.domain.purchasing import (
     SupplierEntryType,
     SupplierLedgerEntry,
     assert_receivable,
+    receipt_total,
     supplier_balance,
 )
 from dukan.infrastructure.change_feed import record_change
@@ -152,7 +153,7 @@ class SqlPurchasingService(PurchasingService):
                 )
             products[product.id] = product
             receipt_lines.append(line)
-        total = sum(line.line_cost for line in receipt_lines)
+        total = receipt_total(receipt_lines)
         receipt = GoodsReceiptModel(
             id=new_id(), number=self._next_number(), supplier_id=supplier_id, branch_id=branch_id,
             total_cost_minor=total, created_by=actor.id, updated_by=actor.id,

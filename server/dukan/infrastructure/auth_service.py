@@ -8,7 +8,7 @@ import hmac
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -24,6 +24,7 @@ from dukan.domain.identity import (
     UserStatus,
     assert_password_strong,
 )
+from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     BranchAssignmentModel,
@@ -136,9 +137,10 @@ class SqlAuthService(AuthService):
             self._s.add(RoleModel(id=new_id(), name=name, permissions=[p.value for p in perms]))
         for unit in BUILTIN_UNITS:  # the same ids as on every device
             if self._s.get(UnitModel, unit.id) is None:
-                self._s.add(
-                    UnitModel(id=unit.id, name=unit.name, decimal_places=unit.decimal_places)
-                )
+                row = UnitModel(id=unit.id, name=unit.name, decimal_places=unit.decimal_places)
+                self._s.add(row)
+                # In the feed like any other unit, so every device pulls them.
+                record_change(self._s, "units", row, op="insert", branch_id=None)
         branch = BranchModel(id=new_id(), name=shop_name)
         self._s.add(branch)
         owner = UserModel(
@@ -253,9 +255,15 @@ class SqlAuthService(AuthService):
         return AuthTokens(access_token=access, refresh_token=raw)
 
     def logout(self, *, refresh_token: str) -> None:
+        presented = tokens.hash_refresh(refresh_token)
+        # A sign-out may carry the token that a renewal still in flight has just
+        # rotated out: it ends the session all the same.
         sess = self._s.scalar(
             select(SessionModel).where(
-                SessionModel.refresh_hash == tokens.hash_refresh(refresh_token)
+                or_(
+                    SessionModel.refresh_hash == presented,
+                    SessionModel.prev_refresh_hash == presented,
+                )
             )
         )
         if sess is not None and sess.revoked_at is None:

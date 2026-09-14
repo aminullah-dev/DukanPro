@@ -334,6 +334,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device\'s secure storage could not be read. Sign in again; if it keeps happening, restart the device.';
 
   @override
+  String get errTotalTooLarge =>
+      'This total is too large to record. Check the quantity and price.';
+
+  @override
   String get errSessionEnded =>
       'Your access has changed or ended. Sign in again.';
 

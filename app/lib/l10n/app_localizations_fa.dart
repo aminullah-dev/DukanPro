@@ -335,6 +335,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'حافظهٔ امن این دستگاه خوانده نشد. دوباره وارد شوید؛ اگر تکرار شد، دستگاه را دوباره روشن کنید.';
 
   @override
+  String get errTotalTooLarge =>
+      'این مجموع برای ثبت بیش از حد بزرگ است. تعداد و قیمت را بررسی کنید.';
+
+  @override
   String get errSessionEnded =>
       'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
 
@@ -894,6 +898,10 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String get errStorage =>
       'حافظهٔ امن این دستگاه خوانده نشد. دوباره وارد شوید؛ اگر تکرار شد، دستگاه را دوباره روشن کنید.';
+
+  @override
+  String get errTotalTooLarge =>
+      'این مجموع برای ثبت بیش از حد بزرگ است. تعداد و قیمت را بررسی کنید.';
 
   @override
   String get errSessionEnded =>

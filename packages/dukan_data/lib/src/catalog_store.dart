@@ -170,23 +170,27 @@ final class LocalCatalog {
   final DriftStockRepository stock;
   final SyncRecorder _rec;
 
-  /// The units, with the built-in ones seeded on first use. They carry the
-  /// same fixed ids as on the server and every other device, so they are not
-  /// queued for sync and never duplicate.
+  /// The units. The built-in ones carry the same fixed ids as on the server and
+  /// every other device, so they are never queued for sync. Any that are
+  /// missing are added on every read, not only on a first one: a product made
+  /// elsewhere in a built-in unit must resolve here too.
   Future<List<UnitRow>> listUnits() async {
-    var rows = await (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
-    if (rows.isEmpty) {
-      await _db.transaction(() async {
-        for (final u in builtInUnits) {
-          await _db.into(_db.units).insert(
+    final ids = [for (final u in builtInUnits) u.id];
+    final have = {
+      for (final r in await (_db.select(_db.units)..where((t) => t.id.isIn(ids))).get()) r.id,
+    };
+    final missing = [for (final u in builtInUnits) if (!have.contains(u.id)) u];
+    if (missing.isNotEmpty) {
+      await _db.batch((b) => b.insertAll(
+            _db.units,
+            [
+              for (final u in missing)
                 UnitsCompanion.insert(id: u.id, name: u.name, decimalPlaces: Value(u.decimalPlaces)),
-                mode: InsertMode.insertOrIgnore,
-              );
-        }
-      });
-      rows = await (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
+            ],
+            mode: InsertMode.insertOrIgnore,
+          ));
     }
-    return rows;
+    return (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
   }
 
   Map<String, Object?> _productData(Product p) => {

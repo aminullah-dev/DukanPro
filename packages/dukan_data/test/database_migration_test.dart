@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
@@ -55,5 +56,40 @@ void main() {
     expect(pending[ops[7].opId], isNot(contains('ref_id')));
     final sent = await (db.select(db.outboxEntries)..where((t) => t.id.equals(ops[6].opId))).getSingle();
     expect(jsonDecode(sent.payload), isNot(contains('ref_id')));
+  });
+
+  test('upgrading to v9 merges seeded copies of the built-in units into the fixed ones', () async {
+    final dir = await Directory.systemTemp.createTemp('dukan_units');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/app.db');
+    final kg = builtInUnits.firstWhere((u) => u.name == 'kg');
+    final copy = newId(); // a "kg" this device seeded before the ids were fixed
+    final rice = newId();
+    final box = newId();
+
+    final old = AppDatabase(NativeDatabase(file));
+    await old.into(old.units).insert(UnitsCompanion.insert(id: copy, name: 'kg', decimalPlaces: const Value(3)));
+    await old.into(old.units).insert(UnitsCompanion.insert(id: box, name: 'box', decimalPlaces: const Value(0)));
+    await LocalCatalog(old).products.create(
+        Product(id: rice, sku: 'RICE', name: 'Rice', unitId: copy, sellPrice: Money(8000, 'AFN')),
+        barcodes: const []);
+    final outbox = DriftSyncOutbox(old);
+    final unitOp = _op(1, 'units', copy, {'name': 'kg', 'decimal_places': 3});
+    final productOp = _op(2, 'products', rice, {'sku': 'RICE', 'name': 'Rice', 'unit_id': copy});
+    await outbox.enqueue(unitOp);
+    await outbox.enqueue(productOp);
+    await old.customStatement('PRAGMA user_version = 8');
+    await old.close();
+
+    final db = AppDatabase(NativeDatabase(file));
+    addTearDown(db.close);
+    final product = await (db.select(db.products)..where((t) => t.id.equals(rice))).getSingle();
+    expect(product.unitId, kg.id);
+    final live = await (db.select(db.units)..where((t) => t.deletedAt.isNull())).get();
+    expect([for (final u in live) if (u.name == 'kg') u.id], [kg.id]);
+    expect(live.map((u) => u.id), contains(box));
+    final pending = {for (final o in await DriftSyncOutbox(db).pending()) o.opId: o.payload};
+    expect(pending.containsKey(unitOp.opId), isFalse); // the copy's own insert is set aside
+    expect(pending[productOp.opId], containsPair('unit_id', kg.id));
   });
 }

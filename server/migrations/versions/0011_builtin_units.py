@@ -11,7 +11,7 @@ Create Date: 2026-09-14
 from datetime import UTC, datetime
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0011"
 down_revision = "0010"
@@ -38,9 +38,17 @@ def upgrade() -> None:
         sa.column("updated_at", sa.DateTime),
         sa.column("version", sa.Integer),
     )
+    now = datetime.now(UTC)
+    if context.is_offline_mode():
+        # alembic --sql: the script is for an empty database, with no units yet.
+        op.bulk_insert(units, [
+            {"id": unit_id, "name": name, "decimal_places": places, "created_at": now,
+             "updated_at": now, "version": 1}
+            for unit_id, name, places in _UNITS
+        ])
+        return
     bind = op.get_bind()
     have = set(bind.execute(sa.select(units.c.id)).scalars())
-    now = datetime.now(UTC)
     for unit_id, name, places in _UNITS:
         if unit_id not in have:
             bind.execute(

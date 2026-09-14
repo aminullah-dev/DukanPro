@@ -98,6 +98,7 @@
   "backToUnlock": "Back",
   "errOfflineExpired": "This device has been offline too long. Sign in online.",
   "errStorage": "This device's secure storage could not be read. Sign in again; if it keeps happening, restart the device.",
+  "errTotalTooLarge": "This total is too large to record. Check the quantity and price.",
   "errSessionEnded": "Your access has changed or ended. Sign in again.",
   "biometricUnlockSetting": "Unlock with fingerprint",
   "confirmPasswordTitle": "Confirm your password",

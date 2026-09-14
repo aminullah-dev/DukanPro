@@ -12,7 +12,7 @@ Create Date: 2026-09-11
 """
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0003"
 down_revision = "0002"
@@ -23,10 +23,14 @@ _TABLES = ["payments", "sale_lines", "sales", "shifts"]
 
 
 def _tables() -> set[str]:
+    if context.is_offline_mode():
+        return set()  # alembic --sql: the script is for an empty database
     return set(sa.inspect(op.get_bind()).get_table_names())
 
 
 def _columns(table: str) -> set[str]:
+    if context.is_offline_mode():
+        return set()  # alembic --sql: the script is for an empty database
     return {c["name"] for c in sa.inspect(op.get_bind()).get_columns(table)}
 
 

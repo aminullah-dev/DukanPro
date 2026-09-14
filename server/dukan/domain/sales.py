@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from dukan.shared.errors import ConflictError, ValidationError
+from dukan.shared.limits import MONEY_MAX
 
 
 class SaleStatus(StrEnum):
@@ -34,6 +35,13 @@ def line_total_minor(unit_price_minor: int, qty_minor: int, decimal_places: int)
     magnitude = abs(product)
     rounded = (magnitude + scale // 2) // scale
     return -rounded if negative else rounded
+
+
+def line_total_fits(unit_price_minor: int, qty_minor: int, decimal_places: int) -> bool:
+    """Whether a line's money value stays within MONEY_MAX, the most a money
+    column or a client's JSON number holds. (The device asks before it
+    multiplies: a 64-bit product wraps.)"""
+    return abs(unit_price_minor * qty_minor) <= MONEY_MAX * _scale(decimal_places)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,10 +76,12 @@ def compute_totals(lines: Sequence[SaleLine], discount_minor: int = 0) -> SaleTo
 
 def assert_sale_lines_valid(lines: Sequence[SaleLine], *, currency: str) -> None:
     """Every line sells a positive quantity at a price of zero or more, in the
-    sale's currency. Raises ValidationError SALE_EMPTY, SALE_LINE_INVALID_QTY or
-    SALE_LINE_INVALID_PRICE, or ConflictError SALE_CURRENCY_MISMATCH."""
+    sale's currency, and the sale's total stays within MONEY_MAX. Raises
+    ValidationError SALE_EMPTY, SALE_LINE_INVALID_QTY, SALE_LINE_INVALID_PRICE or
+    SALE_TOTAL_TOO_LARGE, or ConflictError SALE_CURRENCY_MISMATCH."""
     if not lines:
         raise ValidationError("SALE_EMPTY")
+    total = 0
     for l in lines:
         if l.qty_minor <= 0:
             raise ValidationError("SALE_LINE_INVALID_QTY", product_id=l.product_id, qty=l.qty_minor)
@@ -81,6 +91,11 @@ def assert_sale_lines_valid(lines: Sequence[SaleLine], *, currency: str) -> None
             )
         if l.currency != currency:
             raise ConflictError("SALE_CURRENCY_MISMATCH", expected=currency, got=l.currency)
+        if not line_total_fits(l.unit_price_minor, l.qty_minor, l.decimal_places):
+            raise ValidationError("SALE_TOTAL_TOO_LARGE", product_id=l.product_id)
+        total += l.line_total
+    if total > MONEY_MAX:
+        raise ValidationError("SALE_TOTAL_TOO_LARGE")
 
 
 def assert_settleable(
@@ -138,3 +153,10 @@ def assert_discount_valid(*, discount_minor: int, subtotal_minor: int) -> None:
         raise ValidationError(
             "SALE_DISCOUNT_INVALID", discount=discount_minor, subtotal=subtotal_minor
         )
+
+
+def assert_shift_cash_valid(*, amount_minor: int) -> None:
+    """Cash in a drawer (a shift's opening float, the count at its close) is zero
+    or more. Raises ValidationError SHIFT_CASH_INVALID."""
+    if amount_minor < 0:
+        raise ValidationError("SHIFT_CASH_INVALID", amount=amount_minor)

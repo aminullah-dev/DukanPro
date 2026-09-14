@@ -5,7 +5,8 @@
 library;
 
 import '../shared/errors.dart';
-import 'sales.dart' show lineTotalMinor;
+import 'numbers.dart' show moneyMax;
+import 'sales.dart' show lineTotalFits, lineTotalMinor;
 
 enum SupplierEntryType { bill, payment, adjustment }
 
@@ -75,11 +76,26 @@ final class ReceiptLine {
 }
 
 /// A received line adds a positive quantity at a cost of zero or more (zero: a
-/// quantity-only receipt). Raises [ValidationError] `GRN_LINE_INVALID`.
+/// quantity-only receipt), costing at most [moneyMax]. Raises [ValidationError]
+/// `GRN_LINE_INVALID` or `GRN_TOTAL_TOO_LARGE`.
 void assertReceivable(ReceiptLine line) {
   if (line.qtyMinor <= 0 || line.unitCostMinor < 0) {
     throw ValidationError('GRN_LINE_INVALID', {
       'product_id': line.productId, 'qty': line.qtyMinor, 'cost': line.unitCostMinor,
     });
   }
+  if (!lineTotalFits(line.unitCostMinor, line.qtyMinor, line.decimalPlaces)) {
+    throw ValidationError('GRN_TOTAL_TOO_LARGE', {'product_id': line.productId});
+  }
+}
+
+/// What a receipt of valid lines bills: their costs, at most [moneyMax].
+/// Raises [ValidationError] `GRN_TOTAL_TOO_LARGE`.
+int receiptTotal(Iterable<ReceiptLine> lines) {
+  var total = 0;
+  for (final l in lines) {
+    total += l.lineCost; // each at most moneyMax, so the sum cannot wrap first
+    if (total > moneyMax) throw ValidationError('GRN_TOTAL_TOO_LARGE', {});
+  }
+  return total;
 }

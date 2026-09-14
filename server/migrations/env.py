@@ -15,7 +15,10 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 db_url = os.environ.get("DUKAN_DATABASE_URL", config.get_main_option("sqlalchemy.url"))
-config.set_main_option("sqlalchemy.url", db_url)
+if db_url:
+    # The config file format reads "%" as interpolation (a percent-encoded
+    # password would crash it), so it is doubled here.
+    config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 

@@ -8,12 +8,13 @@ Revises: 0008
 Create Date: 2026-09-14
 """
 
+import os
+import time
+import uuid
 from datetime import UTC, datetime
 
 import sqlalchemy as sa
-from alembic import op
-
-from dukan.shared.ids import new_id
+from alembic import context, op
 
 revision = "0009"
 down_revision = "0008"
@@ -22,7 +23,18 @@ depends_on = None
 
 
 def _columns(table: str) -> set[str]:
+    if context.is_offline_mode():
+        return set()  # alembic --sql: the script is for an empty database
     return {c["name"] for c in sa.inspect(op.get_bind()).get_columns(table)}
+
+
+def _uuid7() -> str:
+    """A UUIDv7 as dukan.shared.ids.new_id makes it, frozen here: a revision
+    never imports the app, which may change after it."""
+    b = bytearray(int(time.time() * 1000).to_bytes(6, "big") + os.urandom(10))
+    b[6] = (b[6] & 0x0F) | 0x70  # version 7
+    b[8] = (b[8] & 0x3F) | 0x80  # variant
+    return str(uuid.UUID(bytes=bytes(b)))
 
 
 def _backfill_branch_owners(bind: sa.engine.Connection) -> None:
@@ -94,7 +106,7 @@ def _backfill_branch_owners(bind: sa.engine.Connection) -> None:
     def make_owner(user_id: str, branch_id: str) -> None:
         current = held.get((user_id, branch_id))
         if current is None:
-            row_id = new_id()
+            row_id = _uuid7()
             bind.execute(
                 sa.insert(assignments).values(
                     id=row_id, user_id=user_id, branch_id=branch_id, role_name="owner",
@@ -125,12 +137,13 @@ def _backfill_branch_owners(bind: sa.engine.Connection) -> None:
 
 
 def upgrade() -> None:
-    # 0001 builds its tables from the live models, so a FRESH database already has
-    # the column (and its index) when this revision runs.
+    # A database an older release built from the live models may already have the
+    # column (and its index).
     if "prev_refresh_hash" not in _columns("sessions"):
         op.add_column("sessions", sa.Column("prev_refresh_hash", sa.String(128), nullable=True))
         op.create_index("ix_sessions_prev_refresh_hash", "sessions", ["prev_refresh_hash"])
-    _backfill_branch_owners(op.get_bind())
+    if not context.is_offline_mode():  # a script's database has no users yet
+        _backfill_branch_owners(op.get_bind())
 
 
 def downgrade() -> None:

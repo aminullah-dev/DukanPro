@@ -104,9 +104,18 @@ class _SqlSyncReader:
         p = self._s.get(ProductModel, product_id)
         if p is None:
             return None
+        unit = self._s.get(UnitModel, p.unit_id)
         return ProductRef(
             id=p.id, deleted=p.deleted_at is not None, track_stock=p.track_stock,
             sell_price_minor=p.sell_price_minor, cost_minor=p.cost_minor,
+            decimal_places=unit.decimal_places if unit is not None else None,
+        )
+
+    def shop_currencies(self) -> frozenset[str]:
+        return frozenset(
+            self._s.scalars(
+                select(BranchModel.currency_default).where(BranchModel.deleted_at.is_(None))
+            )
         )
 
     def unit_exists(self, unit_id: str) -> bool:
@@ -156,7 +165,7 @@ class _SqlSyncReader:
         return SaleRef(
             id=s.id, branch_id=s.branch_id, created_by=s.created_by, customer_id=s.customer_id,
             currency=s.currency, subtotal_minor=s.subtotal_minor, total_minor=s.total_minor,
-            paid_minor=s.paid_minor,
+            paid_minor=s.paid_minor, occurred_at=_aware(s.occurred_at),
         )
 
     def sale_lines_total(self, sale_id: str) -> int:
@@ -223,6 +232,11 @@ class _SqlSyncReader:
                 if type(value) is int:
                     prices.add(value)
         return frozenset(prices)
+
+
+def _aware(at: datetime) -> datetime:
+    """SQLite hands back naive UTC datetimes."""
+    return at if at.tzinfo is not None else at.replace(tzinfo=UTC)
 
 
 class SqlSyncService(SyncService):

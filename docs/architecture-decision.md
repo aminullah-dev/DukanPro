@@ -61,9 +61,9 @@ The **FastAPI + PostgreSQL backend stays aligned** with the family's `api-servic
 
 ## Server data rules
 
-- **Frozen migrations.** An Alembic revision is plain DDL and never reads the live models, so every model change comes with a new revision. The tests upgrade an empty database to head and compare it with the models, walk every revision with a row in every table, and downgrade to base and back. CI runs them on SQLite and on PostgreSQL.
-- **64-bit money.** Money (minor units) and quantities are `BIGINT`, bounded at the API by `MONEY_MAX` (2^53 − 1, exact as a JSON number). Counters and versions stay 32-bit.
-- **One error shape.** Every failure answers `{error: {code, context}}`: domain errors with their code, a malformed request `REQUEST_INVALID` (422), anything unexpected `INTERNAL` (500), with the traceback only in the server log.
+- **Frozen migrations.** An Alembic revision is plain DDL and never reads the live models, so every model change comes with a new revision. The tests upgrade an empty database to head and compare it with the models, walk every revision with a row in every table, and downgrade to base and back. CI runs them on SQLite and on PostgreSQL. They also render as a SQL script for an empty database (`alembic upgrade head --sql`), and a revision never imports the app.
+- **64-bit money.** Money (minor units) and quantities are `BIGINT`, bounded at the API by `MONEY_MAX` (2^53 − 1, exact as a JSON number). A line's value and a sale's or receipt's total are held to it as well (`SALE_TOTAL_TOO_LARGE`, `GRN_TOTAL_TOO_LARGE`), checked before multiplying on the device. Counters and versions stay 32-bit.
+- **One error shape.** Every failure answers `{error: {code, context}}`: domain errors with their code, a malformed request `REQUEST_INVALID` (422), an unknown route or method `NOT_FOUND` (404) / `METHOD_NOT_ALLOWED` (405), anything unexpected `INTERNAL` (500), with the traceback only in the server log.
 - **One connection per request.** Authentication hands its database connection back before the endpoint runs. The PostgreSQL pool covers the request threads and replaces dropped connections.
 
 ## Validate early (tracked risks)

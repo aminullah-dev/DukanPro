@@ -647,6 +647,12 @@ abstract class AppLocalizations {
   /// **'This device\'s secure storage could not be read. Sign in again; if it keeps happening, restart the device.'**
   String get errStorage;
 
+  /// No description provided for @errTotalTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This total is too large to record. Check the quantity and price.'**
+  String get errTotalTooLarge;
+
   /// No description provided for @errSessionEnded.
   ///
   /// In en, this message translates to:

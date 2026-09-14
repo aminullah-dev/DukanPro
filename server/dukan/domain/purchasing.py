@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from dukan.domain.sales import line_total_minor
+from dukan.domain.sales import line_total_fits, line_total_minor
 from dukan.shared.errors import ValidationError
+from dukan.shared.limits import MONEY_MAX
 
 
 class SupplierEntryType(StrEnum):
@@ -64,9 +65,21 @@ class ReceiptLine:
 
 def assert_receivable(line: ReceiptLine) -> None:
     """A received line adds a positive quantity at a cost of zero or more (zero:
-    a quantity-only receipt). Raises ValidationError GRN_LINE_INVALID."""
+    a quantity-only receipt), costing at most MONEY_MAX. Raises ValidationError
+    GRN_LINE_INVALID or GRN_TOTAL_TOO_LARGE."""
     if line.qty_minor <= 0 or line.unit_cost_minor < 0:
         raise ValidationError(
             "GRN_LINE_INVALID", product_id=line.product_id, qty=line.qty_minor,
             cost=line.unit_cost_minor,
         )
+    if not line_total_fits(line.unit_cost_minor, line.qty_minor, line.decimal_places):
+        raise ValidationError("GRN_TOTAL_TOO_LARGE", product_id=line.product_id)
+
+
+def receipt_total(lines: Iterable[ReceiptLine]) -> int:
+    """What a receipt of valid lines bills: their costs, at most MONEY_MAX. Raises
+    ValidationError GRN_TOTAL_TOO_LARGE."""
+    total = sum(line.line_cost for line in lines)
+    if total > MONEY_MAX:
+        raise ValidationError("GRN_TOTAL_TOO_LARGE")
+    return total

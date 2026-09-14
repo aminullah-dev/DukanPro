@@ -332,6 +332,10 @@ class AppLocalizationsPs extends AppLocalizations {
       'د دې وسیلې خوندي حافظه ونه لوستل شوه. بیا ننوځئ؛ که بیا پېښ شو، وسیله بیا چالانه کړئ.';
 
   @override
+  String get errTotalTooLarge =>
+      'دا ټولټال د ثبتولو لپاره ډېر لوی دی. شمېر او بیه وګورئ.';
+
+  @override
   String get errSessionEnded =>
       'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
 

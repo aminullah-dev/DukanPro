@@ -1,4 +1,5 @@
 import '../shared/errors.dart';
+import 'numbers.dart' show moneyMax;
 
 /// Sales / POS domain. Mirrors docs/domain/sales.md and
 /// server/dukan/domain/sales.py. Money is integer minor units; quantities are
@@ -26,6 +27,13 @@ int lineTotalMinor(int unitPriceMinor, int qtyMinor, int decimalPlaces) {
   final rounded = (magnitude + scale ~/ 2) ~/ scale;
   return negative ? -rounded : rounded;
 }
+
+/// Whether a line's money value stays within [moneyMax], the most a money
+/// column or a JSON number holds. Asked before multiplying: a 64-bit product
+/// wraps (2e15 pieces at 520.00 would come out negative).
+bool lineTotalFits(int unitPriceMinor, int qtyMinor, int decimalPlaces) =>
+    BigInt.from(unitPriceMinor).abs() * BigInt.from(qtyMinor).abs() <=
+    BigInt.from(moneyMax) * BigInt.from(10).pow(decimalPlaces);
 
 final class SaleLine {
   const SaleLine({
@@ -64,11 +72,13 @@ SaleTotals computeTotals(List<SaleLine> lines, {int discountMinor = 0}) {
 }
 
 /// Every line sells a positive quantity at a price of zero or more, in the
-/// sale's [currency]. Raises [ValidationError] `SALE_EMPTY`,
-/// `SALE_LINE_INVALID_QTY` or `SALE_LINE_INVALID_PRICE`, or [ConflictError]
+/// sale's [currency], and the sale's total stays within [moneyMax]. Raises
+/// [ValidationError] `SALE_EMPTY`, `SALE_LINE_INVALID_QTY`,
+/// `SALE_LINE_INVALID_PRICE` or `SALE_TOTAL_TOO_LARGE`, or [ConflictError]
 /// `SALE_CURRENCY_MISMATCH`.
 void assertSaleLinesValid(List<SaleLine> lines, {required String currency}) {
   if (lines.isEmpty) throw ValidationError('SALE_EMPTY', {});
+  var total = 0;
   for (final l in lines) {
     if (l.qtyMinor <= 0) {
       throw ValidationError('SALE_LINE_INVALID_QTY', {'product_id': l.productId, 'qty': l.qtyMinor});
@@ -79,6 +89,11 @@ void assertSaleLinesValid(List<SaleLine> lines, {required String currency}) {
     if (l.currency != currency) {
       throw ConflictError('SALE_CURRENCY_MISMATCH', {'expected': currency, 'got': l.currency});
     }
+    if (!lineTotalFits(l.unitPriceMinor, l.qtyMinor, l.decimalPlaces)) {
+      throw ValidationError('SALE_TOTAL_TOO_LARGE', {'product_id': l.productId});
+    }
+    total += l.lineTotal; // each at most moneyMax, so the sum cannot wrap first
+    if (total > moneyMax) throw ValidationError('SALE_TOTAL_TOO_LARGE', {});
   }
 }
 
@@ -134,4 +149,10 @@ void assertDiscountValid({required int discountMinor, required int subtotalMinor
   if (discountMinor < 0 || discountMinor > subtotalMinor) {
     throw ValidationError('SALE_DISCOUNT_INVALID', {'discount': discountMinor, 'subtotal': subtotalMinor});
   }
+}
+
+/// Cash in a drawer (a shift's opening float, the count at its close) is zero
+/// or more. Raises [ValidationError] `SHIFT_CASH_INVALID`.
+void assertShiftCashValid({required int amountMinor}) {
+  if (amountMinor < 0) throw ValidationError('SHIFT_CASH_INVALID', {'amount': amountMinor});
 }

@@ -172,7 +172,7 @@ final class LocalPurchasing {
     required String deviceId,
   }) async {
     lines.forEach(assertReceivable);
-    final total = lines.fold<int>(0, (s, l) => s + l.lineCost);
+    final total = receiptTotal(lines);
     await _db.transaction(() async {
       for (final l in lines) {
         final movementId = newId();

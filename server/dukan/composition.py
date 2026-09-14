@@ -15,6 +15,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from dukan.application.audit import AuditService
 from dukan.application.auth import AuthService
@@ -195,6 +196,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(
             status_code=422,
             content={"error": {"code": "REQUEST_INVALID", "context": {"fields": fields[:20]}}},
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_error_handler(
+        _request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        # An unknown route or method answers in the error contract too, so a
+        # client never reads a 404 or 405 as being offline.
+        code = {404: "NOT_FOUND", 405: "METHOD_NOT_ALLOWED"}.get(
+            exc.status_code, f"HTTP_{exc.status_code}"
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": {"code": code, "context": {}}},
+            headers=exc.headers,
         )
 
     @app.exception_handler(Exception)

@@ -68,8 +68,8 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 
 | Table, op | Permission (branch) | Rules |
 |---|---|---|
-| products insert | product.manage (active) | the unit exists; `category_id` and `cost_*` must be null |
-| products update | product.manage (active), plus price.change when the price or currency changes, plus purchase.cost for a cost | `base_version` required; only `name`, `sell_price_minor`, `sell_currency`, `is_active`, `cost_minor` (a goods receipt's cost, in the selling currency) |
+| products insert | product.manage (active) | the unit exists; `category_id` and `cost_*` must be null; the currency one the shop's branches trade in (`PRICE_CURRENCY_INVALID`), as on REST |
+| products update | product.manage (active), plus price.change when the price or currency changes, plus purchase.cost for a cost | `base_version` required; only `name`, `sell_price_minor`, `sell_currency`, `is_active`, `cost_minor` (a goods receipt's cost, in the selling currency); the currency one the shop's branches trade in (`PRICE_CURRENCY_INVALID`), as on REST |
 | barcodes insert | product.manage (active) | the product exists |
 | units insert | any role in the active branch for the device seed (piece/0, kg/3, litre/3, dozen/0, meter/2); product.manage otherwise | |
 | customers insert | sale.create (active) | a credit limit other than 0 (null is unlimited) without customer.credit is stored as 0, and the audit keeps the requested limit |
@@ -77,9 +77,9 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | suppliers insert | product.manage (active) | |
 | stock_movements insert, `adjustment` | stock.adjust (row) | qty ≠ 0; the product tracks stock |
 | stock_movements insert, `purchase` | stock.adjust (row) | qty > 0 |
-| stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product |
+| stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product; a movement beyond the lines that have arrived, while some are still missing, is a retry (`SALE_LINES_NOT_FOUND`) |
 | sales insert | sale.create (row), plus sale.discount for a discount above 0 | 0 ≤ discount ≤ subtotal; total = subtotal − discount + tax; paid ≥ total unless on credit, and never above the total (`SALE_OVERPAID`); the customer exists; `shift_id` null |
-| sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up); lines ≤ subtotal; the sale's currency; a pushed `unit_cost_minor` is ignored and set by the server from the product's cost; a unit price under the catalog price needs sale.discount or price.change, unless the product had that price within the last 45 days (a till that had not pulled a price change yet) |
+| sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up) at the decimal places of the product's unit (a pushed `decimal_places` that differs is refused, `SYNC_FIELD_INVALID`; a missing one is filled in); lines ≤ subtotal; the sale's currency; a pushed `unit_cost_minor` is ignored and set by the server from the product's cost; a unit price under the catalog price needs sale.discount or price.change, unless the product had that price within the 45 days before the sale (the time its header recorded) (a till that had not pulled a price change yet) |
 | payments insert | sale.create (sale's) | the pusher's own sale, whose lines add up to its subtotal; payments ≤ paid and ≤ total; cash or card, a positive amount, and tendered (cash only) ≥ amount (`SALE_PAYMENT_INVALID`) |
 | customer_ledger insert, `charge` | sale.create (sale's) | `ref_type` `sale` and `ref_id` of the pusher's own sale for that customer, whose lines add up to its subtotal; charges ≤ total − paid; over the credit limit is **flagged** in the audit, not refused |
 | customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused |
@@ -95,7 +95,7 @@ Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories,
 - Envelope: `SYNC_OP_INVALID`, `UNKNOWN_TABLE`, `SYNC_OP_UNSUPPORTED`, `SYNC_BASE_VERSION_REQUIRED`, `SYNC_ACTOR_MISMATCH`, `SYNC_OP_ID_TAKEN` (another user's applied op already holds this op_id).
 - Fields: `SYNC_FIELD_NOT_ALLOWED`, `SYNC_FIELD_REQUIRED`, `SYNC_FIELD_INVALID`, `MONEY_CURRENCY_INVALID` (the context names the field and the reason).
 - Access: `ACCESS_DENIED`, `BRANCH_REQUIRED`, `BRANCH_INACTIVE`.
-- References: `PRODUCT_NOT_FOUND`, `UNIT_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `SUPPLIER_NOT_FOUND`, `SALE_NOT_FOUND`, `SALE_LINES_NOT_FOUND` (money against a sale whose lines have not all arrived), `SYNC_REF_MISMATCH`, `SYNC_ROW_EXISTS` (a ledger row id reused).
+- References: `PRODUCT_NOT_FOUND`, `UNIT_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `SUPPLIER_NOT_FOUND`, `SALE_NOT_FOUND`, `SALE_LINES_NOT_FOUND` (money or a stock movement against a sale whose lines have not all arrived), `SYNC_REF_MISMATCH`, `SYNC_ROW_EXISTS` (a ledger row id reused).
 - Domain: `STOCK_INVALID_QTY`, `PRODUCT_NOT_STOCK_TRACKED`, `SALE_UNDERPAID`, `SALE_DISCOUNT_INVALID`, `SALE_CURRENCY_MISMATCH`, `DEBT_CURRENCY_MISMATCH`, `PURCHASE_CURRENCY_MISMATCH`.
 - `ROW_INVALID`: an unexpected server error on that op.
 
@@ -167,7 +167,7 @@ Two rules keep one user's pull from undoing another's work on a shared device:
 - No tombstones yet: soft deletes do not reach devices.
 - No document atomicity: a sale's rows apply one op at a time. A header counts in reports as soon as it arrives, even while its lines are still queued; money against it (payments, charges) waits for the lines. Grouping a device transaction into one all-or-nothing push is still to do.
 - A rejected append-only op (a sale line, a payment) is not undone on the device: it is listed for review, and its local effect stays until someone acts on it.
-- Line prices are the device's price at sale time. The server does not reprice them; the audit entry records the catalog price next to it, and flags a line under it (`below_catalog`). A line under every price the product had in the last 45 days needs sale.discount or price.change (`ACCESS_DENIED`, retried: granting the role lets it apply). The price history comes from the audit trail's `product.price_changed` entries.
+- Line prices are the device's price at sale time. The server does not reprice them; the audit entry records the catalog price next to it, and flags a line under it (`below_catalog`). A line under every price the product had in the 45 days before the sale needs sale.discount or price.change (`ACCESS_DENIED`, retried: granting the role lets it apply). The price history comes from the audit trail's `product.price_changed` entries.
 - Business numbers are not leased yet (decision B below); device-prefixed numbers keep devices from colliding.
 
 ## Rollout of the hardened push

@@ -149,14 +149,17 @@ def test_pull_pages_are_complete_and_report_the_newest_seq(client: TestClient) -
     shop = Shop(client)
     shop.push(*[op("products", product(sku=f"S{i}"), row_id=_uuid()) for i in range(25)])
     seen: list[int] = []
+    products = 0
     since = 0
     while True:
         page = shop.pull(since=since, limit=10)
         seen += [c["seq"] for c in page["changes"]]
+        products += sum(c["table"] == "products" for c in page["changes"])
         if page["watermark"] == since:
             break
         since = page["watermark"]
-    assert seen == sorted(seen) and len(set(seen)) == 25
+    assert seen == sorted(seen) and len(set(seen)) == len(seen)
+    assert products == 25  # after the shop's built-in units
     assert page["max_seq"] == seen[-1]
 
 

@@ -14,7 +14,7 @@ Create Date: 2026-09-11
 """
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0001"
 down_revision = None
@@ -25,6 +25,8 @@ _TABLES = ["audit_entries", "branch_assignments", "branches", "roles", "sessions
 
 
 def _tables() -> set[str]:
+    if context.is_offline_mode():
+        return set()  # alembic --sql: the script is for an empty database
     return set(sa.inspect(op.get_bind()).get_table_names())
 
 

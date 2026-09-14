@@ -15,10 +15,14 @@ int? amountOrNull(String text) {
 /// The sentence for a typed number (or amount) the domain refused, or null for
 /// any other error.
 String? numberErrorText(AppLocalizations l, Object error) => switch (error) {
-      AppError(code: 'MONEY_AMOUNT_INVALID' || 'CATALOG_PRICE_INVALID' || 'CUSTOMER_CREDIT_LIMIT_INVALID') =>
+      AppError(
+            code: 'MONEY_AMOUNT_INVALID' || 'CATALOG_PRICE_INVALID' || 'CUSTOMER_CREDIT_LIMIT_INVALID' ||
+                'SHIFT_CASH_INVALID'
+          ) =>
         l.errAmountInvalid,
       AppError(code: 'CATALOG_QTY_INVALID' || 'STOCK_INVALID_QTY') => l.errQtyInvalid,
       AppError(code: 'CATALOG_UNIT_PRECISION') => l.errQtyPrecision,
+      AppError(code: 'SALE_TOTAL_TOO_LARGE' || 'GRN_TOTAL_TOO_LARGE') => l.errTotalTooLarge,
       AppError(code: 'GRN_LINE_INVALID' || 'DEBT_PAYMENT_INVALID' || 'SALE_LINE_INVALID_QTY') =>
         l.errMustBePositive,
       _ => null,

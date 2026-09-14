@@ -8,7 +8,7 @@
 - **Role** — `{ id, name, permissions: set<Permission> }`. Built-in roles: `owner`, `manager`, `cashier`, `stock_keeper`, `accountant`.
 - **Permission** — a value object, dotted code: `sale.create`, `price.change`, `stock.adjust`, `product.manage`, `user.manage`, `report.view`, `branch.manage`, `debt.write_off`, `audit.view`, and the money actions `sale.void`, `sale.discount`, `customer.credit`, `purchase.cost` (owner and manager only).
 - **BranchAssignment** — `{ user_id, branch_id, role_id }` (a user may work in several branches, with a role per branch).
-- **Session** — `{ id, user_id, device_id, issued_at, expires_at, refresh_token_hash, prev_refresh_hash }`. A refresh rotates the hash in place; `expires_at` is never extended. Presenting the rotated-out token again revokes the session, except within 60 seconds of that rotation: a device whose refresh answer was lost may retry once, and the retry rotates again.
+- **Session** — `{ id, user_id, device_id, issued_at, expires_at, refresh_token_hash, prev_refresh_hash }`. A refresh rotates the hash in place; `expires_at` is never extended. Presenting the rotated-out token again revokes the session, except within 60 seconds of that rotation: a device whose refresh answer was lost may retry once, and the retry rotates again. A sign-out ends the session with either token, since a renewal may still be in flight when the device signs out.
 
 ## Invariants
 

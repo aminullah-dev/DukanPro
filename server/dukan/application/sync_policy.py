@@ -383,6 +383,7 @@ class ProductRef:
     track_stock: bool
     sell_price_minor: int
     cost_minor: int | None
+    decimal_places: int | None  # its unit's; None when the unit row is missing
 
 
 @dataclass(frozen=True, slots=True)
@@ -410,6 +411,7 @@ class SaleRef:
     subtotal_minor: int
     total_minor: int
     paid_minor: int
+    occurred_at: datetime  # the sale's time, as its header recorded it
 
 
 class SyncReader(Protocol):
@@ -418,6 +420,8 @@ class SyncReader(Protocol):
     def product(self, product_id: str) -> ProductRef | None: ...
 
     def unit_exists(self, unit_id: str) -> bool: ...
+
+    def shop_currencies(self) -> frozenset[str]: ...  # the live branches' currencies
 
     def customer(self, customer_id: str) -> CustomerRef | None: ...
 
@@ -568,6 +572,10 @@ def _products_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     _guard_insert(ctx)
     if not ctx.reader.unit_exists(v["unit_id"]):
         raise ValidationError("UNIT_NOT_FOUND", unit_id=v["unit_id"])
+    currency = v.get("sell_currency", DEFAULT_CURRENCY)
+    if currency not in ctx.reader.shop_currencies():
+        # A price is in a currency the shop's branches trade in, as on REST.
+        raise ValidationError("PRICE_CURRENCY_INVALID", currency=currency)
     after = _pick(
         v, "sku", "name", "unit_id", "sell_price_minor", "sell_currency", "track_stock", "is_active"
     )
@@ -580,6 +588,8 @@ def _products_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     current = _guard_update(ctx, "PRODUCT_NOT_FOUND")
     if not v:
         raise ValidationError("SYNC_OP_INVALID", field="data", reason="empty")
+    if "sell_currency" in v and v["sell_currency"] not in ctx.reader.shop_currencies():
+        raise ValidationError("PRICE_CURRENCY_INVALID", currency=v["sell_currency"])
     changed = {k: val for k, val in v.items() if current.values.get(k) != val}
     price_changed = "sell_price_minor" in changed or "sell_currency" in changed
     if price_changed:
@@ -697,6 +707,9 @@ def _stock_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
         sold = ctx.reader.sale_line_qty(sale.id, v["product_id"])
         moved = ctx.reader.sale_stock_out_qty(sale.id, v["product_id"])
         if moved - qty > sold:
+            # A line still on its way (waiting for a permission, say) makes this a
+            # retry; once every line is in, moving more than they sold is refused.
+            _require_complete_lines(ctx, sale)
             raise ValidationError(
                 "SYNC_REF_MISMATCH", field="qty_delta", reason="exceeds_sale_lines"
             )
@@ -759,7 +772,16 @@ def _sale_lines_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     sale = _own_sale(ctx, v["sale_id"])
     _guard_insert(ctx)
     product = _product(ctx, v["product_id"], allow_deleted=True)
-    expected = line_total_minor(v["unit_price_minor"], v["qty_minor"], v.get("decimal_places", 0))
+    places = product.decimal_places
+    if places is None:
+        raise NotFoundError("UNIT_NOT_FOUND", product_id=product.id)
+    if v.get("decimal_places", places) != places:
+        # Decimal places say what a quantity means (1500 is 1.500 kg, or 1500
+        # pieces): the product's unit decides, never the device.
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="sale_lines", field="decimal_places", reason="unit"
+        )
+    expected = line_total_minor(v["unit_price_minor"], v["qty_minor"], places)
     if v["line_total_minor"] != expected:
         raise ValidationError(
             "SYNC_FIELD_INVALID", table="sale_lines", field="line_total_minor",
@@ -776,11 +798,13 @@ def _sale_lines_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     below_catalog = price < product.sell_price_minor
     if below_catalog and not any(POLICY.can(ctx.actor, p, sale.branch_id) for p in _DISCOUNTERS):
         # Under the catalog price is a discount, a manager's decision, unless the
-        # device still had an older price: one the product had within the window.
-        since = ctx.now - PRICE_DRIFT_WINDOW
+        # device still had an older price: one the product had within the window
+        # before the sale (its time as the header recorded it, never after now).
+        since = min(ctx.now, sale.occurred_at) - PRICE_DRIFT_WINDOW
         if price not in ctx.reader.recent_sell_prices(product.id, since):
             require_any_permission(POLICY, ctx.actor, _DISCOUNTERS, sale.branch_id)
-    values = {**v, "unit_cost_minor": product.cost_minor or 0}  # cost snapshot is server-owned
+    # The unit's decimal places, and the cost snapshot, are the server's.
+    values = {**v, "decimal_places": places, "unit_cost_minor": product.cost_minor or 0}
     after = {
         **_pick(v, "sale_id", "product_id", "qty_minor", "unit_price_minor", "line_total_minor"),
         "catalog_price_minor": product.sell_price_minor,

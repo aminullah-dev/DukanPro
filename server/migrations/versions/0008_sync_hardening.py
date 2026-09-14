@@ -11,15 +11,15 @@ import json
 from typing import Any
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0008"
 down_revision = "0007"
 branch_labels = None
 depends_on = None
 
-# 0002-0006 build their tables from the live models, so on a FRESH database these
-# columns already exist when this revision runs. Add (or drop) only what's needed.
+# A database an older release built from the live models may already have these
+# columns. Add (or drop) only what's needed.
 _COLUMNS: dict[str, list[tuple[str, sa.types.TypeEngine]]] = {
     "processed_ops": [
         ("code", sa.String(64)),
@@ -37,6 +37,8 @@ _BRANCH_ROWS = ("sales", "stock_movements", "sale_lines", "payments")
 
 
 def _existing(table: str) -> set[str]:
+    if context.is_offline_mode():
+        return set()  # alembic --sql: the script is for an empty database
     return {c["name"] for c in sa.inspect(op.get_bind()).get_columns(table)}
 
 
@@ -73,7 +75,8 @@ def upgrade() -> None:
         for name, type_ in cols:
             if name not in have:
                 op.add_column(table, sa.Column(name, type_, nullable=True))
-    _backfill_branch_ids(op.get_bind())
+    if not context.is_offline_mode():  # a script's database has no feed yet
+        _backfill_branch_ids(op.get_bind())
 
 
 def downgrade() -> None:

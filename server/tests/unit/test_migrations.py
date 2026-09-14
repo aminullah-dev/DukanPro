@@ -7,10 +7,12 @@ when DUKAN_TEST_DATABASE_URL is set (CI)."""
 from __future__ import annotations
 
 import importlib.util
+import io
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.autogenerate import compare_metadata
@@ -23,6 +25,7 @@ from dukan.infrastructure.db.base import Base
 from dukan.infrastructure.db.schema_compare import compare_type
 
 _CONFTEST = Path(__file__).resolve().parents[1] / "conftest.py"
+_MIGRATIONS = Path(__file__).resolve().parents[2] / "migrations"
 
 
 def _alembic_config(connection: sa.Connection) -> Config:
@@ -124,3 +127,70 @@ def test_0010_restores_a_sale_reference_an_old_upgrade_skipped(empty_database_ur
     _migrate(engine, "head")
     assert {"ref_type", "ref_id"} <= _columns(engine, "stock_movements")
     engine.dispose()
+
+
+def _row(table: sa.Table, **values: object) -> dict[str, object]:
+    row = {
+        c.name: _sample(c)
+        for c in table.columns
+        if not c.nullable and not (c.primary_key and isinstance(c.type, sa.Integer))
+    }
+    return {**row, **values}
+
+
+def test_0012_merges_seeded_copies_of_the_built_in_units(empty_database_url: str) -> None:
+    engine = sa.create_engine(empty_database_url)
+    _migrate(engine, "0011")
+    kg = "00000000-0000-7000-8000-000000000002"
+    copy, box, rice = (str(uuid.uuid4()) for _ in range(3))
+    meta = sa.MetaData()
+    units = sa.Table("units", meta, autoload_with=engine)
+    products = sa.Table("products", meta, autoload_with=engine)
+    with engine.begin() as conn:
+        # A device from before the fixed ids pushed its own "kg"; Rice uses it.
+        conn.execute(units.insert().values(**_row(units, id=copy, name="kg", decimal_places=3)))
+        conn.execute(units.insert().values(**_row(units, id=box, name="box", decimal_places=0)))
+        conn.execute(products.insert().values(**_row(products, id=rice, unit_id=copy, version=3)))
+    _migrate(engine, "0012")
+    feed_table = sa.Table("change_log", sa.MetaData(), autoload_with=engine)
+    with engine.connect() as conn:
+        product = conn.execute(sa.select(products).where(products.c.id == rice)).mappings().one()
+        live = conn.execute(
+            sa.select(units.c.name).where(units.c.deleted_at.is_(None))
+        ).scalars().all()
+        feed = conn.execute(
+            sa.select(
+                feed_table.c.table_name, feed_table.c.row_id, feed_table.c.op, feed_table.c.data
+            ).order_by(feed_table.c.seq)
+        ).all()
+    engine.dispose()
+    assert (product["unit_id"], product["version"]) == (kg, 4)
+    assert sorted(live) == ["box", "dozen", "kg", "litre", "meter", "piece"]
+    moved = [(kind, data) for table, row_id, kind, data in feed if (table, row_id) == ("products", rice)]
+    assert len(moved) == 1 and moved[0][0] == "update"
+    assert (moved[0][1]["unit_id"], moved[0][1]["version"]) == (kg, 4)
+    assert len({row_id for table, row_id, _, _ in feed if table == "units"}) == 5
+
+
+def _offline_sql(url: str, monkeypatch: pytest.MonkeyPatch) -> str:
+    """The migrations as a SQL script (alembic --sql): no database is touched."""
+    monkeypatch.setenv("DUKAN_DATABASE_URL", url)
+    buffer = io.StringIO()
+    cfg = Config(output_buffer=buffer)
+    cfg.set_main_option("script_location", str(_MIGRATIONS))
+    command.upgrade(cfg, "head", sql=True)
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize(
+    "url", ["sqlite:///offline.db", "postgresql://dukan:p%40ss@db.invalid/dukan"]
+)
+def test_the_migrations_render_as_a_sql_script(url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A percent-encoded password in the URL is fine too.
+    sql = _offline_sql(url, monkeypatch)
+    assert "CREATE TABLE products" in sql
+    assert "INSERT INTO units" in sql
+    if url.startswith("postgresql"):
+        # 0010 alters each table in one statement, so it is rewritten once.
+        assert sql.count("ALTER TABLE sales ALTER COLUMN") == 1
+

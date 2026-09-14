@@ -23,7 +23,9 @@
 ## Built-in units
 
 `piece` (0 decimal places), `kg` (3), `litre` (3), `dozen` (0) and `meter` (2) have fixed ids, the same on the server and on every device (`builtInUnits` / `BUILTIN_UNITS`).
-- The server seeds them at bootstrap and in migration 0011. A device seeds them on first use and does not sync them. Reading units never writes.
+- The server seeds them at bootstrap and in migration 0011, and they are in the change feed like any unit (0012 logs them for databases made before). Reading units on the server never writes.
+- A device adds any that are missing whenever it reads units, and never queues them for sync.
+- Before the ids were fixed, every device seeded its own copies and pushed them. Server migration 0012 and device schema 9 merge each copy into its built-in unit: products move to it (a product edit in the feed), the copy is soft-deleted, and a device's queued ops for it follow.
 - Custom units are ordinary synced rows.
 - A quantity is always read in its product's unit. A screen that cannot find the unit says so (it never assumes 0 decimal places), and the server answers `UNIT_NOT_FOUND`.
 
