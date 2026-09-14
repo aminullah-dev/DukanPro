@@ -2,7 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_sync/dukan_sync.dart';
 
-import 'auth_api.dart' show NetworkException;
+import 'auth_api.dart' show AuthApiException, NetworkException;
+import 'http.dart' show errorCode, newDio;
 import 'secure_store.dart';
 
 /// [SyncClient] over the authoritative FastAPI sync API. Pushes row-level ops
@@ -10,7 +11,7 @@ import 'secure_store.dart';
 /// storage on each call. See docs/sync-protocol.md.
 class DioSyncClient implements SyncClient {
   DioSyncClient({required String baseUrl, required this.store, Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(baseUrl: baseUrl));
+      : _dio = dio ?? newDio(baseUrl);
   final Dio _dio;
   final SecureStore store;
 
@@ -47,8 +48,8 @@ class DioSyncClient implements SyncClient {
       );
       final results = ((r.data as Map)['results'] as List).cast<Map<String, dynamic>>();
       return results.map(_toPushResult).toList(growable: false);
-    } on DioException {
-      throw const NetworkException();
+    } on DioException catch (e) {
+      throw _failure(e);
     }
   }
 
@@ -67,10 +68,16 @@ class DioSyncClient implements SyncClient {
         changed: changes.map((c) => c.cast<String, Object?>()).toList(growable: false),
         tombstones: const [],
       );
-    } on DioException {
-      throw const NetworkException();
+    } on DioException catch (e) {
+      throw _failure(e);
     }
   }
+
+  /// A refusal the server explains is not "offline".
+  Exception _failure(DioException e) => switch (errorCode(e)) {
+        final code? => AuthApiException(code, statusCode: e.response?.statusCode),
+        null => const NetworkException(),
+      };
 
   PushResult _toPushResult(Map<String, dynamic> j) => PushResult(
         j['op_id'] as String,

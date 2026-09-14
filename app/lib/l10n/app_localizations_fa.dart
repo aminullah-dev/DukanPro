@@ -331,6 +331,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'این دستگاه مدت زیادی آفلاین بوده است. آنلاین وارد شوید.';
 
   @override
+  String get errStorage =>
+      'حافظهٔ امن این دستگاه خوانده نشد. دوباره وارد شوید؛ اگر تکرار شد، دستگاه را دوباره روشن کنید.';
+
+  @override
   String get errSessionEnded =>
       'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
 
@@ -833,6 +837,10 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String get errOfflineExpired =>
       'این دستگاه مدت زیادی آفلاین بوده است. آنلاین وارد شوید.';
+
+  @override
+  String get errStorage =>
+      'حافظهٔ امن این دستگاه خوانده نشد. دوباره وارد شوید؛ اگر تکرار شد، دستگاه را دوباره روشن کنید.';
 
   @override
   String get errSessionEnded =>

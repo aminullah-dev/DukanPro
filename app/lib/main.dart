@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'composition.dart';
+import 'features/auth/auth_controller.dart';
 import 'features/auth/providers.dart';
 import 'features/iam/iam_providers.dart';
 import 'features/audit/audit_providers.dart';
@@ -9,6 +13,7 @@ import 'features/insights/insights_providers.dart';
 import 'infrastructure/audit_api.dart';
 import 'infrastructure/auth_api.dart';
 import 'infrastructure/biometric.dart';
+import 'infrastructure/http.dart';
 import 'infrastructure/iam_api.dart';
 import 'infrastructure/insights_api.dart';
 import 'infrastructure/keyboard_wedge_scanner.dart';
@@ -23,24 +28,33 @@ Future<void> main() async {
   final db = await openAppDatabase();
   const apiBase = String.fromEnvironment('DUKAN_API', defaultValue: 'http://localhost:8088');
   final secureStore = FlutterSecureStore();
+  final authApi = DioAuthApi(baseUrl: apiBase);
+  // One refresher for every client: the server rotates the refresh token, so
+  // renewals must never race.
+  final refresher = TokenRefresher(store: secureStore, api: authApi);
+  Dio api() => authedDio(apiBase, store: secureStore, refresher: refresher);
 
-  runApp(
-    ProviderScope(
-      overrides: [
-        databaseProvider.overrideWithValue(db),
-        secureStoreProvider.overrideWithValue(secureStore),
-        authApiProvider.overrideWithValue(DioAuthApi(baseUrl: apiBase)),
-        biometricProvider.overrideWithValue(LocalAuthBiometric()),
-        syncClientProvider
-            .overrideWithValue(DioSyncClient(baseUrl: apiBase, store: secureStore)),
-        iamApiProvider.overrideWithValue(DioIamApi(baseUrl: apiBase, store: secureStore)),
-        insightsApiProvider.overrideWithValue(DioInsightsApi(baseUrl: apiBase, store: secureStore)),
-        auditApiProvider.overrideWithValue(DioAuditApi(baseUrl: apiBase, store: secureStore)),
-        scannerProvider.overrideWithValue(KeyboardWedgeScanner()),
-      ],
-      child: const DukanProApp(),
-    ),
+  final container = ProviderContainer(
+    overrides: [
+      databaseProvider.overrideWithValue(db),
+      secureStoreProvider.overrideWithValue(secureStore),
+      authApiProvider.overrideWithValue(authApi),
+      tokenRefresherProvider.overrideWithValue(refresher),
+      biometricProvider.overrideWithValue(LocalAuthBiometric()),
+      syncClientProvider
+          .overrideWithValue(DioSyncClient(baseUrl: apiBase, store: secureStore, dio: api())),
+      iamApiProvider.overrideWithValue(DioIamApi(baseUrl: apiBase, store: secureStore, dio: api())),
+      insightsApiProvider
+          .overrideWithValue(DioInsightsApi(baseUrl: apiBase, store: secureStore, dio: api())),
+      auditApiProvider.overrideWithValue(DioAuditApi(baseUrl: apiBase, store: secureStore, dio: api())),
+      scannerProvider.overrideWithValue(KeyboardWedgeScanner()),
+    ],
   );
+  // A background request that finds the session over sends the app to sign-in.
+  refresher.onSessionEnded =
+      (code) => unawaited(container.read(authControllerProvider.notifier).sessionEnded(code));
+
+  runApp(UncontrolledProviderScope(container: container, child: const DukanProApp()));
 }
 
 class DukanProApp extends ConsumerWidget {

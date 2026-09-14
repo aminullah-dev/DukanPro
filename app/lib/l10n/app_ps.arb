@@ -90,6 +90,7 @@
   "useAnotherAccount": "له بل حساب سره ننوتل",
   "backToUnlock": "بېرته",
   "errOfflineExpired": "دا وسیله ډېره موده آفلاین وه. آنلاین ننوځئ.",
+  "errStorage": "د دې وسیلې خوندي حافظه ونه لوستل شوه. بیا ننوځئ؛ که بیا پېښ شو، وسیله بیا چالانه کړئ.",
   "errSessionEnded": "ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.",
   "biometricUnlockSetting": "د ګوتې په نښه خلاصول",
   "confirmPasswordTitle": "خپل پټنوم تایید کړئ",

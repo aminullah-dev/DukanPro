@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
@@ -8,10 +10,17 @@ import 'package:dukanpro/features/auth/session.dart';
 import 'package:dukanpro/features/pos/pos_providers.dart';
 import 'package:dukanpro/infrastructure/biometric.dart';
 import 'package:dukanpro/infrastructure/secure_store.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes.dart';
+
+/// Secure storage that cannot be read (a locked keychain).
+class _LockedKeychain extends FakeSecureStore {
+  @override
+  Future<String?> read(String key) async => throw PlatformException(code: '-34018');
+}
 
 /// A device whose fingerprint reader always says yes.
 class _Fingerprint implements BiometricAuth {
@@ -183,6 +192,56 @@ void main() {
     controller.lock();
     await controller.unlockWithPassword('correct');
     expect((c.read(authControllerProvider) as AuthLoggedOut).error, 'OFFLINE_EXPIRED');
+  });
+
+  test('a session that ended renews with the password used to unlock', () async {
+    final api = FakeAuthApi();
+    final c = makeContainer(FakeSecureStore(), api: api);
+    final controller = c.read(authControllerProvider.notifier);
+    await controller.loginOnline(username: 'owner', password: 'correct');
+    controller.lock();
+    await controller.unlockWithPassword('correct');
+
+    api.meErrors.add('SESSION_REVOKED');
+    await controller.revalidate(password: 'correct');
+    expect(c.read(authControllerProvider), isA<AuthLoggedIn>());
+    expect(api.loginCalls, 2);
+
+    // Reset on the server: the old password no longer signs in.
+    api
+      ..password = 'changed-by-owner'
+      ..meErrors.add('SESSION_REVOKED');
+    await controller.revalidate(password: 'correct');
+    expect((c.read(authControllerProvider) as AuthLoggedOut).error, 'SESSION_REVOKED');
+  });
+
+  test('without a password (PIN, fingerprint) an ended session needs an online sign-in', () async {
+    final api = FakeAuthApi();
+    final c = makeContainer(FakeSecureStore(), api: api);
+    final controller = c.read(authControllerProvider.notifier);
+    await controller.loginOnline(username: 'owner', password: 'correct');
+    api.meErrors.add('REFRESH_INVALID');
+    await controller.revalidate();
+    expect((c.read(authControllerProvider) as AuthLoggedOut).error, 'REFRESH_INVALID');
+    expect(api.loginCalls, 1);
+  });
+
+  test('sign-out does not wait for the server', () async {
+    final store = FakeSecureStore();
+    final api = FakeAuthApi()..logoutGate = Completer<void>(); // never answers
+    final c = makeContainer(store, api: api);
+    final controller = c.read(authControllerProvider.notifier);
+    await controller.loginOnline(username: 'owner', password: 'correct');
+
+    await controller.logout();
+    expect(c.read(authControllerProvider), isA<AuthLoggedOut>());
+    expect(await store.read(SecureKeys.refreshToken), isNull);
+  });
+
+  test('unreadable secure storage shows a message instead of a spinner', () async {
+    final c = makeContainer(_LockedKeychain());
+    await c.read(authControllerProvider.notifier).restore();
+    expect((c.read(authControllerProvider) as AuthLoggedOut).error, 'STORAGE_UNAVAILABLE');
   });
 
   test('biometric unlock works only after the user opts in with the password', () async {

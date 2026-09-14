@@ -330,6 +330,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device has been offline too long. Sign in online.';
 
   @override
+  String get errStorage =>
+      'This device\'s secure storage could not be read. Sign in again; if it keeps happening, restart the device.';
+
+  @override
   String get errSessionEnded =>
       'Your access has changed or ended. Sign in again.';
 

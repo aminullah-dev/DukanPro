@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../infrastructure/http.dart' show retryWhenOffline;
 import '../../infrastructure/insights_api.dart';
 import '../auth/session.dart';
 
@@ -14,6 +15,7 @@ final insightsProvider = FutureProvider<List<InsightDto>>(
     ref.watch(sessionUserIdProvider);
     return ref.watch(insightsApiProvider).listInsights();
   },
+  retry: retryWhenOffline,
 );
 
 /// The persisted notification feed; mutations go through [NotificationsController].
@@ -26,26 +28,34 @@ class NotificationsController extends AsyncNotifier<List<NotificationDto>> {
     return _api.listNotifications();
   }
 
-  Future<void> _reload() async {
-    ref.invalidateSelf();
-    await future;
-  }
-
-  /// Recompute insights into the feed, then reload.
+  /// Recompute insights into the feed; the feed then reloads in the background.
   Future<int> refresh() async {
     final created = await _api.refresh();
-    await _reload();
+    ref.invalidateSelf();
     return created;
   }
 
   Future<void> markRead(String id) async {
     await _api.markRead(id);
-    await _reload();
+    final feed = state.asData?.value;
+    if (feed == null) return;
+    state = AsyncData([
+      for (final n in feed)
+        n.id != id
+            ? n
+            : NotificationDto(
+                id: n.id, code: n.code, severity: n.severity, data: n.data, read: true,
+                createdAt: n.createdAt,
+              ),
+    ]);
   }
 }
 
 final notificationsControllerProvider =
-    AsyncNotifierProvider<NotificationsController, List<NotificationDto>>(NotificationsController.new);
+    AsyncNotifierProvider<NotificationsController, List<NotificationDto>>(
+  NotificationsController.new,
+  retry: retryWhenOffline,
+);
 
 /// Unread badge count for the shell bell.
 final unreadNotificationsProvider = Provider<int>((ref) {

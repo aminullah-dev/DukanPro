@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import Select, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from dukan.application.access import require_any_permission, require_permission
@@ -318,7 +319,13 @@ class SqlIamService(IamService):
                 created_by=actor.id,
             )
         )
-        self._s.flush()
+        try:
+            self._s.flush()
+        except IntegrityError:
+            # Another request took the username since the check above.
+            self._s.rollback()
+            assert_username_available(username=username, taken=True)
+            raise
         self._audit(
             "user.created",
             actor_id=actor.id,

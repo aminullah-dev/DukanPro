@@ -257,6 +257,15 @@ class SqlAuthService(AuthService):
             self._s.commit()
 
     def authenticated_user(self, *, access_token: str) -> User:
+        try:
+            return self._authenticated_user(access_token)
+        finally:
+            # Hand the connection back before the endpoint runs: otherwise every
+            # request holds two pooled connections, and a shop whose devices all
+            # start at once exhausts the pool.
+            self._s.rollback()
+
+    def _authenticated_user(self, access_token: str) -> User:
         claims = tokens.decode_access(secret=self._cfg.secret_key, token=access_token)
         sess = self._s.get(SessionModel, str(claims["sid"]))
         if (

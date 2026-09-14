@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The API server and the receipt printer (TCP 9100) are on the network.
+         Debug builds get this from src/debug; release builds need it here. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="dukanpro"
         android:name="${applicationName}"

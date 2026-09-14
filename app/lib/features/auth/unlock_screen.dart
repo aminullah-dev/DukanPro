@@ -42,11 +42,13 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
 
   Future<void> _unlock() async {
     final controller = ref.read(authControllerProvider.notifier);
+    final password = _secret.text;
     setState(() => _busy = true);
-    await controller.unlockWithPassword(_secret.text);
+    await controller.unlockWithPassword(password);
     if (mounted) setState(() => _busy = false);
-    // Once unlocked, confirm the user with the server if it is reachable.
-    unawaited(controller.revalidate());
+    // Once unlocked, confirm the user with the server if it is reachable; a
+    // session that simply ended renews with this password.
+    unawaited(controller.revalidate(password: password));
   }
 
   Future<void> _unlockWithBiometric() async {

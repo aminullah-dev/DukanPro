@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'auth_api.dart' show AuthApiException, NetworkException;
+import 'http.dart' show newDio;
 import 'secure_store.dart';
 
 /// Typed client for the audit trail (Phase 10). Read-only; gated audit.view.
@@ -38,7 +39,7 @@ abstract interface class AuditApi {
 /// Dio-backed [AuditApi]. Bearer from secure storage; active branch header.
 class DioAuditApi implements AuditApi {
   DioAuditApi({required String baseUrl, required this.store, this.branchId, Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(baseUrl: baseUrl));
+      : _dio = dio ?? newDio(baseUrl);
   final Dio _dio;
   final SecureStore store;
   final String? branchId;

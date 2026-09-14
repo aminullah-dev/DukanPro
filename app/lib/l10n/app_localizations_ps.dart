@@ -328,6 +328,10 @@ class AppLocalizationsPs extends AppLocalizations {
   String get errOfflineExpired => 'دا وسیله ډېره موده آفلاین وه. آنلاین ننوځئ.';
 
   @override
+  String get errStorage =>
+      'د دې وسیلې خوندي حافظه ونه لوستل شوه. بیا ننوځئ؛ که بیا پېښ شو، وسیله بیا چالانه کړئ.';
+
+  @override
   String get errSessionEnded =>
       'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
 

@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import 'http.dart' show newDio;
+
 /// Typed client for the DukanPro auth API. DTOs mirror the server's JSON.
 
 class ApiTokens {
@@ -90,8 +92,11 @@ abstract interface class AuthApi {
 }
 
 class DioAuthApi implements AuthApi {
+  /// Sign-out has already wiped the device; the server only hears about it.
+  static const _quick = Duration(seconds: 5);
+
   DioAuthApi({required String baseUrl, Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(baseUrl: baseUrl));
+      : _dio = dio ?? newDio(baseUrl);
   final Dio _dio;
 
   Future<T> _wrap<T>(
@@ -156,7 +161,11 @@ class DioAuthApi implements AuthApi {
   @override
   Future<void> logout(String refreshToken) async {
     try {
-      await _dio.post('/auth/logout', data: {'refresh_token': refreshToken});
+      await _dio.post(
+        '/auth/logout',
+        data: {'refresh_token': refreshToken},
+        options: Options(sendTimeout: _quick, receiveTimeout: _quick),
+      );
     } on DioException {
       // Best-effort; local credentials are cleared regardless.
     }

@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/auth_api.dart';
+import '../../infrastructure/http.dart';
 import '../../infrastructure/secure_store.dart';
 import '../../infrastructure/verifier.dart';
 import 'auth_state.dart';
@@ -19,9 +23,6 @@ class AuthController extends Notifier<AuthState> {
 
   /// How far the clock may step back (a time sync) before it counts as set back.
   static const clockSkew = Duration(minutes: 5);
-
-  /// Server answers meaning this account or session is no longer accepted.
-  static const _endedCodes = {'USER_DISABLED', 'SESSION_REVOKED', 'REFRESH_INVALID', 'TOKEN_INVALID'};
 
   @override
   AuthState build() => const AuthUnknown();
@@ -41,9 +42,16 @@ class AuthController extends Notifier<AuthState> {
   /// Restore from cache on startup: locked if a cached profile + password
   /// verifier exist, otherwise logged out.
   Future<void> restore() async {
-    final profile = await _profiles.current();
-    final hasVerifier = await _store.read(SecureKeys.passwordVerifier) != null;
-    state = (profile != null && hasVerifier) ? AuthLocked(profile) : const AuthLoggedOut();
+    try {
+      final profile = await _profiles.current();
+      final hasVerifier = await _store.read(SecureKeys.passwordVerifier) != null;
+      state = (profile != null && hasVerifier) ? AuthLocked(profile) : const AuthLoggedOut();
+    } catch (e, st) {
+      // Secure storage or the database could not be read (a locked keychain, a
+      // failed migration): say so on the sign-in screen instead of spinning.
+      developer.log('restore failed', name: 'auth', error: e, stackTrace: st);
+      state = const AuthLoggedOut(error: 'STORAGE_UNAVAILABLE');
+    }
   }
 
   Future<void> loginOnline({required String username, required String password}) async {
@@ -193,8 +201,10 @@ class AuthController extends Notifier<AuthState> {
 
   /// Confirm the signed-in user with the server when it is reachable: refresh
   /// the cached roles, or sign out when the account or session has ended.
-  /// Offline, nothing changes.
-  Future<void> revalidate() async {
+  /// Offline, nothing changes. After a password unlock, pass that [password]:
+  /// a session that simply ended (expired or revoked) then renews by signing in
+  /// again with it.
+  Future<void> revalidate({String? password}) async {
     if (state is! AuthLoggedIn) return;
     try {
       final profile = await _me();
@@ -203,36 +213,64 @@ class AuthController extends Notifier<AuthState> {
       final current = await _profiles.current();
       if (current != null && state is AuthLoggedIn) state = AuthLoggedIn(current);
     } on AuthApiException catch (e) {
-      if (_endedCodes.contains(e.code)) {
-        await _forget();
-        state = AuthLoggedOut(error: e.code);
-      }
+      if (!sessionEndedCodes.contains(e.code)) return;
+      final failed = password == null || e.code == 'USER_DISABLED'
+          ? e.code
+          : await _signInAgain(password, ended: e.code);
+      if (failed != null) await sessionEnded(failed);
     } on NetworkException {
       // Offline: keep working from the cache.
     }
   }
 
-  /// `/auth/me`, refreshing the access token once when it has expired.
+  /// Sign in online with the password that just unlocked the device. Null on
+  /// success, else the code to end the session with.
+  Future<String?> _signInAgain(String password, {required String ended}) async {
+    final profile = await _profiles.current();
+    if (profile == null) return ended;
+    try {
+      final res = await _api.login(
+        username: profile.username,
+        password: password,
+        deviceId: ref.read(deviceIdProvider),
+      );
+      final saved = await _persist(res, password);
+      if (saved != null && state is AuthLoggedIn) state = AuthLoggedIn(saved);
+      return saved == null ? ended : null;
+    } on AuthApiException catch (e) {
+      return e.code == 'USER_DISABLED' ? e.code : ended;
+    } on NetworkException {
+      return ended;
+    }
+  }
+
+  /// `/auth/me`, renewing the access token once when it has expired.
   Future<ApiProfile> _me() async {
     final access = await _store.read(SecureKeys.accessToken);
     try {
       return await _api.me(access ?? '');
     } on AuthApiException catch (e) {
       if (e.code != 'TOKEN_EXPIRED' && e.code != 'AUTH_REQUIRED') rethrow;
-      final refresh = await _store.read(SecureKeys.refreshToken);
-      if (refresh == null) throw const AuthApiException('REFRESH_INVALID');
-      final tokens = await _api.refresh(refresh);
-      await _store.write(SecureKeys.refreshToken, tokens.refreshToken);
-      await _store.write(SecureKeys.accessToken, tokens.accessToken);
-      return _api.me(tokens.accessToken);
+      return _api.me(await ref.read(tokenRefresherProvider).renew(access));
     }
   }
 
+  /// The server no longer accepts this session or account: wipe the saved
+  /// sign-in and ask for an online sign-in. Safe to call more than once.
+  Future<void> sessionEnded(String code) async {
+    final s = state;
+    if (s is AuthLoggedOut || s is AuthUnknown) return;
+    await _forget();
+    state = AuthLoggedOut(error: code);
+  }
+
+  /// Sign out: wipe the device first, then tell the server best-effort, so a
+  /// bad connection never keeps the app signed in.
   Future<void> logout() async {
     final refresh = await _store.read(SecureKeys.refreshToken);
-    if (refresh != null) await _api.logout(refresh);
     await _forget();
     state = const AuthLoggedOut();
+    if (refresh != null) unawaited(_api.logout(refresh));
   }
 
   /// Remove every trace of the signed-in user from this device. The outbox

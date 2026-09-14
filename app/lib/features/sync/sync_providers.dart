@@ -2,7 +2,7 @@ import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../composition.dart';
-import '../../infrastructure/auth_api.dart' show NetworkException;
+import '../../infrastructure/auth_api.dart' show AuthApiException, NetworkException;
 import '../auth/providers.dart';
 import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
@@ -75,15 +75,25 @@ class SyncController extends Notifier<SyncStatus> {
   Future<void> syncNow() async {
     if (state.syncing) return;
     state = state.copyWith(syncing: true, failed: false);
+    var synced = false;
     try {
       // As the signed-in user: the server applies an op only under the token of
       // the user who recorded it, and each user pulls through their own scope.
       await _engine.syncNow(actorId: ref.read(sessionActorProvider)?.user.id);
-      state = state.copyWith(syncing: false, lastSyncedAt: DateTime.now(), failed: false);
-      _refreshReadModels();
+      synced = true;
     } on NetworkException {
-      state = state.copyWith(syncing: false, failed: true);
+      // Offline: a failed sync; the outbox keeps everything.
+    } on AuthApiException {
+      // The server refused the request itself. A session that ended has already
+      // sent the app to sign-in.
     } finally {
+      // Whatever happened, never stay "syncing": that would block every later sync.
+      state = state.copyWith(
+        syncing: false,
+        failed: !synced,
+        lastSyncedAt: synced ? DateTime.now() : null,
+      );
+      if (synced) _refreshReadModels();
       await refreshPending();
     }
   }

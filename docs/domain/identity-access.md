@@ -67,6 +67,11 @@ The server is authoritative; the device keeps just enough to work offline.
 - **Revalidation.** After each unlock, when the server is reachable, the app re-reads `/auth/me`, refreshing the access token once if it expired.
   - New roles take effect at once.
   - `USER_DISABLED`, `SESSION_REVOKED`, `REFRESH_INVALID` or `TOKEN_INVALID` wipe the saved sign-in and require an online sign-in.
+- **Token renewal.** Every API client shares one refresher. A 401 `TOKEN_EXPIRED` renews the access token once (requests that fail together share the renewal) and retries the request.
+  - An answer that the session or account is over sends the app to sign-in; it is never shown as "offline".
+  - After a password unlock, a session that simply ended renews by signing in again with that password. After a PIN or fingerprint unlock it needs an online sign-in.
+  - Requests time out (10 s to connect, 30 s to send or receive). Sign-out wipes the device first and tells the server best-effort.
+  - If secure storage cannot be read at startup, the sign-in screen says so (`STORAGE_UNAVAILABLE`) instead of an endless spinner.
 - **Offline window.** Offline unlock works for 30 days after the server last confirmed the user, then fails with `OFFLINE_EXPIRED`.
   - The device remembers the latest time it has seen. A clock set back more than 5 minutes behind it also fails with `OFFLINE_EXPIRED`, so winding the clock back cannot keep the window open.
 - **Lock.** There is a Lock action, and the app locks itself when it goes to the background or sits idle for 10 minutes.

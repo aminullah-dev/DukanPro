@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_sync/dukan_sync.dart';
 import 'package:dukanpro/infrastructure/audit_api.dart';
@@ -37,6 +39,13 @@ class FakeAuthApi implements AuthApi {
   final List<String> meErrors = [];
 
   int refreshCalls = 0;
+  int loginCalls = 0;
+
+  /// The password the server accepts (a reset on the server changes it).
+  String password = 'correct';
+
+  /// Holds the server's answer to a sign-out; null answers at once.
+  Completer<void>? logoutGate;
 
   static ApiProfile _profile(String username, {String role = 'owner'}) => ApiProfile(
         id: username == 'owner' ? 'u1' : 'u-$username',
@@ -57,7 +66,8 @@ class FakeAuthApi implements AuthApi {
     required String password,
     required String deviceId,
   }) async {
-    if (password != 'correct') {
+    loginCalls++;
+    if (password != this.password) {
       throw const AuthApiException('INVALID_CREDENTIALS', statusCode: 401);
     }
     return _result(username);
@@ -81,7 +91,7 @@ class FakeAuthApi implements AuthApi {
   }
 
   @override
-  Future<void> logout(String refreshToken) async {}
+  Future<void> logout(String refreshToken) => logoutGate?.future ?? Future.value();
 
   @override
   Future<ApiProfile> me(String accessToken) async {
@@ -119,6 +129,10 @@ class FakeIamApi implements IamApi {
   final List<EmployeeDto> _employees;
   final List<BranchDto> _branches;
   int _seq = 0;
+  int listCalls = 0;
+
+  /// Thrown by [listEmployees] once set: a list reload that fails.
+  Exception? listError;
 
   EmployeeDto _replace(EmployeeDto updated) {
     final i = _employees.indexWhere((e) => e.id == updated.id);
@@ -127,7 +141,11 @@ class FakeIamApi implements IamApi {
   }
 
   @override
-  Future<List<EmployeeDto>> listEmployees() async => List.of(_employees);
+  Future<List<EmployeeDto>> listEmployees() async {
+    listCalls++;
+    if (listError case final e?) throw e;
+    return List.of(_employees);
+  }
 
   @override
   Future<EmployeeDto> createEmployee({

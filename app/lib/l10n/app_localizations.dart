@@ -641,6 +641,12 @@ abstract class AppLocalizations {
   /// **'This device has been offline too long. Sign in online.'**
   String get errOfflineExpired;
 
+  /// No description provided for @errStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s secure storage could not be read. Sign in again; if it keeps happening, restart the device.'**
+  String get errStorage;
+
   /// No description provided for @errSessionEnded.
   ///
   /// In en, this message translates to:

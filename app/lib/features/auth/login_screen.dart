@@ -61,6 +61,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         'BOOTSTRAP_ALREADY_DONE' => l.errBootstrapDone,
         'SETUP_TOKEN_INVALID' => l.errSetupCode,
         'OFFLINE_EXPIRED' => l.errOfflineExpired,
+        'STORAGE_UNAVAILABLE' => l.errStorage,
         'USER_DISABLED' || 'SESSION_REVOKED' || 'REFRESH_INVALID' || 'TOKEN_INVALID' => l.errSessionEnded,
         _ => _setup ? l.setupFailed : l.loginFailed,
       };

@@ -197,6 +197,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={"error": {"code": "REQUEST_INVALID", "context": {"fields": fields[:20]}}},
         )
 
+    @app.exception_handler(Exception)
+    async def _unexpected_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+        # Anything unexpected still answers in the error contract, so the app
+        # never mistakes it for being offline. The traceback stays in the log.
+        logging.getLogger("dukan").error("unhandled error", exc_info=exc)
+        return JSONResponse(status_code=500, content={"error": {"code": "INTERNAL", "context": {}}})
+
     @app.middleware("http")
     async def _security_headers(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
