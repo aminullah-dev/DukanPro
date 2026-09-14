@@ -431,6 +431,18 @@ abstract class AppLocalizations {
   /// **'Credit limit'**
   String get creditLimit;
 
+  /// No description provided for @setCreditLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Set credit limit'**
+  String get setCreditLimit;
+
+  /// No description provided for @creditLimitHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty for no limit'**
+  String get creditLimitHelp;
+
   /// No description provided for @recordPayment.
   ///
   /// In en, this message translates to:

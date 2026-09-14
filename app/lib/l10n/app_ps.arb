@@ -55,6 +55,8 @@
   "customerName": "نوم",
   "phone": "تلیفون",
   "creditLimit": "د پور حد",
+  "setCreditLimit": "د پور حد ټاکل",
+  "creditLimitHelp": "د بې حده لپاره یې خالي پرېږدئ",
   "recordPayment": "د تادیې ثبت",
   "amount": "اندازه",
   "balance": "بیلانس",

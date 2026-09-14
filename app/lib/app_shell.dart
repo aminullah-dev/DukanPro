@@ -1,15 +1,14 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:dukan_core/dukan_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_state.dart';
 import 'features/audit/audit_log_screen.dart';
 import 'features/auth/session.dart';
+import 'features/auth/session_guard.dart';
 import 'features/catalog/product_list_screen.dart';
 import 'features/customers/customers_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
@@ -69,62 +68,13 @@ class AppShell extends ConsumerWidget {
     ];
 
     final showBell = can(Permission.reportView);
-    return _SessionGuard(
+    return SessionGuard(
+      onLock: () => ref.read(authControllerProvider.notifier).lock(),
       child: isWideLayout(MediaQuery.sizeOf(context).width)
           ? _WideShell(features: features, showBell: showBell)
           : _HomePane(features: features, showTiles: true, showShellActions: true, showBell: showBell),
     );
   }
-}
-
-/// Locks the app when it goes to the background or sits idle, so an unattended
-/// till never stays open as its last user. Locking keeps the saved sign-in.
-class _SessionGuard extends ConsumerStatefulWidget {
-  const _SessionGuard({required this.child});
-  final Widget child;
-  @override
-  ConsumerState<_SessionGuard> createState() => _SessionGuardState();
-}
-
-class _SessionGuardState extends ConsumerState<_SessionGuard> {
-  static const idleLock = Duration(minutes: 10);
-  late final AppLifecycleListener _lifecycle;
-  Timer? _idle;
-
-  @override
-  void initState() {
-    super.initState();
-    _lifecycle = AppLifecycleListener(onHide: _lock, onPause: _lock);
-    HardwareKeyboard.instance.addHandler(_onKey);
-    _touch();
-  }
-
-  @override
-  void dispose() {
-    _idle?.cancel();
-    HardwareKeyboard.instance.removeHandler(_onKey);
-    _lifecycle.dispose();
-    super.dispose();
-  }
-
-  void _lock() => ref.read(authControllerProvider.notifier).lock();
-
-  void _touch() {
-    _idle?.cancel();
-    _idle = Timer(idleLock, _lock);
-  }
-
-  bool _onKey(KeyEvent event) {
-    _touch(); // scanner input is activity too
-    return false;
-  }
-
-  @override
-  Widget build(BuildContext context) => Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) => _touch(),
-        child: widget.child,
-      );
 }
 
 /// Signing out wipes this device's saved sign-in, so an offline shop could not

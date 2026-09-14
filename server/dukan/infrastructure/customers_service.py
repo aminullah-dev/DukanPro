@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from sqlalchemy import or_, select
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, cast
+
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 from dukan.application.access import require_any_permission, require_permission
@@ -17,8 +20,11 @@ from dukan.domain.customers import (
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.infrastructure.db.models import AuditEntryModel, CustomerLedgerModel, CustomerModel
 from dukan.infrastructure.scope import require_active_branch
-from dukan.shared.errors import NotFoundError
+from dukan.shared.errors import ConflictError, NotFoundError
 from dukan.shared.ids import new_id
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import CursorResult
 
 _POLICY = PermissionPolicy()
 
@@ -27,11 +33,14 @@ class SqlCustomerService(CustomerService):
     def __init__(self, session: Session) -> None:
         self._s = session
 
-    def _audit(self, action: str, actor_id: str, entity_id: str, after: dict | None = None) -> None:
+    def _audit(
+        self, action: str, actor_id: str, entity_id: str, after: dict | None = None,
+        before: dict | None = None,
+    ) -> None:
         self._s.add(
             AuditEntryModel(
                 id=new_id(), action=action, actor_id=actor_id, entity_type="customer",
-                entity_id=entity_id, after=after, origin="api",
+                entity_id=entity_id, before=before, after=after, origin="api",
             )
         )
 
@@ -54,7 +63,7 @@ class SqlCustomerService(CustomerService):
     def _view(self, c: CustomerModel) -> CustomerView:
         return CustomerView(
             id=c.id, name=c.name, phone=c.phone, credit_limit_minor=c.credit_limit_minor,
-            currency=c.currency, balance_minor=self._balance(c.id),
+            currency=c.currency, balance_minor=self._balance(c.id), version=c.version,
         )
 
     def _get(self, customer_id: str) -> CustomerModel:
@@ -110,6 +119,46 @@ class SqlCustomerService(CustomerService):
     def get_customer(self, *, actor: User, branch_id: str, customer_id: str) -> CustomerView:
         self._require_reader(actor, branch_id)
         return self._view(self._get(customer_id))
+
+    def set_credit_limit(
+        self, *, actor: User, branch_id: str, customer_id: str, credit_limit_minor: int | None,
+        version: int,
+    ) -> CustomerView:
+        """Credit is a manager's decision; a stale version is a conflict, never an
+        overwrite."""
+        require_permission(_POLICY, actor, Permission.CUSTOMER_CREDIT, branch_id)
+        require_active_branch(self._s, branch_id)
+        assert_credit_limit_valid(credit_limit_minor=credit_limit_minor)
+        customer = self._get(customer_id)
+        before, current_version = customer.credit_limit_minor, customer.version
+        done = cast(
+            "CursorResult[Any]",
+            self._s.execute(
+                update(CustomerModel)
+                .where(
+                    CustomerModel.id == customer_id,
+                    CustomerModel.version == version,
+                    CustomerModel.deleted_at.is_(None),
+                )
+                .values(
+                    credit_limit_minor=credit_limit_minor, version=CustomerModel.version + 1,
+                    updated_by=actor.id, updated_at=datetime.now(UTC),
+                )
+                .execution_options(synchronize_session=False)
+            ),
+        )
+        if done.rowcount != 1:
+            self._s.rollback()
+            raise ConflictError(
+                "CUSTOMER_VERSION_CONFLICT", base_version=version, current_version=current_version
+            )
+        self._audit(
+            "customer.credit_limit_changed", actor.id, customer_id,
+            {"credit_limit_minor": credit_limit_minor}, before={"credit_limit_minor": before},
+        )
+        self._s.commit()
+        self._s.refresh(customer)  # the compare-and-set wrote around the loaded row
+        return self._view(customer)
 
     def record_payment(
         self, *, actor: User, branch_id: str, customer_id: str, amount_minor: int

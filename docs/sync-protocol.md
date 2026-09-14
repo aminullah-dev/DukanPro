@@ -73,18 +73,19 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | barcodes insert | product.manage (active) | the product exists |
 | units insert | any role in the active branch for the device seed (piece/0, kg/3, litre/3, dozen/0, meter/2); product.manage otherwise | |
 | customers insert | sale.create (active) | a credit limit other than 0 (null is unlimited) without customer.credit is stored as 0, and the audit keeps the requested limit |
+| customers update | sale.create (active), plus customer.credit when the credit limit or `is_active` changes | `base_version` required; only `name`, `phone`, `credit_limit_minor`, `is_active` |
 | suppliers insert | product.manage (active) | |
 | stock_movements insert, `adjustment` | stock.adjust (row) | qty ≠ 0; the product tracks stock |
 | stock_movements insert, `purchase` | stock.adjust (row) | qty > 0 |
 | stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product |
 | sales insert | sale.create (row), plus sale.discount for a discount above 0 | 0 ≤ discount ≤ subtotal; total = subtotal − discount + tax; paid ≥ total unless on credit; the customer exists; `shift_id` null |
-| sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up); lines ≤ subtotal; the sale's currency; a pushed `unit_cost_minor` is ignored and set by the server from the product's cost |
+| sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up); lines ≤ subtotal; the sale's currency; a pushed `unit_cost_minor` is ignored and set by the server from the product's cost; a unit price under the catalog price needs sale.discount or price.change, unless the product had that price within the last 45 days (a till that had not pulled a price change yet) |
 | payments insert | sale.create (sale's) | the pusher's own sale, whose lines add up to its subtotal; payments ≤ paid and ≤ total; tendered ≥ amount |
 | customer_ledger insert, `charge` | sale.create (sale's) | `ref_type` `sale` and `ref_id` of the pusher's own sale for that customer, whose lines add up to its subtotal; charges ≤ total − paid; over the credit limit is **flagged** in the audit, not refused |
 | customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused |
 | supplier_ledger insert, `bill` | purchase.cost (active) | the supplier exists; the supplier's currency |
 
-Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories, updates of anything but products, stock transfers, counts and returns, customer opening balances and adjustments, supplier payments. Offline ledger entries that break a limit online would enforce still apply, because two tills can both act while offline; the audit flag is what the owner reviews.
+Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories, updates of anything but products and customers, stock transfers, counts and returns, customer opening balances and adjustments, supplier payments. Offline ledger entries that break a limit online would enforce still apply, because two tills can both act while offline; the audit flag is what the owner reviews.
 
 ## Push codes
 
@@ -145,7 +146,7 @@ Two rules keep one user's pull from undoing another's work on a shared device:
 
 - No tombstones yet: soft deletes do not reach devices.
 - No document atomicity: a sale's rows apply one op at a time. A header counts in reports as soon as it arrives, even while its lines are still queued; money against it (payments, charges) waits for the lines.
-- Line prices are the device's price at sale time. The server does not reprice them; the audit entry records the catalog price next to it.
+- Line prices are the device's price at sale time. The server does not reprice them; the audit entry records the catalog price next to it, and flags a line under it (`below_catalog`). A line under every price the product had in the last 45 days needs sale.discount or price.change (`ACCESS_DENIED`, retried: granting the role lets it apply). The price history comes from the audit trail's `product.price_changed` entries.
 - `change_log.seq` is assigned before commit, so on PostgreSQL a pull can pass a row that commits later (review theme 6).
 - Business numbers are not leased yet (decision B below): devices number sales locally.
 

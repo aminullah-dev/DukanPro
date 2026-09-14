@@ -17,7 +17,7 @@
 4. A DebtPayment cannot exceed the outstanding balance in that currency → `DEBT_OVERPAYMENT` (unless an explicit over-payment/credit-balance is allowed by config; default: reject).
 5. Debt write-off is an `adjustment` entry requiring `debt.write_off` permission and is always audited.
 6. Ledger entries are append-only and immutable; corrections are compensating entries.
-7. **Credit is a manager's decision.** Setting any credit limit other than 0 (none means unlimited) needs `customer.credit` (owner, manager); a limit is never negative (`CUSTOMER_CREDIT_LIMIT_INVALID`). A customer a cashier creates offline syncs with limit 0, and its audit entry keeps the requested limit.
+7. **Credit is a manager's decision.** Setting any credit limit other than 0 (none means unlimited) needs `customer.credit` (owner, manager); a limit is never negative (`CUSTOMER_CREDIT_LIMIT_INVALID`). A customer a cashier creates offline syncs with limit 0, and its audit entry keeps the requested limit. A manager changes the limit later from the customers screen (a sync `customers` update) or with `PUT /customers/{id}/credit-limit` (`{credit_limit_minor, version}`); a stale version is `CUSTOMER_VERSION_CONFLICT`, never an overwrite.
 8. Reading customers and their balances needs `sale.create`, `report.view` or `debt.write_off` in the active branch.
 
 ## Error codes
@@ -41,6 +41,8 @@
 | multi-currency | owes 300 AFN | pay 10 USD | `DEBT_CURRENCY_MISMATCH` |
 | write-off audited | balance=300 | write off (perm ok) | balance 0, `debt.written_off` audited |
 | cashier grants credit | cashier | create customer with limit 50000 (or none) | `ACCESS_DENIED`; limit 0 is allowed |
+| manager raises a limit | manager, customer at version 1 | set limit 500000 with version 1 | allowed, version 2; again with version 1 → `CUSTOMER_VERSION_CONFLICT` |
+| cashier raises a limit | cashier | set limit 500000 | `ACCESS_DENIED` |
 
 ## Audit
 

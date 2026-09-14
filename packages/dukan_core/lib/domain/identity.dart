@@ -133,6 +133,15 @@ void assertBranchKeepsOwner({required String branchId, required int ownersAfter}
   }
 }
 
+/// Domain invariant: some active user keeps owning every branch, or nobody
+/// could open a branch or read the shop-wide audit trail. [ownersAfter] counts
+/// such users once the change applies. Raises [ConflictError] `USER_LAST_OWNER`.
+void assertShopKeepsOwner({required int ownersAfter}) {
+  if (ownersAfter < 1) {
+    throw ConflictError('USER_LAST_OWNER', const {'scope': 'shop'});
+  }
+}
+
 /// Domain invariant: a user keeps at least one branch assignment.
 /// Raises [ConflictError] `USER_LAST_ASSIGNMENT`.
 void assertKeepsAnAssignment({required String userId, required int remaining}) {

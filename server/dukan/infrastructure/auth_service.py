@@ -40,6 +40,10 @@ def _as_utc(dt: datetime) -> datetime:
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
+# A device whose refresh answer was lost retries with the token it still holds.
+# Within this window that retry rotates again instead of counting as theft.
+REFRESH_RETRY_GRACE = timedelta(seconds=60)
+
 class SqlAuthService(AuthService):
     def __init__(self, session: Session, settings: Settings, *, setup_token: str) -> None:
         self._s = session
@@ -185,21 +189,28 @@ class SqlAuthService(AuthService):
     def refresh(self, *, refresh_token: str) -> AuthTokens:
         presented = tokens.hash_refresh(refresh_token)
         now = datetime.now(UTC)
+        replacing = presented  # the refresh hash this rotation replaces
         sess = self._s.scalar(select(SessionModel).where(SessionModel.refresh_hash == presented))
         if sess is None:
-            reused = self._s.scalar(
+            sess = self._s.scalar(
                 select(SessionModel).where(SessionModel.prev_refresh_hash == presented)
             )
-            if reused is not None and reused.revoked_at is None:
+            if sess is None or sess.revoked_at is not None:
+                raise AuthError("REFRESH_INVALID")
+            if now - _as_utc(sess.updated_at) > REFRESH_RETRY_GRACE:
                 # A refresh token that was already rotated came back, so it was
                 # copied: revoke the session so neither holder keeps it.
-                reused.revoked_at = now
+                sess.revoked_at = now
                 self._audit(
-                    "session.reuse_detected", actor_id=reused.user_id,
-                    entity_type="session", entity_id=reused.id,
+                    "session.reuse_detected", actor_id=sess.user_id,
+                    entity_type="session", entity_id=sess.id,
                 )
                 self._s.commit()
-            raise AuthError("REFRESH_INVALID")
+                raise AuthError("REFRESH_INVALID")
+            # The answer to the last refresh was lost and the device retries: rotate
+            # again. The token that answer carried becomes the rotated-out one, so it
+            # cannot be used later either.
+            replacing = sess.refresh_hash
         if sess.revoked_at is not None or _as_utc(sess.expires_at) <= now:
             raise AuthError("REFRESH_INVALID")
         m = self._s.get(UserModel, sess.user_id)
@@ -214,10 +225,13 @@ class SqlAuthService(AuthService):
                 update(SessionModel)
                 .where(
                     SessionModel.id == sess.id,
-                    SessionModel.refresh_hash == presented,
+                    SessionModel.refresh_hash == replacing,
                     SessionModel.revoked_at.is_(None),
                 )
-                .values(refresh_hash=tokens.hash_refresh(raw), prev_refresh_hash=presented)
+                .values(
+                    refresh_hash=tokens.hash_refresh(raw), prev_refresh_hash=replacing,
+                    updated_at=now,
+                )
                 .execution_options(synchronize_session=False)
             ),
         )

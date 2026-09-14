@@ -198,6 +198,25 @@ class _SqlSyncReader:
         b = self._s.get(BranchModel, branch_id)
         return b is not None and b.deleted_at is None and b.is_active
 
+    def recent_sell_prices(self, product_id: str, since: datetime) -> frozenset[int]:
+        """The price now and both sides of every price change since `since`, from
+        the audit trail (REST records `price_minor`, sync `sell_price_minor`)."""
+        p = self._s.get(ProductModel, product_id)
+        prices: set[int] = {p.sell_price_minor} if p is not None else set()
+        changes = self._s.execute(
+            select(AuditEntryModel.before, AuditEntryModel.after).where(
+                AuditEntryModel.action == "product.price_changed",
+                AuditEntryModel.entity_id == product_id,
+                AuditEntryModel.occurred_at >= since,
+            )
+        ).tuples()
+        for image in (image for pair in changes for image in pair):
+            for key in ("sell_price_minor", "price_minor"):
+                value = (image or {}).get(key)
+                if type(value) is int:
+                    prices.add(value)
+        return frozenset(prices)
+
 
 class SqlSyncService(SyncService):
     def __init__(self, session: Session) -> None:

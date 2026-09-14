@@ -17,6 +17,9 @@ class AuthController extends Notifier<AuthState> {
   /// that a disabled employee's cached password stops working.
   static const maxOfflineUnlock = Duration(days: 30);
 
+  /// How far the clock may step back (a time sync) before it counts as set back.
+  static const clockSkew = Duration(minutes: 5);
+
   /// Server answers meaning this account or session is no longer accepted.
   static const _endedCodes = {'USER_DISABLED', 'SESSION_REVOKED', 'REFRESH_INVALID', 'TOKEN_INVALID'};
 
@@ -26,12 +29,13 @@ class AuthController extends Notifier<AuthState> {
   SecureStore get _store => ref.read(secureStoreProvider);
   AuthApi get _api => ref.read(authApiProvider);
   PasswordVerifier get _verifier => ref.read(verifierProvider);
+  DateTime _now() => ref.read(clockProvider)().toUtc();
   ProfileStore get _profiles => ProfileStore(ref.read(databaseProvider));
 
   /// Dismiss a lingering sign-in error (e.g. when switching to setup mode).
   void clearError() {
     final s = state;
-    if (s is AuthLoggedOut && s.error != null) state = AuthLoggedOut(canReturn: s.canReturn);
+    if (s is AuthLoggedOut && s.error != null) state = AuthLoggedOut(returnTo: s.returnTo);
   }
 
   /// Restore from cache on startup: locked if a cached profile + password
@@ -43,7 +47,7 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> loginOnline({required String username, required String password}) async {
-    final canReturn = _canReturn;
+    final returnTo = _returnTo;
     try {
       final res = await _api.login(
         username: username,
@@ -53,9 +57,9 @@ class AuthController extends Notifier<AuthState> {
       final profile = await _persist(res, password);
       if (profile != null) state = AuthLoggedIn(profile);
     } on AuthApiException catch (e) {
-      state = AuthLoggedOut(error: e.code, canReturn: canReturn);
+      state = AuthLoggedOut(error: e.code, returnTo: returnTo);
     } on NetworkException {
-      state = AuthLoggedOut(error: 'NETWORK', canReturn: canReturn);
+      state = AuthLoggedOut(error: 'NETWORK', returnTo: returnTo);
     }
   }
 
@@ -84,9 +88,9 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  bool get _canReturn {
+  CachedProfileRow? get _returnTo {
     final s = state;
-    return s is AuthLoggedOut && s.canReturn;
+    return s is AuthLoggedOut ? s.returnTo : null;
   }
 
   Future<void> unlockWithPassword(String password) =>
@@ -119,11 +123,22 @@ class AuthController extends Notifier<AuthState> {
       return true;
     }
     final at = DateTime.tryParse(raw);
-    return at != null && DateTime.now().toUtc().difference(at) <= maxOfflineUnlock;
+    if (at == null) return false;
+    final now = _now();
+    final seen = DateTime.tryParse(await _store.read(SecureKeys.lastSeenAt) ?? '') ?? at;
+    // A clock set back behind a time this device already saw would keep the
+    // window open for ever: that needs the server again.
+    if (now.isBefore(seen.subtract(clockSkew))) return false;
+    if (now.difference(at) > maxOfflineUnlock) return false;
+    if (now.isAfter(seen)) await _store.write(SecureKeys.lastSeenAt, now.toIso8601String());
+    return true;
   }
 
-  Future<void> _markValidated() =>
-      _store.write(SecureKeys.validatedAt, DateTime.now().toUtc().toIso8601String());
+  Future<void> _markValidated() async {
+    final now = _now().toIso8601String();
+    await _store.write(SecureKeys.validatedAt, now);
+    await _store.write(SecureKeys.lastSeenAt, now);
+  }
 
   /// Biometric unlock, only for the user who opted in on this device: never on
   /// by default, so another fingerprint enrolled on a shared till opens nothing.
@@ -172,7 +187,8 @@ class AuthController extends Notifier<AuthState> {
   /// From the lock screen, sign in as someone else. The cached session stays
   /// until that sign-in succeeds, and [restore] returns to it.
   void useAnotherAccount() {
-    if (state is AuthLocked) state = const AuthLoggedOut(canReturn: true);
+    final s = state;
+    if (s is AuthLocked) state = AuthLoggedOut(returnTo: s.profile);
   }
 
   /// Confirm the signed-in user with the server when it is reachable: refresh
@@ -229,6 +245,7 @@ class AuthController extends Notifier<AuthState> {
       SecureKeys.pinVerifier,
       SecureKeys.biometricUser,
       SecureKeys.validatedAt,
+      SecureKeys.lastSeenAt,
     ]) {
       await _store.delete(k);
     }

@@ -63,6 +63,14 @@ void main() {
       assertBranchKeepsOwner(branchId: 'B1', ownersAfter: 1); // no throw
     });
 
+    test('the shop keeps an owner of every branch', () {
+      expect(
+        () => assertShopKeepsOwner(ownersAfter: 0),
+        throwsA(isA<ConflictError>().having((e) => e.code, 'code', 'USER_LAST_OWNER')),
+      );
+      assertShopKeepsOwner(ownersAfter: 1); // no throw
+    });
+
     test('a user keeps an assignment', () {
       expect(
         () => assertKeepsAnAssignment(userId: 'u', remaining: 0),

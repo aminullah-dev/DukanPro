@@ -186,6 +186,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creditLimit => 'Credit limit';
 
   @override
+  String get setCreditLimit => 'Set credit limit';
+
+  @override
+  String get creditLimitHelp => 'Leave empty for no limit';
+
+  @override
   String get recordPayment => 'Record payment';
 
   @override

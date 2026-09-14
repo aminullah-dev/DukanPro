@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import Select, select, update
 from sqlalchemy.orm import Session
 
 from dukan.application.access import require_any_permission, require_permission
@@ -29,6 +29,7 @@ from dukan.domain.identity import (
     assert_keeps_an_assignment,
     assert_password_strong,
     assert_role_known,
+    assert_shop_keeps_owner,
     assert_username_available,
 )
 from dukan.infrastructure.db.models import (
@@ -45,6 +46,27 @@ from dukan.shared.ids import new_id
 
 _POLICY = PermissionPolicy()
 _OWNER = "owner"
+
+
+def _active_owner_query() -> Select[tuple[str, str]]:
+    """(user_id, branch_id) of every live owner assignment of an active user.
+
+    It locks the assignment AND user rows, so on PostgreSQL a concurrent demotion
+    or disable waits, then re-reads the first one's change: two owners unseating
+    each other cannot both pass. SQLite (dev) serializes writers only at commit,
+    so there the check is best effort."""
+    return (
+        select(BranchAssignmentModel.user_id, BranchAssignmentModel.branch_id)
+        .join(UserModel, UserModel.id == BranchAssignmentModel.user_id)
+        .where(
+            BranchAssignmentModel.role_name == _OWNER,
+            BranchAssignmentModel.deleted_at.is_(None),
+            UserModel.status == UserStatus.ACTIVE.value,
+            UserModel.deleted_at.is_(None),
+        )
+        .order_by(BranchAssignmentModel.id)
+        .with_for_update()
+    )
 
 
 class SqlIamService(IamService):
@@ -82,8 +104,10 @@ class SqlIamService(IamService):
             for b in self._s.scalars(select(BranchModel).where(BranchModel.id.in_(ids)))
         }
 
-    def _employee_view(self, m: UserModel) -> EmployeeView:
-        assignments = self._assignments(m.id)
+    def _employee_view(self, m: UserModel, actor: User) -> EmployeeView:
+        # Only the branches the actor manages: another branch's roles are not theirs.
+        managed = self._branches_where(actor, Permission.USER_MANAGE)
+        assignments = tuple(a for a in self._assignments(m.id) if a.branch_id in managed)
         names = self._branch_names({a.branch_id for a in assignments})
         return EmployeeView(
             id=m.id,
@@ -154,22 +178,7 @@ class SqlIamService(IamService):
             )
 
     def _active_owner_rows(self) -> list[tuple[str, str]]:
-        """(user_id, branch_id) of every live owner assignment of an active user.
-        The rows are locked, so two concurrent demotions cannot both pass."""
-        return [
-            (uid, bid)
-            for uid, bid in self._s.execute(
-                select(BranchAssignmentModel.user_id, BranchAssignmentModel.branch_id)
-                .join(UserModel, UserModel.id == BranchAssignmentModel.user_id)
-                .where(
-                    BranchAssignmentModel.role_name == _OWNER,
-                    BranchAssignmentModel.deleted_at.is_(None),
-                    UserModel.status == UserStatus.ACTIVE.value,
-                    UserModel.deleted_at.is_(None),
-                )
-                .with_for_update(of=BranchAssignmentModel)
-            ).tuples()
-        ]
+        return [(uid, bid) for uid, bid in self._s.execute(_active_owner_query()).tuples()]
 
     def _assert_owner_remains(self, branch_id: str, *, losing: str) -> None:
         """The branch must keep an active owner once `losing` stops being one."""
@@ -177,6 +186,28 @@ class SqlIamService(IamService):
             1 for uid, bid in self._active_owner_rows() if bid == branch_id and uid != losing
         )
         assert_branch_keeps_owner(branch_id=branch_id, owners_after=owners_after)
+
+    def _assert_shop_owner_remains(self, *, losing: str) -> None:
+        """Some active user keeps owning every branch: they open branches and read
+        the audit trail. Data that already has no such owner is not blocked."""
+        owners = self._shop_owners()
+        if owners:
+            assert_shop_keeps_owner(owners_after=len(owners - {losing}))
+
+    def _require_owner_rights_over(self, actor: User, target: User) -> None:
+        """Owner rights in every branch the target works in: an owner of one branch
+        cannot unseat the shop's owner there."""
+        if not all(self._is_owner_in(actor, a.branch_id) for a in target.assignments):
+            raise PermissionDeniedError(
+                "ACCESS_DENIED", permission=_OWNER, user_id=target.id, actor_id=actor.id
+            )
+
+    def _unseat_owner(self, actor: User, m: UserModel, branch_id: str) -> None:
+        """Taking an owner role away: owner rights over that owner, and both the
+        branch and the shop keep an owner."""
+        self._require_owner_rights_over(actor, self._domain_user(m))
+        self._assert_owner_remains(branch_id, losing=m.id)
+        self._assert_shop_owner_remains(losing=m.id)
 
     def _shop_owners(self) -> set[str]:
         """Active users who own every branch of the shop."""
@@ -242,7 +273,7 @@ class SqlIamService(IamService):
             )
             .order_by(UserModel.display_name)
         ).all()
-        return [self._employee_view(m) for m in rows]
+        return [self._employee_view(m, actor) for m in rows]
 
     def create_employee(
         self,
@@ -296,7 +327,7 @@ class SqlIamService(IamService):
             after={"username": username, "role": role_name, "branch_id": branch_id},
         )
         self._s.commit()
-        return self._employee_view(m)
+        return self._employee_view(m, actor)
 
     def set_employee_status(
         self, *, actor: User, branch_id: str, user_id: str, active: bool
@@ -308,6 +339,8 @@ class SqlIamService(IamService):
         if not active:
             for owned in sorted({a.branch_id for a in target.assignments if a.role_name == _OWNER}):
                 self._assert_owner_remains(owned, losing=target.id)
+            if target.is_owner:
+                self._assert_shop_owner_remains(losing=target.id)
         m.status = "active" if active else "disabled"
         m.updated_by = actor.id
         m.version += 1
@@ -321,7 +354,7 @@ class SqlIamService(IamService):
             entity_id=user_id,
         )
         self._s.commit()
-        return self._employee_view(m)
+        return self._employee_view(m, actor)
 
     def assign_role(
         self, *, actor: User, branch_id: str, user_id: str, target_branch_id: str, role_name: str
@@ -340,7 +373,7 @@ class SqlIamService(IamService):
         )
         if existing is not None:
             if existing.role_name == _OWNER and role_name != _OWNER:
-                self._assert_owner_remains(target_branch_id, losing=user_id)
+                self._unseat_owner(actor, m, target_branch_id)
             existing.role_name = role_name
             existing.updated_by = actor.id
             existing.version += 1
@@ -363,7 +396,7 @@ class SqlIamService(IamService):
             after={"branch_id": target_branch_id, "role": role_name},
         )
         self._s.commit()
-        return self._employee_view(m)
+        return self._employee_view(m, actor)
 
     def revoke_assignment(
         self, *, actor: User, branch_id: str, user_id: str, target_branch_id: str
@@ -381,7 +414,7 @@ class SqlIamService(IamService):
         if row is None:
             raise NotFoundError("ASSIGNMENT_NOT_FOUND", user_id=user_id, branch_id=target_branch_id)
         if row.role_name == _OWNER:
-            self._assert_owner_remains(target_branch_id, losing=user_id)
+            self._unseat_owner(actor, m, target_branch_id)
         remaining = [a for a in self._assignments(user_id) if a.branch_id != target_branch_id]
         assert_keeps_an_assignment(user_id=user_id, remaining=len(remaining))
         row.deleted_at = datetime.now(UTC)
@@ -400,7 +433,7 @@ class SqlIamService(IamService):
             after={"branch_id": target_branch_id, "default_branch_id": m.default_branch_id},
         )
         self._s.commit()
-        return self._employee_view(m)
+        return self._employee_view(m, actor)
 
     def reset_password(
         self, *, actor: User, branch_id: str, user_id: str, new_password: str

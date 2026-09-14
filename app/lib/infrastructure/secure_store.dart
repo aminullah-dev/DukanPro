@@ -17,6 +17,10 @@ class SecureKeys {
   /// When the server last confirmed the user (ISO-8601 UTC); caps offline unlock.
   static const validatedAt = 'validated_at';
 
+  /// The latest time this device has seen (ISO-8601 UTC): a clock set back
+  /// behind it must not reopen the offline window.
+  static const lastSeenAt = 'last_seen_at';
+
   /// The user who opted in to biometric unlock on this device.
   static const biometricUser = 'biometric_user';
 }

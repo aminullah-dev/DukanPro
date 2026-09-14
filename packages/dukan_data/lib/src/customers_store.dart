@@ -30,6 +30,28 @@ final class LocalCustomers {
     });
   }
 
+  /// Change a customer's credit limit (null: no limit). A manager's decision:
+  /// the screen offers it only with customer.credit, and the server checks again.
+  Future<void> setCreditLimit(
+    Customer c,
+    int? creditLimitMinor, {
+    required String actorId,
+    required String deviceId,
+  }) async {
+    assertCreditLimitValid(creditLimitMinor: creditLimitMinor);
+    await _db.transaction(() async {
+      await (_db.update(_db.customers)..where((t) => t.id.equals(c.id))).write(CustomersCompanion(
+            creditLimitMinor: Value(creditLimitMinor),
+            updatedBy: Value(actorId),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ));
+      await _rec.record(
+        table: 'customers', rowId: c.id, op: 'update', baseVersion: c.version,
+        data: {'credit_limit_minor': creditLimitMinor}, actorId: actorId, deviceId: deviceId,
+      );
+    });
+  }
+
   Future<List<Customer>> list({String? search}) async {
     final q = _db.select(_db.customers)..where((t) => t.deletedAt.isNull());
     if (search != null && search.isNotEmpty) {
@@ -139,12 +161,16 @@ final class LocalPurchasing {
               id: movementId, productId: l.productId, branchId: branchId,
               qtyDelta: l.qtyMinor, reason: 'purchase', createdBy: Value(actorId),
             ));
-        await (_db.update(_db.products)..where((t) => t.id.equals(l.productId))).write(
-          ProductsCompanion(
-            costMinor: Value(l.unitCostMinor), costCurrency: const Value('AFN'),
-            updatedAt: Value(DateTime.now().toUtc()),
-          ),
-        );
+        if (l.unitCostMinor > 0) {
+          // A receipt without a cost (a stock keeper's) says nothing about the
+          // price paid: the product keeps its cost, as on the server.
+          await (_db.update(_db.products)..where((t) => t.id.equals(l.productId))).write(
+            ProductsCompanion(
+              costMinor: Value(l.unitCostMinor), costCurrency: const Value('AFN'),
+              updatedAt: Value(DateTime.now().toUtc()),
+            ),
+          );
+        }
         await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
           'product_id': l.productId, 'branch_id': branchId, 'qty_delta': l.qtyMinor, 'reason': 'purchase',
         }, actorId: actorId, deviceId: deviceId);

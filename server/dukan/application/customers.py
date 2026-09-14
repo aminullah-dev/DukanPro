@@ -16,6 +16,7 @@ class CustomerView:
     credit_limit_minor: int | None
     currency: str
     balance_minor: int
+    version: int
 
 
 class CustomerService(Protocol):
@@ -29,6 +30,11 @@ class CustomerService(Protocol):
     ) -> list[CustomerView]: ...
 
     def get_customer(self, *, actor: User, branch_id: str, customer_id: str) -> CustomerView: ...
+
+    def set_credit_limit(
+        self, *, actor: User, branch_id: str, customer_id: str, credit_limit_minor: int | None,
+        version: int,
+    ) -> CustomerView: ...
 
     def record_payment(
         self, *, actor: User, branch_id: str, customer_id: str, amount_minor: int

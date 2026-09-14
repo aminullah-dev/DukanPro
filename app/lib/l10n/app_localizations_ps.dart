@@ -186,6 +186,12 @@ class AppLocalizationsPs extends AppLocalizations {
   String get creditLimit => 'د پور حد';
 
   @override
+  String get setCreditLimit => 'د پور حد ټاکل';
+
+  @override
+  String get creditLimitHelp => 'د بې حده لپاره یې خالي پرېږدئ';
+
+  @override
   String get recordPayment => 'د تادیې ثبت';
 
   @override

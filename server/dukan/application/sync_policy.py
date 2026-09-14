@@ -15,10 +15,10 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Protocol
 
-from dukan.application.access import require_permission
+from dukan.application.access import require_any_permission, require_permission
 from dukan.application.sync import OpInput
 from dukan.domain.branches import assert_branch_active
 from dukan.domain.customers import (
@@ -37,6 +37,10 @@ POLICY = PermissionPolicy()
 PULL_LIMIT_MAX = 1000
 PUSH_OPS_MAX = 500  # ops per /sync/push request (the client sends batches of 200)
 DEFAULT_CURRENCY = "AFN"
+# A device sells at the prices it last pulled: for up to the app's 30-day offline
+# unlock window, plus time to push. A sale line at a price the product had within
+# this window is not a discount.
+PRICE_DRIFT_WINDOW = timedelta(days=45)
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 _CURRENCY = re.compile(r"[A-Z]{3}")
@@ -236,6 +240,12 @@ _UPDATE: dict[str, dict[str, _Field]] = {
         "sell_currency": _CURRENCY_F,
         "is_active": _BOOL,
     },
+    "customers": {
+        "name": _str(128),
+        "phone": _str(32, nullable=True),
+        "credit_limit_minor": _int(lo=0, nullable=True),
+        "is_active": _BOOL,
+    },
 }
 
 
@@ -404,6 +414,10 @@ class SyncReader(Protocol):
     def sale_charges_total(self, sale_id: str) -> int: ...
 
     def branch_active(self, branch_id: str) -> bool: ...
+
+    def recent_sell_prices(self, product_id: str, since: datetime) -> frozenset[int]:
+        """Every sell price the product had at some moment since `since`."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -595,6 +609,23 @@ def _customers_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     return ApplyPlan(v, branch, None, AuditIntent("customer.created", "customer", after))
 
 
+def _customers_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    branch = _active(ctx)
+    _need(ctx, Permission.SALE_CREATE, branch)
+    current = _guard_update(ctx, "CUSTOMER_NOT_FOUND")
+    if not v:
+        raise ValidationError("SYNC_OP_INVALID", field="data", reason="empty")
+    changed = {k: val for k, val in v.items() if current.values.get(k) != val}
+    if "credit_limit_minor" in changed or "is_active" in changed:
+        # Credit, and closing a customer's account, are a manager's decision.
+        _need(ctx, Permission.CUSTOMER_CREDIT, branch)
+    action = (
+        "customer.credit_limit_changed" if "credit_limit_minor" in changed else "customer.updated"
+    )
+    before = {k: current.values.get(k) for k in changed}
+    return ApplyPlan(v, branch, None, AuditIntent(action, "customer", changed, before))
+
+
 def _suppliers_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     branch = _active(ctx)
     _need(ctx, Permission.PRODUCT_MANAGE, branch)
@@ -684,6 +715,9 @@ def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     return ApplyPlan(v, branch, branch, AuditIntent("sale.settled", "sale", after))
 
 
+_DISCOUNTERS = (Permission.SALE_DISCOUNT, Permission.PRICE_CHANGE)
+
+
 def _sale_lines_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     sale = _own_sale(ctx, v["sale_id"])
     _guard_insert(ctx)
@@ -701,10 +735,19 @@ def _sale_lines_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
         raise ValidationError(
             "SYNC_REF_MISMATCH", field="line_total_minor", reason="exceeds_subtotal"
         )
+    price: int = v["unit_price_minor"]
+    below_catalog = price < product.sell_price_minor
+    if below_catalog and not any(POLICY.can(ctx.actor, p, sale.branch_id) for p in _DISCOUNTERS):
+        # Under the catalog price is a discount, a manager's decision, unless the
+        # device still had an older price: one the product had within the window.
+        since = ctx.now - PRICE_DRIFT_WINDOW
+        if price not in ctx.reader.recent_sell_prices(product.id, since):
+            require_any_permission(POLICY, ctx.actor, _DISCOUNTERS, sale.branch_id)
     values = {**v, "unit_cost_minor": product.cost_minor or 0}  # cost snapshot is server-owned
     after = {
         **_pick(v, "sale_id", "product_id", "qty_minor", "unit_price_minor", "line_total_minor"),
         "catalog_price_minor": product.sell_price_minor,
+        **({"below_catalog": True} if below_catalog else {}),
     }
     return ApplyPlan(
         values, sale.branch_id, sale.branch_id, AuditIntent("sale.line_added", "sale_line", after)
@@ -816,6 +859,7 @@ _HANDLERS: dict[tuple[str, str], Callable[[_Ctx, dict[str, Any]], ApplyPlan]] = 
     ("barcodes", "insert"): _barcodes_insert,
     ("units", "insert"): _units_insert,
     ("customers", "insert"): _customers_insert,
+    ("customers", "update"): _customers_update,
     ("suppliers", "insert"): _suppliers_insert,
     ("stock_movements", "insert"): _stock_insert,
     ("sales", "insert"): _sales_insert,

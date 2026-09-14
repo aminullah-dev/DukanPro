@@ -92,6 +92,42 @@ def test_a_branch_owner_cannot_take_over_other_branches(client: TestClient) -> N
     assert client.post("/auth/login", json={"username": "owner", "password": PW}).status_code == 200
 
 
+def test_a_branch_owner_cannot_unseat_the_shop_owner(client: TestClient) -> None:
+    shop = Shop(client)
+    b2 = shop.branch("B2")  # the shop owner owns B2 too
+    bo_token, bo_id = shop.user("bo", "owner", branch=b2)
+    bo = _h(bo_token, b2)
+    attempts = [
+        client.post(f"/users/{shop.owner_id}/roles", headers=bo,
+                    json={"branch_id": b2, "role_name": "manager"}),
+        client.delete(f"/users/{shop.owner_id}/roles/{b2}", headers=bo),
+    ]
+    assert [(r.status_code, _code(r)) for r in attempts] == [(403, "ACCESS_DENIED")] * 2
+    # bo sees the shop owner's role in B2, not where else they work.
+    listed = {u["username"]: u for u in client.get("/users", headers=bo).json()["users"]}
+    assert [b["branch_id"] for b in listed["owner"]["branches"]] == [b2]
+    # The shop owner still opens branches, and may step a branch owner down.
+    assert client.post("/branches", headers=shop.owner, json={"name": "B3"}).status_code == 200
+    owner_b2 = _h(shop.owner_token, b2)
+    r = client.post(f"/users/{bo_id}/roles", headers=owner_b2,
+                    json={"branch_id": b2, "role_name": "manager"})
+    assert r.status_code == 200, r.text
+
+
+def test_the_shop_keeps_an_owner_of_every_branch(client: TestClient) -> None:
+    shop = Shop(client)
+    b2 = shop.branch("B2")
+    shop.user("bo", "owner", branch=b2)
+    # B2 keeps an owner either way, but nobody would own every branch.
+    owner_b2 = _h(shop.owner_token, b2)
+    attempts = [
+        client.post(f"/users/{shop.owner_id}/roles", headers=owner_b2,
+                    json={"branch_id": b2, "role_name": "manager"}),
+        client.delete(f"/users/{shop.owner_id}/roles/{b2}", headers=owner_b2),
+    ]
+    assert [(r.status_code, _code(r)) for r in attempts] == [(409, "USER_LAST_OWNER")] * 2
+
+
 def test_every_branch_keeps_an_active_owner(client: TestClient) -> None:
     shop = Shop(client)
     me = shop.owner_id
@@ -237,6 +273,29 @@ def test_credit_is_granted_by_a_manager(client: TestClient) -> None:
     r = client.post("/sync/push", headers=c, json={"device_id": "d", "ops": [op]})
     assert r.json()["results"][0]["outcome"] == "applied"
     assert client.get(f"/customers/{cid}", headers=shop.owner).json()["credit_limit_minor"] == 0
+
+
+def test_a_manager_changes_a_customers_credit_limit(client: TestClient) -> None:
+    shop = Shop(client)
+    c1_token, _ = shop.user("c1", "cashier")
+    created = client.post("/customers", headers=_h(c1_token),
+                          json={"name": "Ahmad", "credit_limit_minor": 0})
+    assert created.status_code == 200, created.text
+    customer = created.json()
+    assert (customer["credit_limit_minor"], customer["version"]) == (0, 1)
+    url = f"/customers/{customer['id']}/credit-limit"
+
+    denied = client.put(url, headers=_h(c1_token), json={"credit_limit_minor": 500000, "version": 1})
+    assert (denied.status_code, _code(denied)) == (403, "ACCESS_DENIED")
+    ok = client.put(url, headers=shop.owner, json={"credit_limit_minor": 500000, "version": 1})
+    assert ok.status_code == 200, ok.text
+    assert (ok.json()["credit_limit_minor"], ok.json()["version"]) == (500000, 2)
+    stale = client.put(url, headers=shop.owner, json={"credit_limit_minor": None, "version": 1})
+    assert (stale.status_code, _code(stale)) == (409, "CUSTOMER_VERSION_CONFLICT")
+    negative = client.put(url, headers=shop.owner, json={"credit_limit_minor": -1, "version": 2})
+    assert (negative.status_code, _code(negative)) == (422, "CUSTOMER_CREDIT_LIMIT_INVALID")
+    unlimited = client.put(url, headers=shop.owner, json={"credit_limit_minor": None, "version": 2})
+    assert unlimited.status_code == 200 and unlimited.json()["credit_limit_minor"] is None
 
 
 def test_a_stock_keeper_receives_quantities_only(client: TestClient) -> None:

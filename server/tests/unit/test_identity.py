@@ -15,6 +15,7 @@ from dukan.domain.identity import (
     assert_password_strong,
     assert_role_known,
     assert_role_mutable,
+    assert_shop_keeps_owner,
     assert_username_available,
 )
 from dukan.shared.errors import ConflictError, PermissionDeniedError, ValidationError
@@ -55,6 +56,13 @@ def test_every_branch_keeps_an_owner() -> None:
         assert_branch_keeps_owner(branch_id="B1", owners_after=0)
     assert e.value.code == "USER_LAST_OWNER"
     assert_branch_keeps_owner(branch_id="B1", owners_after=1)  # no raise
+
+
+def test_the_shop_keeps_an_owner_of_every_branch() -> None:
+    with pytest.raises(ConflictError) as e:
+        assert_shop_keeps_owner(owners_after=0)
+    assert e.value.code == "USER_LAST_OWNER" and e.value.context["scope"] == "shop"
+    assert_shop_keeps_owner(owners_after=1)  # no raise
 
 
 def test_a_user_keeps_an_assignment() -> None:

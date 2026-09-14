@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import jwt
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError as SettingsError
+from sqlalchemy import update
+from sqlalchemy.orm import Session
 
 from dukan.config import Settings
+from dukan.infrastructure.auth_service import REFRESH_RETRY_GRACE
+from dukan.infrastructure.db.models import SessionModel
 
 
 def _bootstrap(client: TestClient) -> dict:
@@ -17,6 +23,13 @@ def _bootstrap(client: TestClient) -> dict:
     )
     assert r.status_code == 200, r.text
     return r.json()
+
+
+def _age_sessions(client: TestClient, by: timedelta) -> None:
+    """As if every session's last refresh happened `by` ago."""
+    with Session(client.app.state.engine) as s:  # type: ignore[attr-defined]
+        s.execute(update(SessionModel).values(updated_at=datetime.now(UTC) - by))
+        s.commit()
 
 
 def test_bootstrap_issues_tokens_and_is_idempotent_once(client: TestClient) -> None:
@@ -82,12 +95,30 @@ def test_refresh_rotates_in_place_and_reuse_revokes_the_session(client: TestClie
     # Same session: the access token issued before the refresh still works.
     assert client.get("/auth/me", headers=access).status_code == 200
 
-    # The rotated-out token coming back means it was copied: the session is revoked,
-    # so neither the thief nor the device keeps it.
+    # Past the retry grace, the rotated-out token coming back means it was copied:
+    # the session is revoked, so neither the thief nor the device keeps it.
+    _age_sessions(client, REFRESH_RETRY_GRACE + timedelta(seconds=1))
     assert client.post("/auth/refresh", json={"refresh_token": refresh}).status_code == 401
     me = client.get("/auth/me", headers=access)
     assert me.status_code == 401 and me.json()["error"]["code"] == "SESSION_REVOKED"
     assert client.post("/auth/refresh", json={"refresh_token": new_refresh}).status_code == 401
+
+
+def test_a_lost_refresh_answer_can_be_retried(client: TestClient) -> None:
+    data = _bootstrap(client)
+    access = {"Authorization": f"Bearer {data['tokens']['access_token']}"}
+    refresh = data["tokens"]["refresh_token"]
+    lost = client.post("/auth/refresh", json={"refresh_token": refresh})
+    assert lost.status_code == 200  # ...but the answer never reaches the device
+
+    retry = client.post("/auth/refresh", json={"refresh_token": refresh})
+    assert retry.status_code == 200
+    assert client.get("/auth/me", headers=access).status_code == 200
+    # The lost answer's token is now the rotated-out one: showing up later, it was copied.
+    _age_sessions(client, REFRESH_RETRY_GRACE + timedelta(seconds=1))
+    stolen = client.post("/auth/refresh", json={"refresh_token": lost.json()["refresh_token"]})
+    assert stolen.status_code == 401
+    assert client.get("/auth/me", headers=access).json()["error"]["code"] == "SESSION_REVOKED"
 
 
 def test_logout_revokes_the_session(client: TestClient) -> None:
@@ -126,7 +157,10 @@ def test_access_tokens_must_be_complete_and_match_their_session(client: TestClie
         assert r.status_code == 401 and r.json()["error"]["code"] == "TOKEN_INVALID"
 
 
-@pytest.mark.parametrize("weak", ["short", "a" * 40, "abcabcabcabcabcabcabcabcabcabcabc"])
+@pytest.mark.parametrize(
+    "weak",
+    ["short", "a" * 40, "abcabcabcabcabcabcabcabcabcabcabc", "change-me-to-a-long-random-string"],
+)
 def test_the_secret_key_must_be_strong(weak: str) -> None:
     with pytest.raises(SettingsError):
         Settings(secret_key=weak, database_url="sqlite://")

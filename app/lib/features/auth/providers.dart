@@ -23,3 +23,6 @@ final verifierProvider = Provider<PasswordVerifier>((ref) => Argon2Verifier());
 final biometricProvider = Provider<BiometricAuth>((ref) => const NoBiometric());
 
 final deviceIdProvider = Provider<String>((ref) => 'unknown-device');
+
+/// The wall clock; tests override it.
+final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);

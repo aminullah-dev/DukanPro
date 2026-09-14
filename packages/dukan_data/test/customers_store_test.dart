@@ -86,4 +86,34 @@ void main() {
     final ops = await DriftSyncOutbox(db).pending();
     expect(ops.where((o) => o.aggregateType == 'supplier_ledger'), isEmpty); // the server rejects a zero bill
   });
+
+  test('a credit limit change is saved and queued against the version it read', () async {
+    final c = Customer(id: newId(), name: 'Ahmad', creditLimitMinor: 0);
+    await customers.createCustomer(c, actorId: 'u1', deviceId: 'app');
+    final saved = (await customers.find(c.id))!;
+    await customers.setCreditLimit(saved, 500000, actorId: 'm1', deviceId: 'app');
+
+    expect((await customers.find(c.id))?.creditLimitMinor, 500000);
+    final op = (await DriftSyncOutbox(db).pending()).last;
+    expect((op.aggregateType, op.opType, op.baseVersion), ('customers', 'update', saved.version));
+    expect(op.payload, {'credit_limit_minor': 500000});
+    await expectLater(
+      customers.setCreditLimit(saved, -1, actorId: 'm1', deviceId: 'app'),
+      throwsA(isA<ValidationError>()),
+    );
+  });
+
+  test('a receipt without a cost keeps the product cost', () async {
+    final p = Product(
+      id: newId(), sku: 'P5', name: 'Oil', unitId: 'piece',
+      sellPrice: Money(9000, 'AFN'), cost: Money(7000, 'AFN'),
+    );
+    await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    await purchasing.receiveGoods(
+      lines: [ReceiptLine(productId: p.id, qtyMinor: 3, unitCostMinor: 0)],
+      branchId: 'B1', actorId: 'u1', deviceId: 'app',
+    );
+    expect(await catalog.onHand(p.id, 'B1'), 3);
+    expect((await catalog.products.findById(p.id))?.cost?.amountMinor, 7000);
+  });
 }

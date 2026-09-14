@@ -40,12 +40,14 @@ final sessionActorProvider = Provider<SessionActor?>((ref) {
   return SessionActor(user, branchId);
 });
 
-/// The signed-in user's id, kept while the app is locked. Session state (the
-/// POS cart, admin lists, the notification feed) watches it, so it resets when
-/// another user signs in on this device but survives a lock.
+/// The signed-in user's id, kept while the app is locked or another account is
+/// being tried. Session state (the POS cart, admin lists, the notification
+/// feed) watches it, so it resets when another user signs in on this device but
+/// survives a lock.
 final sessionUserIdProvider = Provider<String?>(
   (ref) => ref.watch(authControllerProvider.select((s) => switch (s) {
         AuthLoggedIn(:final profile) || AuthLocked(:final profile) => profile.userId,
+        AuthLoggedOut(:final returnTo?) => returnTo.userId,
         _ => null,
       })),
 );

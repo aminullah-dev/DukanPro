@@ -30,6 +30,11 @@ class PaymentRequest(BaseModel):
     amount_minor: Int32
 
 
+class CreditLimitRequest(BaseModel):
+    credit_limit_minor: Int32 | None  # null: no limit
+    version: Int32
+
+
 @router.get("/customers")
 def list_customers(
     actor: Actor, svc: Customers, search: str | None = None, x_branch_id: BranchHeader = None
@@ -59,6 +64,22 @@ def get_customer(
     return customer_view_dict(
         svc.get_customer(
             actor=actor, branch_id=active_branch(actor, x_branch_id), customer_id=customer_id
+        )
+    )
+
+
+@router.put("/customers/{customer_id}/credit-limit")
+def set_credit_limit(
+    customer_id: str,
+    body: CreditLimitRequest,
+    actor: Actor,
+    svc: Customers,
+    x_branch_id: BranchHeader = None,
+) -> dict:
+    return customer_view_dict(
+        svc.set_credit_limit(
+            actor=actor, branch_id=active_branch(actor, x_branch_id), customer_id=customer_id,
+            credit_limit_minor=body.credit_limit_minor, version=body.version,
         )
     )
 

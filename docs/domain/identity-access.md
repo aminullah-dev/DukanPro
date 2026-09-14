@@ -8,7 +8,7 @@
 - **Role** — `{ id, name, permissions: set<Permission> }`. Built-in roles: `owner`, `manager`, `cashier`, `stock_keeper`, `accountant`.
 - **Permission** — a value object, dotted code: `sale.create`, `price.change`, `stock.adjust`, `product.manage`, `user.manage`, `report.view`, `branch.manage`, `debt.write_off`, `audit.view`, and the money actions `sale.void`, `sale.discount`, `customer.credit`, `purchase.cost` (owner and manager only).
 - **BranchAssignment** — `{ user_id, branch_id, role_id }` (a user may work in several branches, with a role per branch).
-- **Session** — `{ id, user_id, device_id, issued_at, expires_at, refresh_token_hash, prev_refresh_hash }`. A refresh rotates the hash in place; `expires_at` is never extended.
+- **Session** — `{ id, user_id, device_id, issued_at, expires_at, refresh_token_hash, prev_refresh_hash }`. A refresh rotates the hash in place; `expires_at` is never extended. Presenting the rotated-out token again revokes the session, except within 60 seconds of that rotation: a device whose refresh answer was lost may retry once, and the retry rotates again.
 
 ## Invariants
 
@@ -18,6 +18,9 @@
    - the branch a role is granted in (granting `owner` needs owner rights there);
    - every branch a user works in, when acting on that user (status, password); acting on an owner needs owner rights in all of them.
 3. `owner` implies all permissions **in its branch**. Every branch keeps at least one active owner (`USER_LAST_OWNER`), so no branch can become unadministrable. Opening a branch is a shop-wide act (`branch.manage` in every branch) and makes the shop's owners owners of the new branch.
+   - Some active user also keeps owning every branch (`USER_LAST_OWNER`, scope `shop`): they open branches and read the audit trail.
+   - Taking an owner role away (demote or revoke) needs owner rights in every branch that owner works in, so an owner of one branch cannot unseat the shop's owner there.
+   - Upgrading to migration 0009 gives each branch with no active owner to its creator, and makes the owners of the shop's first branch owners of every branch (before 0009 they acted everywhere).
 4. Disabling a User immediately invalidates their sessions (enforced at the auth boundary, not domain — domain only flags status).
 5. Passwords are never stored or logged in plaintext; only a salted hash (argon2id) — domain holds the hash opaquely.
 6. Only built-in roles can be granted until custom roles exist (`ROLE_UNKNOWN`).
@@ -47,8 +50,11 @@
 | per-branch role | user is manager@B1, cashier@B2 | `price.change` active branch=B2 | `ACCESS_DENIED` |
 | owner of B2 acts on B1 | user is owner@B2 only | grant self owner@B1, reset B1 owner's password | `ACCESS_DENIED` |
 | branch keeps an owner | sole owner of B1 | demote self or revoke the assignment | `USER_LAST_OWNER` |
+| shop keeps an owner | the only user owning every branch; B2 has another owner | step down in B2 | `USER_LAST_OWNER` (scope `shop`) |
+| branch owner vs shop owner | user is owner@B2 only | demote or revoke the shop owner in B2 | `ACCESS_DENIED` |
 | last assignment | cashier works in B1 only | revoke B1 | `USER_LAST_ASSIGNMENT` |
-| refresh reuse | refresh token rotated once | present the old token again | `REFRESH_INVALID`, session revoked |
+| refresh reuse | refresh token rotated over 60 s ago | present the old token again | `REFRESH_INVALID`, session revoked |
+| lost refresh answer | refresh token rotated under 60 s ago | present the old token again | rotates again |
 
 ## Audit
 
@@ -62,18 +68,20 @@ The server is authoritative; the device keeps just enough to work offline.
   - New roles take effect at once.
   - `USER_DISABLED`, `SESSION_REVOKED`, `REFRESH_INVALID` or `TOKEN_INVALID` wipe the saved sign-in and require an online sign-in.
 - **Offline window.** Offline unlock works for 30 days after the server last confirmed the user, then fails with `OFFLINE_EXPIRED`.
+  - The device remembers the latest time it has seen. A clock set back more than 5 minutes behind it also fails with `OFFLINE_EXPIRED`, so winding the clock back cannot keep the window open.
 - **Lock.** There is a Lock action, and the app locks itself when it goes to the background or sits idle for 10 minutes.
+  - Any touch, scroll or key anywhere in the app counts as activity, including screens and dialogs opened over the shell.
   - Locking keeps the saved sign-in and the POS cart.
   - When another user signs in, session state (cart, admin lists, notifications) starts empty.
 - **Sign-out.** It wipes the saved sign-in, so it is always confirmed, with a warning when changes are not synced yet.
   - The lock screen offers no sign-out.
-  - Instead it offers "use another account", which keeps the cached session until that sign-in succeeds.
+  - Instead it offers "use another account", which keeps the cached session until that sign-in succeeds. Going back keeps the POS cart.
 - **Biometric unlock.** It stays off until the user opts in with their password. It accepts biometrics only (never the device PIN) and belongs to that one user.
 - **Backups.** Android cloud backup and device transfer exclude all app data. The local database is not encrypted yet (SQLCipher).
 
 ## Server secrets and first run
 
-- `DUKAN_SECRET_KEY` signs access tokens: at least 32 random characters, or the server refuses to start.
+- `DUKAN_SECRET_KEY` signs access tokens: at least 32 random characters, or the server refuses to start. Placeholder text such as `change-me` is refused too; `server/.env.example` leaves the key empty and shows how to generate one.
 - The first owner account needs the server's **setup code**: `DUKAN_BOOTSTRAP_TOKEN` (12+ characters) or, when unset, a code the server logs at startup. Nobody who cannot read the server's console can claim a fresh server.
 
 ## Sync class

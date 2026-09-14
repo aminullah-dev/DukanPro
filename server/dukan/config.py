@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     @classmethod
     def _strong_secret(cls, value: str) -> str:
         # HS256 tokens are only as strong as this key.
-        if len(value) < 32 or len(set(value)) < 8:
+        lowered = value.lower()
+        placeholder = "change-me" in lowered or "changeme" in lowered or "example" in lowered
+        if len(value) < 32 or len(set(value)) < 8 or placeholder:
             raise ValueError("DUKAN_SECRET_KEY must be at least 32 random characters")
         return value
 

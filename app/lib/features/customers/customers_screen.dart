@@ -23,6 +23,19 @@ class CustomersScreen extends ConsumerWidget {
     ref.invalidate(customersProvider);
   }
 
+  Future<void> _setCredit(BuildContext context, WidgetRef ref, Customer c) async {
+    final actor = ref.read(sessionActorProvider);
+    if (actor == null) return;
+    final result = await showDialog<({int? limit})>(
+      context: context,
+      builder: (_) => _CreditLimitDialog(customer: c),
+    );
+    if (result == null) return;
+    await ref.read(localCustomersProvider).setCreditLimit(
+          c, result.limit, actorId: actor.user.id, deviceId: 'app');
+    ref.invalidate(customersProvider);
+  }
+
   Future<void> _pay(BuildContext context, WidgetRef ref, Customer c) async {
     final actor = ref.read(sessionActorProvider);
     if (actor == null) return;
@@ -44,7 +57,9 @@ class CustomersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final canManage = ref.watch(sessionActorProvider)?.can(Permission.saleCreate) ?? false;
+    final actor = ref.watch(sessionActorProvider);
+    final canManage = actor?.can(Permission.saleCreate) ?? false;
+    final canCredit = actor?.can(Permission.customerCredit) ?? false;
     final async = ref.watch(customersProvider);
     return Scaffold(
       appBar: AppBar(title: Text(l.customers)),
@@ -65,7 +80,15 @@ class CustomersScreen extends ConsumerWidget {
                   return ListTile(
                     title: Text(c.name),
                     subtitle: c.phone != null ? Text(c.phone!) : null,
-                    trailing: _BalanceChip(customerId: c.id),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      _BalanceChip(customerId: c.id),
+                      if (canCredit)
+                        IconButton(
+                          icon: const Icon(Icons.credit_score_outlined),
+                          tooltip: l.setCreditLimit,
+                          onPressed: () => _setCredit(context, ref, c),
+                        ),
+                    ]),
                     onTap: canManage ? () => _pay(context, ref, c) : null,
                   );
                 },
@@ -147,6 +170,54 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
                 creditLimitMinor: !widget.canGrantCredit ? 0 : (limit == null ? null : (limit * 100).round()),
               ),
             );
+          },
+          child: Text(l.save),
+        ),
+      ],
+    );
+  }
+}
+
+/// A manager changes a customer's credit limit; empty means no limit.
+class _CreditLimitDialog extends StatefulWidget {
+  const _CreditLimitDialog({required this.customer});
+  final Customer customer;
+  @override
+  State<_CreditLimitDialog> createState() => _CreditLimitDialogState();
+}
+
+class _CreditLimitDialogState extends State<_CreditLimitDialog> {
+  late final _limit = TextEditingController(
+    text: switch (widget.customer.creditLimitMinor) { null => '', final v => _afn(v) },
+  );
+
+  @override
+  void dispose() {
+    _limit.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text('${l.setCreditLimit} · ${widget.customer.name}'),
+      content: TextField(
+        controller: _limit,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(
+          labelText: l.creditLimit, suffixText: 'AFN', helperText: l.creditLimitHelp,
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        FilledButton(
+          onPressed: () {
+            final text = _limit.text.trim();
+            final v = double.tryParse(text);
+            if (text.isNotEmpty && (v == null || !v.isFinite || v < 0)) return;
+            Navigator.pop<({int? limit})>(context, (limit: v == null ? null : (v * 100).round()));
           },
           child: Text(l.save),
         ),

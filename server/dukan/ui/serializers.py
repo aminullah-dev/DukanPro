@@ -127,6 +127,7 @@ def customer_view_dict(v: CustomerView) -> dict:
         "credit_limit_minor": v.credit_limit_minor,
         "currency": v.currency,
         "balance_minor": v.balance_minor,
+        "version": v.version,
     }
 
 

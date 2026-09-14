@@ -27,7 +27,12 @@ void main() {
   setUp(() => db = AppDatabase(NativeDatabase.memory()));
   tearDown(() async => db.close());
 
-  ProviderContainer makeContainer(FakeSecureStore store, {FakeAuthApi? api, BiometricAuth? biometric}) {
+  ProviderContainer makeContainer(
+    FakeSecureStore store, {
+    FakeAuthApi? api,
+    BiometricAuth? biometric,
+    DateTime Function()? clock,
+  }) {
     final c = ProviderContainer(
       overrides: [
         databaseProvider.overrideWithValue(db),
@@ -35,6 +40,7 @@ void main() {
         authApiProvider.overrideWithValue(api ?? FakeAuthApi()),
         verifierProvider.overrideWithValue(FakeVerifier()),
         if (biometric != null) biometricProvider.overrideWithValue(biometric),
+        if (clock != null) clockProvider.overrideWithValue(clock),
       ],
     );
     addTearDown(c.dispose);
@@ -143,15 +149,40 @@ void main() {
     final c = makeContainer(FakeSecureStore());
     final controller = c.read(authControllerProvider.notifier);
     await controller.loginOnline(username: 'owner', password: 'correct');
+    final soap = Product(id: newId(), sku: 'S1', name: 'Soap', unitId: 'piece', sellPrice: Money(5000, 'AFN'));
+    c.read(posCartProvider.notifier).add(soap, 0);
 
     controller.lock();
     expect(c.read(authControllerProvider), isA<AuthLocked>());
     controller.useAnotherAccount();
     expect((c.read(authControllerProvider) as AuthLoggedOut).canReturn, isTrue);
+    await controller.loginOnline(username: 'someone', password: 'bad'); // a failed try keeps the way back
+    expect((c.read(authControllerProvider) as AuthLoggedOut).canReturn, isTrue);
     await controller.restore();
     expect(c.read(authControllerProvider), isA<AuthLocked>());
     await controller.unlockWithPassword('correct');
     expect(c.read(authControllerProvider), isA<AuthLoggedIn>());
+    expect(c.read(posCartProvider), hasLength(1)); // the abandoned try kept the cart
+  });
+
+  test('setting the clock back does not stretch the offline window', () async {
+    final store = FakeSecureStore();
+    var now = DateTime.utc(2026, 9, 1);
+    final c = makeContainer(store, clock: () => now);
+    final controller = c.read(authControllerProvider.notifier);
+    await controller.loginOnline(username: 'owner', password: 'correct');
+
+    now = DateTime.utc(2026, 9, 21);
+    controller.lock();
+    await controller.unlockWithPassword('correct');
+    expect(c.read(authControllerProvider), isA<AuthLoggedIn>());
+
+    // This device has seen 21 September: back on the 6th, a clock set back
+    // could otherwise keep the 30-day window open for ever.
+    now = DateTime.utc(2026, 9, 6);
+    controller.lock();
+    await controller.unlockWithPassword('correct');
+    expect((c.read(authControllerProvider) as AuthLoggedOut).error, 'OFFLINE_EXPIRED');
   });
 
   test('biometric unlock works only after the user opts in with the password', () async {

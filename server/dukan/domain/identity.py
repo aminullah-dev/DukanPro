@@ -97,6 +97,14 @@ def assert_branch_keeps_owner(*, branch_id: str, owners_after: int) -> None:
         raise ConflictError("USER_LAST_OWNER", branch_id=branch_id)
 
 
+def assert_shop_keeps_owner(*, owners_after: int) -> None:
+    """Some active user keeps owning every branch, or nobody could open a branch
+    or read the shop-wide audit trail. `owners_after` counts such users once the
+    change applies. Raises ConflictError USER_LAST_OWNER."""
+    if owners_after < 1:
+        raise ConflictError("USER_LAST_OWNER", scope="shop")
+
+
 def assert_keeps_an_assignment(*, user_id: str, remaining: int) -> None:
     """A user keeps at least one branch assignment. Raises ConflictError
     USER_LAST_ASSIGNMENT."""

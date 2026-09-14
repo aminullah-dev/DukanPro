@@ -57,6 +57,8 @@
   "customerName": "Name",
   "phone": "Phone",
   "creditLimit": "Credit limit",
+  "setCreditLimit": "Set credit limit",
+  "creditLimitHelp": "Leave empty for no limit",
   "recordPayment": "Record payment",
   "amount": "Amount",
   "balance": "Balance",

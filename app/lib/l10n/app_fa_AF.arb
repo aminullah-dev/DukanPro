@@ -55,6 +55,8 @@
   "customerName": "نام",
   "phone": "تلفن",
   "creditLimit": "سقف اعتبار",
+  "setCreditLimit": "تعیین سقف اعتبار",
+  "creditLimitHelp": "برای بدون سقف، خالی بگذارید",
   "recordPayment": "ثبت پرداخت",
   "amount": "مبلغ",
   "balance": "بیلانس",

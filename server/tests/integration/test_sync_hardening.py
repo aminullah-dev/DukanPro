@@ -756,6 +756,58 @@ def test_a_push_carries_at_most_500_ops(client: TestClient) -> None:
     assert r.status_code == 422 and r.json()["error"]["code"] == "REQUEST_INVALID"
 
 
+def _numbered(ops: list[dict], number: str) -> list[dict]:
+    ops[0]["data"]["number"] = number
+    return ops
+
+
+def test_selling_under_the_catalog_price_is_a_managers_discount(client: TestClient) -> None:
+    shop = Shop(client)
+    cashier, _ = shop.employee("c1", "cashier")
+    manager, _ = shop.employee("m1", "manager")
+    pid = shop.product()  # sells at 5000
+    _, ops = sale_ops(shop.branch, pid, price=4000)
+    assert outcomes(shop.push(cashier, *ops[:2])) == [("applied", None), ("rejected", "ACCESS_DENIED")]
+    _, ops = sale_ops(shop.branch, pid, price=4000)
+    ops = _numbered(ops, "INV-20260912-0002")
+    assert outcomes(shop.push(manager, *ops)) == [("applied", None)] * 4
+
+
+def test_an_offline_till_may_still_sell_at_a_recent_price(client: TestClient) -> None:
+    shop = Shop(client)
+    cashier, _ = shop.employee("c1", "cashier")
+    pid = shop.product()  # sells at 5000
+    raised = op("products", {"name": "Tea", "sell_price_minor": 6000}, row_id=pid, kind="update",
+                base_version=1)
+    assert outcomes(shop.push(shop.owner, raised)) == [("applied", None)]
+    # The till had not pulled the new price yet: 5000 was the price a moment ago.
+    _, ops = sale_ops(shop.branch, pid, price=5000)
+    assert outcomes(shop.push(cashier, *ops)) == [("applied", None)] * 4
+    # A price the product never had is still a discount.
+    _, ops = sale_ops(shop.branch, pid, price=4500)
+    ops = _numbered(ops, "INV-20260912-0002")
+    assert outcomes(shop.push(cashier, *ops[:2])) == [("applied", None), ("rejected", "ACCESS_DENIED")]
+
+
+def test_credit_limits_change_through_sync_by_a_manager(client: TestClient) -> None:
+    shop = Shop(client)
+    cashier, _ = shop.employee("c1", "cashier")
+    cid = _uuid()
+    new = op("customers", {"name": "Ahmad", "credit_limit_minor": 0, "currency": "AFN"}, row_id=cid)
+    assert outcomes(shop.push(cashier, new)) == [("applied", None)]
+
+    def edit(data: dict[str, Any], version: int) -> dict[str, Any]:
+        return op("customers", data, row_id=cid, kind="update", base_version=version)
+
+    # A cashier may correct the name, not grant credit.
+    res = shop.push(cashier, edit({"credit_limit_minor": 500000}, 1), edit({"name": "Ahmad K."}, 1))
+    assert outcomes(res) == [("rejected", "ACCESS_DENIED"), ("applied", None)]
+    res = shop.push(
+        shop.owner, edit({"credit_limit_minor": 500000}, 2), edit({"credit_limit_minor": None}, 2)
+    )
+    assert outcomes(res) == [("applied", None), ("conflict", "CUSTOMERS_VERSION_CONFLICT")]
+
+
 def test_the_pushed_unit_cost_is_ignored(client: TestClient) -> None:
     shop = Shop(client)
     pid = shop.product()

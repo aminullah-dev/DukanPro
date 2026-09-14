@@ -187,6 +187,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get creditLimit => 'سقف اعتبار';
 
   @override
+  String get setCreditLimit => 'تعیین سقف اعتبار';
+
+  @override
+  String get creditLimitHelp => 'برای بدون سقف، خالی بگذارید';
+
+  @override
   String get recordPayment => 'ثبت پرداخت';
 
   @override
@@ -683,6 +689,12 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get creditLimit => 'سقف اعتبار';
+
+  @override
+  String get setCreditLimit => 'تعیین سقف اعتبار';
+
+  @override
+  String get creditLimitHelp => 'برای بدون سقف، خالی بگذارید';
 
   @override
   String get recordPayment => 'ثبت پرداخت';
