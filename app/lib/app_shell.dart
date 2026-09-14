@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dukan_core/dukan_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/auth_controller.dart';
@@ -18,6 +20,7 @@ import 'features/pos/pos_screen.dart';
 import 'features/purchasing/receive_stock_screen.dart';
 import 'features/settings/printer_settings_screen.dart';
 import 'features/sync/sync_button.dart';
+import 'features/sync/sync_providers.dart';
 import 'l10n/app_localizations.dart';
 import 'widgets/locale_toggle.dart';
 
@@ -66,13 +69,81 @@ class AppShell extends ConsumerWidget {
     ];
 
     final showBell = can(Permission.reportView);
-    if (isWideLayout(MediaQuery.sizeOf(context).width)) {
-      return _WideShell(features: features, showBell: showBell);
-    }
-    return _HomePane(
-      features: features, showTiles: true, showShellActions: true, showBell: showBell,
+    return _SessionGuard(
+      child: isWideLayout(MediaQuery.sizeOf(context).width)
+          ? _WideShell(features: features, showBell: showBell)
+          : _HomePane(features: features, showTiles: true, showShellActions: true, showBell: showBell),
     );
   }
+}
+
+/// Locks the app when it goes to the background or sits idle, so an unattended
+/// till never stays open as its last user. Locking keeps the saved sign-in.
+class _SessionGuard extends ConsumerStatefulWidget {
+  const _SessionGuard({required this.child});
+  final Widget child;
+  @override
+  ConsumerState<_SessionGuard> createState() => _SessionGuardState();
+}
+
+class _SessionGuardState extends ConsumerState<_SessionGuard> {
+  static const idleLock = Duration(minutes: 10);
+  late final AppLifecycleListener _lifecycle;
+  Timer? _idle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onHide: _lock, onPause: _lock);
+    HardwareKeyboard.instance.addHandler(_onKey);
+    _touch();
+  }
+
+  @override
+  void dispose() {
+    _idle?.cancel();
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  void _lock() => ref.read(authControllerProvider.notifier).lock();
+
+  void _touch() {
+    _idle?.cancel();
+    _idle = Timer(idleLock, _lock);
+  }
+
+  bool _onKey(KeyEvent event) {
+    _touch(); // scanner input is activity too
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _touch(),
+        child: widget.child,
+      );
+}
+
+/// Signing out wipes this device's saved sign-in, so an offline shop could not
+/// sell until someone signs in online again: always confirm, and say so.
+Future<void> confirmLogout(BuildContext context, WidgetRef ref) async {
+  final l = AppLocalizations.of(context);
+  final pending = ref.read(syncControllerProvider).pending;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l.logoutConfirmTitle),
+      content: Text([l.logoutConfirmBody, if (pending > 0) l.logoutPendingWarning(pending)].join('\n\n')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l.logout)),
+      ],
+    ),
+  );
+  if (ok ?? false) await ref.read(authControllerProvider.notifier).logout();
 }
 
 /// Wide layout: a navigation rail beside the selected destination. The rail's
@@ -120,9 +191,14 @@ class _WideShellState extends ConsumerState<_WideShell> {
                           const SyncAction(),
                           const LocaleToggle(),
                           IconButton(
+                            tooltip: l.lock,
+                            icon: const Icon(Icons.lock_outline),
+                            onPressed: () => ref.read(authControllerProvider.notifier).lock(),
+                          ),
+                          IconButton(
                             tooltip: l.logout,
                             icon: const Icon(Icons.logout),
-                            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+                            onPressed: () => confirmLogout(context, ref),
                           ),
                         ],
                       ),
@@ -175,9 +251,14 @@ class _HomePane extends ConsumerWidget {
                 const SyncAction(),
                 const LocaleToggle(),
                 IconButton(
+                  tooltip: l.lock,
+                  icon: const Icon(Icons.lock_outline),
+                  onPressed: () => ref.read(authControllerProvider.notifier).lock(),
+                ),
+                IconButton(
                   tooltip: l.logout,
                   icon: const Icon(Icons.logout),
-                  onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+                  onPressed: () => confirmLogout(context, ref),
                 ),
                 const SizedBox(width: 8),
               ]

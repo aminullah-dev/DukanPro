@@ -60,6 +60,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         'INVALID_CREDENTIALS' => l.loginFailed,
         'BOOTSTRAP_ALREADY_DONE' => l.errBootstrapDone,
         'SETUP_TOKEN_INVALID' => l.errSetupCode,
+        'OFFLINE_EXPIRED' => l.errOfflineExpired,
+        'USER_DISABLED' || 'SESSION_REVOKED' || 'REFRESH_INVALID' || 'TOKEN_INVALID' => l.errSessionEnded,
         _ => _setup ? l.setupFailed : l.loginFailed,
       };
 
@@ -131,6 +133,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: _busy ? null : _toggleMode,
                 child: Text(_setup ? l.signIn : l.firstRunSetup),
               ),
+              if (state is AuthLoggedOut && state.canReturn)
+                TextButton(
+                  onPressed: _busy ? null : () => ref.read(authControllerProvider.notifier).restore(),
+                  child: Text(l.backToUnlock),
+                ),
             ],
           ),
         ),

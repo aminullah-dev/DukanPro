@@ -13,8 +13,12 @@ class AuthUnknown extends AuthState {
 
 /// No cached session — must sign in online.
 class AuthLoggedOut extends AuthState {
-  const AuthLoggedOut({this.error});
+  const AuthLoggedOut({this.error, this.canReturn = false});
   final String? error; // error code, e.g. INVALID_CREDENTIALS / NETWORK
+
+  /// Signing in as someone else from the lock screen: the cached session is
+  /// kept, and the login screen offers the way back to it.
+  final bool canReturn;
 }
 
 /// A session is cached but the app is locked — unlock with password/PIN/biometric.

@@ -294,6 +294,47 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errSetupCode => 'کد راه‌اندازی درست نیست. کنسول سرور را ببینید.';
 
   @override
+  String get lock => 'قفل';
+
+  @override
+  String get logoutConfirmTitle => 'از این دستگاه خارج می‌شوید؟';
+
+  @override
+  String get logoutConfirmBody =>
+      'با خروج، ورود ذخیره‌شده از این دستگاه پاک می‌شود. تا وقتی کسی دوباره آنلاین وارد نشود، هیچ‌کس نمی‌تواند در اینجا فروش کند.';
+
+  @override
+  String logoutPendingWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تغییر هنوز همگام نشده است.',
+      one: '۱ تغییر هنوز همگام نشده است.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get useAnotherAccount => 'ورود با حساب دیگر';
+
+  @override
+  String get backToUnlock => 'بازگشت';
+
+  @override
+  String get errOfflineExpired =>
+      'این دستگاه مدت زیادی آفلاین بوده است. آنلاین وارد شوید.';
+
+  @override
+  String get errSessionEnded =>
+      'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
+
+  @override
+  String get biometricUnlockSetting => 'باز کردن با اثر انگشت';
+
+  @override
+  String get confirmPasswordTitle => 'رمز عبور خود را تأیید کنید';
+
+  @override
   String lastSyncedAt(String time) {
     return 'آخرین همگام‌سازی $time';
   }
@@ -749,6 +790,47 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get errSetupCode => 'کد راه‌اندازی درست نیست. کنسول سرور را ببینید.';
+
+  @override
+  String get lock => 'قفل';
+
+  @override
+  String get logoutConfirmTitle => 'از این دستگاه خارج می‌شوید؟';
+
+  @override
+  String get logoutConfirmBody =>
+      'با خروج، ورود ذخیره‌شده از این دستگاه پاک می‌شود. تا وقتی کسی دوباره آنلاین وارد نشود، هیچ‌کس نمی‌تواند در اینجا فروش کند.';
+
+  @override
+  String logoutPendingWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تغییر هنوز همگام نشده است.',
+      one: '۱ تغییر هنوز همگام نشده است.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get useAnotherAccount => 'ورود با حساب دیگر';
+
+  @override
+  String get backToUnlock => 'بازگشت';
+
+  @override
+  String get errOfflineExpired =>
+      'این دستگاه مدت زیادی آفلاین بوده است. آنلاین وارد شوید.';
+
+  @override
+  String get errSessionEnded =>
+      'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
+
+  @override
+  String get biometricUnlockSetting => 'باز کردن با اثر انگشت';
+
+  @override
+  String get confirmPasswordTitle => 'رمز عبور خود را تأیید کنید';
 
   @override
   String lastSyncedAt(String time) {

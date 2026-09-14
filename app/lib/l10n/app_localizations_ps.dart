@@ -292,6 +292,46 @@ class AppLocalizationsPs extends AppLocalizations {
   String get errSetupCode => 'د تنظیم کوډ سم نه دی. د سرور کنسول وګورئ.';
 
   @override
+  String get lock => 'قلف';
+
+  @override
+  String get logoutConfirmTitle => 'له دې وسیلې وځئ؟';
+
+  @override
+  String get logoutConfirmBody =>
+      'په وتلو سره، د ننوتلو ساتل شوي معلومات له دې وسیلې پاکېږي. تر هغه چې څوک بیا آنلاین ننوځي، هیڅوک دلته پلور نشي کولی.';
+
+  @override
+  String logoutPendingWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count بدلونونه لا نه دي همغږي شوي.',
+      one: '۱ بدلون لا نه دی همغږی شوی.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get useAnotherAccount => 'له بل حساب سره ننوتل';
+
+  @override
+  String get backToUnlock => 'بېرته';
+
+  @override
+  String get errOfflineExpired => 'دا وسیله ډېره موده آفلاین وه. آنلاین ننوځئ.';
+
+  @override
+  String get errSessionEnded =>
+      'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
+
+  @override
+  String get biometricUnlockSetting => 'د ګوتې په نښه خلاصول';
+
+  @override
+  String get confirmPasswordTitle => 'خپل پټنوم تایید کړئ';
+
+  @override
   String lastSyncedAt(String time) {
     return 'وروستۍ همغږي $time';
   }

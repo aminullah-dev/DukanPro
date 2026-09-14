@@ -587,6 +587,66 @@ abstract class AppLocalizations {
   /// **'Wrong setup code. Check the server console.'**
   String get errSetupCode;
 
+  /// No description provided for @lock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get lock;
+
+  /// No description provided for @logoutConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out of this device?'**
+  String get logoutConfirmTitle;
+
+  /// No description provided for @logoutConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing out removes the saved sign-in from this device. Until someone signs in online again, nobody can sell here.'**
+  String get logoutConfirmBody;
+
+  /// No description provided for @logoutPendingWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 change is not synced yet.} other{{count} changes are not synced yet.}}'**
+  String logoutPendingWarning(int count);
+
+  /// No description provided for @useAnotherAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Use another account'**
+  String get useAnotherAccount;
+
+  /// No description provided for @backToUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get backToUnlock;
+
+  /// No description provided for @errOfflineExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has been offline too long. Sign in online.'**
+  String get errOfflineExpired;
+
+  /// No description provided for @errSessionEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your access has changed or ended. Sign in again.'**
+  String get errSessionEnded;
+
+  /// No description provided for @biometricUnlockSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock with fingerprint'**
+  String get biometricUnlockSetting;
+
+  /// No description provided for @confirmPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your password'**
+  String get confirmPasswordTitle;
+
   /// No description provided for @lastSyncedAt.
   ///
   /// In en, this message translates to:

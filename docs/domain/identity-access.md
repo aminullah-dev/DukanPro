@@ -54,6 +54,23 @@
 
 `user.created`, `user.disabled`, `role.assigned` (also when a new branch gets its owners), `role.revoked`, `permission.changed`, `password.reset`, `session.reuse_detected`, `user.login_failed` — all audited (identity + permissions are audit-worthy).
 
+## Sessions on the device
+
+The server is authoritative; the device keeps just enough to work offline.
+- **One cached profile.** It is the server's answer for the one signed-in user, replaced (never merged) at every sign-in and revalidation.
+- **Revalidation.** After each unlock, when the server is reachable, the app re-reads `/auth/me`, refreshing the access token once if it expired.
+  - New roles take effect at once.
+  - `USER_DISABLED`, `SESSION_REVOKED`, `REFRESH_INVALID` or `TOKEN_INVALID` wipe the saved sign-in and require an online sign-in.
+- **Offline window.** Offline unlock works for 30 days after the server last confirmed the user, then fails with `OFFLINE_EXPIRED`.
+- **Lock.** There is a Lock action, and the app locks itself when it goes to the background or sits idle for 10 minutes.
+  - Locking keeps the saved sign-in and the POS cart.
+  - When another user signs in, session state (cart, admin lists, notifications) starts empty.
+- **Sign-out.** It wipes the saved sign-in, so it is always confirmed, with a warning when changes are not synced yet.
+  - The lock screen offers no sign-out.
+  - Instead it offers "use another account", which keeps the cached session until that sign-in succeeds.
+- **Biometric unlock.** It stays off until the user opts in with their password. It accepts biometrics only (never the device PIN) and belongs to that one user.
+- **Backups.** Android cloud backup and device transfer exclude all app data. The local database is not encrypted yet (SQLCipher).
+
 ## Server secrets and first run
 
 - `DUKAN_SECRET_KEY` signs access tokens: at least 32 random characters, or the server refuses to start.

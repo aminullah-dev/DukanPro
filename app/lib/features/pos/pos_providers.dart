@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../composition.dart';
 import '../auth/providers.dart';
 import '../catalog/catalog_providers.dart';
+import '../auth/session.dart';
 
 final localSalesProvider = Provider<LocalSales>((ref) => LocalSales(ref.watch(databaseProvider)));
 
@@ -42,7 +43,10 @@ class CartLine {
 
 class PosCart extends Notifier<List<CartLine>> {
   @override
-  List<CartLine> build() => const [];
+  List<CartLine> build() {
+    ref.watch(sessionUserIdProvider); // a new user starts with an empty cart
+    return const [];
+  }
 
   void add(Product product, int decimalPlaces) {
     final step = _pow10(decimalPlaces);

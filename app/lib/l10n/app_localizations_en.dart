@@ -293,6 +293,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errSetupCode => 'Wrong setup code. Check the server console.';
 
   @override
+  String get lock => 'Lock';
+
+  @override
+  String get logoutConfirmTitle => 'Sign out of this device?';
+
+  @override
+  String get logoutConfirmBody =>
+      'Signing out removes the saved sign-in from this device. Until someone signs in online again, nobody can sell here.';
+
+  @override
+  String logoutPendingWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes are not synced yet.',
+      one: '1 change is not synced yet.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get useAnotherAccount => 'Use another account';
+
+  @override
+  String get backToUnlock => 'Back';
+
+  @override
+  String get errOfflineExpired =>
+      'This device has been offline too long. Sign in online.';
+
+  @override
+  String get errSessionEnded =>
+      'Your access has changed or ended. Sign in again.';
+
+  @override
+  String get biometricUnlockSetting => 'Unlock with fingerprint';
+
+  @override
+  String get confirmPasswordTitle => 'Confirm your password';
+
+  @override
   String lastSyncedAt(String time) {
     return 'Last synced $time';
   }

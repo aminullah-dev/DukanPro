@@ -386,6 +386,23 @@ final class ProfileStore {
         );
   }
 
+  /// The one signed-in user's profile: replaces whatever was cached, in one
+  /// transaction, so the device never answers with another user's role.
+  Future<void> replace({
+    required String userId,
+    required String username,
+    required String displayName,
+    String? defaultBranchId,
+    required List<Map<String, Object?>> branches,
+  }) =>
+      _db.transaction(() async {
+        await clear();
+        await save(
+          userId: userId, username: username, displayName: displayName,
+          defaultBranchId: defaultBranchId, branches: branches,
+        );
+      });
+
   Future<CachedProfileRow?> current() async {
     final rows = await _db.select(_db.cachedProfiles).get();
     return rows.isEmpty ? null : rows.first;

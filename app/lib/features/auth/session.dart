@@ -40,6 +40,16 @@ final sessionActorProvider = Provider<SessionActor?>((ref) {
   return SessionActor(user, branchId);
 });
 
+/// The signed-in user's id, kept while the app is locked. Session state (the
+/// POS cart, admin lists, the notification feed) watches it, so it resets when
+/// another user signs in on this device but survives a lock.
+final sessionUserIdProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider.select((s) => switch (s) {
+        AuthLoggedIn(:final profile) || AuthLocked(:final profile) => profile.userId,
+        _ => null,
+      })),
+);
+
 /// The active branch's name — used as the receipt header. The bootstrap owner's
 /// default branch is the shop itself. Falls back to the app name.
 final shopNameProvider = Provider<String>((ref) {

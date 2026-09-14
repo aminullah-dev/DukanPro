@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/iam_api.dart';
+import '../auth/session.dart';
 
 /// The employee/branch admin API. Server-authoritative, online-only (Phase 7).
 /// Overridden in main with a [DioIamApi]; tests inject a fake.
@@ -12,7 +13,10 @@ class EmployeesController extends AsyncNotifier<List<EmployeeDto>> {
   IamApi get _api => ref.read(iamApiProvider);
 
   @override
-  Future<List<EmployeeDto>> build() => _api.listEmployees();
+  Future<List<EmployeeDto>> build() {
+    ref.watch(sessionUserIdProvider);
+    return _api.listEmployees();
+  }
 
   Future<void> _refresh() async {
     ref.invalidateSelf();
@@ -58,7 +62,10 @@ class BranchesController extends AsyncNotifier<List<BranchDto>> {
   IamApi get _api => ref.read(iamApiProvider);
 
   @override
-  Future<List<BranchDto>> build() => _api.listBranches();
+  Future<List<BranchDto>> build() {
+    ref.watch(sessionUserIdProvider);
+    return _api.listBranches();
+  }
 
   Future<void> _refresh() async {
     ref.invalidateSelf();

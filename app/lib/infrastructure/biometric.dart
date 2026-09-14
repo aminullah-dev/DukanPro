@@ -31,7 +31,9 @@ class LocalAuthBiometric implements BiometricAuth {
   @override
   Future<bool> authenticate(String reason) async {
     try {
-      return await _auth.authenticate(localizedReason: reason);
+      // Biometrics only: a shared till's device PIN proves nothing about which
+      // app user is standing there.
+      return await _auth.authenticate(localizedReason: reason, biometricOnly: true);
     } on Object {
       return false;
     }

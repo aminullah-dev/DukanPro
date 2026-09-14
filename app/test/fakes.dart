@@ -28,13 +28,22 @@ class FakeVerifier implements PasswordVerifier {
 }
 
 /// Canned auth API. Password "correct" succeeds; anything else is rejected.
+/// Each username is its own user ('owner' is u1).
 class FakeAuthApi implements AuthApi {
-  static ApiProfile _profile(String username) => ApiProfile(
-        id: 'u1',
+  /// The role /auth/me reports for the owner (a change made on the server).
+  String meRole = 'owner';
+
+  /// Error codes /auth/me throws, one per call, before it answers normally.
+  final List<String> meErrors = [];
+
+  int refreshCalls = 0;
+
+  static ApiProfile _profile(String username, {String role = 'owner'}) => ApiProfile(
+        id: username == 'owner' ? 'u1' : 'u-$username',
         username: username,
         displayName: 'Owner',
         defaultBranchId: 'b1',
-        branches: const [BranchRoleDto(branchId: 'b1', branchName: 'Main', roleName: 'owner')],
+        branches: [BranchRoleDto(branchId: 'b1', branchName: 'Main', roleName: role)],
       );
 
   static ApiAuthResult _result(String username) => ApiAuthResult(
@@ -66,14 +75,19 @@ class FakeAuthApi implements AuthApi {
       _result(username);
 
   @override
-  Future<ApiTokens> refresh(String refreshToken) async =>
-      const ApiTokens(accessToken: 'a2', refreshToken: 'r2');
+  Future<ApiTokens> refresh(String refreshToken) async {
+    refreshCalls++;
+    return const ApiTokens(accessToken: 'a2', refreshToken: 'r2');
+  }
 
   @override
   Future<void> logout(String refreshToken) async {}
 
   @override
-  Future<ApiProfile> me(String accessToken) async => _profile('owner');
+  Future<ApiProfile> me(String accessToken) async {
+    if (meErrors.isNotEmpty) throw AuthApiException(meErrors.removeAt(0), statusCode: 401);
+    return _profile('owner', role: meRole);
+  }
 }
 
 /// In-memory [SyncClient]: records pushed ops and pulls nothing. Every op is

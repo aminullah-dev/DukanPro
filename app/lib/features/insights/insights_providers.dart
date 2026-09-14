@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/insights_api.dart';
+import '../auth/session.dart';
 
 /// The insights/notifications API. Overridden in main with a [DioInsightsApi];
 /// tests inject a fake.
@@ -9,7 +10,10 @@ final insightsApiProvider = Provider<InsightsApi>(
 
 /// Live business insights (recomputed on demand).
 final insightsProvider = FutureProvider<List<InsightDto>>(
-  (ref) => ref.watch(insightsApiProvider).listInsights(),
+  (ref) {
+    ref.watch(sessionUserIdProvider);
+    return ref.watch(insightsApiProvider).listInsights();
+  },
 );
 
 /// The persisted notification feed; mutations go through [NotificationsController].
@@ -17,7 +21,10 @@ class NotificationsController extends AsyncNotifier<List<NotificationDto>> {
   InsightsApi get _api => ref.read(insightsApiProvider);
 
   @override
-  Future<List<NotificationDto>> build() => _api.listNotifications();
+  Future<List<NotificationDto>> build() {
+    ref.watch(sessionUserIdProvider);
+    return _api.listNotifications();
+  }
 
   Future<void> _reload() async {
     ref.invalidateSelf();
