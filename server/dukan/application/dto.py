@@ -10,6 +10,8 @@ class BranchRole:
     branch_id: str
     branch_name: str
     role_name: str
+    timezone: str = "Asia/Kabul"  # the branch's business day, on the device too
+    currency: str = "AFN"
 
 
 @dataclass(frozen=True, slots=True)

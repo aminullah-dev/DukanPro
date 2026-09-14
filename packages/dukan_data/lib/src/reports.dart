@@ -55,12 +55,16 @@ final class LocalReports {
 
   /// [lowStockThreshold] is in whole units of each product's unit: 5 kg is
   /// 5000 grams, 5 pieces is 5.
-  Future<DashboardData> dashboard(String branchId, {int lowStockThreshold = 5}) async {
-    final now = DateTime.now();
-    bool isToday(DateTime d) {
-      final local = d.toLocal();
-      return local.year == now.year && local.month == now.month && local.day == now.day;
-    }
+  /// "Today" is the business day of the branch's [zone] (docs/domain/branches.md),
+  /// not the device's day: a till set to another zone counts the same sales.
+  Future<DashboardData> dashboard(
+    String branchId, {
+    String zone = defaultBranchZone,
+    DateTime? now,
+    int lowStockThreshold = 5,
+  }) async {
+    final today = businessDay(zone, now ?? DateTime.now());
+    bool isToday(DateTime d) => !d.isBefore(today.start) && d.isBefore(today.end);
 
     final units = {for (final u in await _db.select(_db.units).get()) u.id: u};
     final products = await (_db.select(_db.products)..where((t) => t.deletedAt.isNull())).get();

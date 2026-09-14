@@ -1027,4 +1027,50 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get auditUserLogout => 'ووت';
+
+  @override
+  String get solarMonth1 => 'وری';
+
+  @override
+  String get solarMonth2 => 'غویی';
+
+  @override
+  String get solarMonth3 => 'غبرګولی';
+
+  @override
+  String get solarMonth4 => 'چنګاښ';
+
+  @override
+  String get solarMonth5 => 'زمری';
+
+  @override
+  String get solarMonth6 => 'وږی';
+
+  @override
+  String get solarMonth7 => 'تله';
+
+  @override
+  String get solarMonth8 => 'لړم';
+
+  @override
+  String get solarMonth9 => 'لیندۍ';
+
+  @override
+  String get solarMonth10 => 'مرغومی';
+
+  @override
+  String get solarMonth11 => 'سلواغه';
+
+  @override
+  String get solarMonth12 => 'کب';
+
+  @override
+  String solarDate(String day, String month, String year) {
+    return '$day $month $year';
+  }
+
+  @override
+  String dateAndTime(String date, String time) {
+    return '$date، $time';
+  }
 }

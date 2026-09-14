@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
@@ -76,5 +77,28 @@ void main() {
     final d = await reports.dashboard('B1');
     expect(d.lowStockCount, 1); // 2.5 kg of rice; the inactive product does not count
     expect(d.topSellers.map((s) => (s.name, s.qtyLabel)), [('Soap', '3 piece'), ('Rice', '1.500 kg')]);
+  });
+
+  test("today is the branch's business day, not the device's", () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+    final catalog = LocalCatalog(db);
+    final p = Product(id: newId(), sku: 'P1', name: 'Soap', unitId: 'piece', sellPrice: Money(52000, 'AFN'));
+    await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    await catalog.adjust(productId: p.id, branchId: 'B1', qtyDelta: 5, actorId: 'u1', deviceId: 'app');
+    final sale = await LocalSales(db).settleCash(
+      lines: [SaleLine(productId: p.id, name: 'Soap', qtyMinor: 1, decimalPlaces: 0, unitPriceMinor: 52000, unitCostMinor: 0, currency: 'AFN')],
+      tenderedMinor: 52000, branchId: 'B1', actorId: 'u1', deviceId: 'app',
+    );
+    // Sold at 19:29 UTC on 11 September: 23:59 in Kabul, still the 11th there.
+    await (db.update(db.sales)..where((t) => t.id.equals(sale.id)))
+        .write(SalesCompanion(occurredAt: Value(DateTime.utc(2026, 9, 11, 19, 29))));
+    final reports = LocalReports(db);
+    Future<int> today(DateTime now, {String zone = 'Asia/Kabul'}) async =>
+        (await reports.dashboard('B1', zone: zone, now: now)).salesTodayMinor;
+
+    expect(await today(DateTime.utc(2026, 9, 11, 12)), 52000); // 16:30 on the 11th in Kabul
+    expect(await today(DateTime.utc(2026, 9, 11, 20, 30)), 0); // 01:00 on the 12th in Kabul
+    expect(await today(DateTime.utc(2026, 9, 11, 20, 30), zone: 'UTC'), 52000); // still the 11th in UTC
   });
 }

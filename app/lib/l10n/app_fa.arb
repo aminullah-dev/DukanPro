@@ -293,5 +293,19 @@
   "auditUserDisabled": "کارمند غیرفعال شد",
   "auditUserEnabled": "کارمند فعال شد",
   "auditUserLoginFailed": "ورود ناموفق",
-  "auditUserLogout": "خارج شد"
+  "auditUserLogout": "خارج شد",
+  "solarMonth1": "حمل",
+  "solarMonth2": "ثور",
+  "solarMonth3": "جوزا",
+  "solarMonth4": "سرطان",
+  "solarMonth5": "اسد",
+  "solarMonth6": "سنبله",
+  "solarMonth7": "میزان",
+  "solarMonth8": "عقرب",
+  "solarMonth9": "قوس",
+  "solarMonth10": "جدی",
+  "solarMonth11": "دلو",
+  "solarMonth12": "حوت",
+  "solarDate": "{day} {month} {year}",
+  "dateAndTime": "{date}، {time}"
 }

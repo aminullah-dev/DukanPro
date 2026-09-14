@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/dates.dart';
 import '../../widgets/labels.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
@@ -170,7 +171,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final sales = ref.read(localSalesProvider);
     final recent = await sales.recent(branchId: actor.branchId);
     if (!mounted) return;
-    final picked = await showDialog<SaleRow>(context: context, builder: (_) => _RecentSalesDialog(sales: recent));
+    final picked = await showDialog<SaleRow>(context: context, builder: (_) => _RecentSalesDialog(zone: ref.read(branchZoneProvider), sales: recent));
     if (picked == null) return;
     final lines = await sales.saleLinesFor(picked.id);
     if (mounted) {
@@ -854,7 +855,10 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
     }
     setState(() => _printing = true);
     try {
-      final data = buildReceipt(shopName: ref.read(shopNameProvider), sale: widget.sale, lines: widget.lines);
+      final data = buildReceipt(
+        shopName: ref.read(shopNameProvider), sale: widget.sale, lines: widget.lines,
+        zone: ref.read(branchZoneProvider),
+      );
       // A printer that stops answering must not hold the till.
       await printer.printRaw(const EscPosEncoder().encode(data)).timeout(const Duration(seconds: 10));
     } on Object {
@@ -928,8 +932,9 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
 
 /// This device's latest sales: pick one to see and reprint its receipt.
 class _RecentSalesDialog extends StatelessWidget {
-  const _RecentSalesDialog({required this.sales});
+  const _RecentSalesDialog({required this.sales, required this.zone});
   final List<SaleRow> sales;
+  final String zone; // the branch's clock
 
   @override
   Widget build(BuildContext context) {
@@ -946,7 +951,7 @@ class _RecentSalesDialog extends StatelessWidget {
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, i) {
                   final s = sales[i];
-                  final time = TimeOfDay.fromDateTime(s.occurredAt.toLocal()).format(context);
+                  final time = formatTime(l, s.occurredAt, zone);
                   return ListTile(
                     dense: true,
                     title: Text(s.number, maxLines: 1, overflow: TextOverflow.ellipsis),

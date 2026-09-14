@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/dates.dart';
+import '../auth/session.dart';
 import '../../widgets/labels.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
@@ -17,6 +18,7 @@ class AuditLogScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final async = ref.watch(auditLogProvider);
+    final zone = ref.watch(branchZoneProvider);
     return Scaffold(
       appBar: AppBar(
         leading: ShellScope.menuButton(context),
@@ -40,7 +42,7 @@ class AuditLogScreen extends ConsumerWidget {
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, i) {
                   final e = entries[i];
-                  final time = DateFormat.yMd().add_Hm().format(e.occurredAt);
+                  final time = formatDateTime(l, e.occurredAt, zone);
                   return ListTile(
                     dense: true,
                     leading: const Icon(Icons.history, size: 20),

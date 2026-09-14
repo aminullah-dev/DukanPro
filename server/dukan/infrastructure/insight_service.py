@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from dukan.application.access import require_permission
 from dukan.application.insights import Insight, InsightService, Notification
+from dukan.domain.branches import DEFAULT_BRANCH_ZONE, branch_wall_clock, business_day
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.domain.insights import (
     InsightSeverity,
@@ -22,6 +23,7 @@ from dukan.domain.insights import (
 )
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
+    BranchModel,
     CustomerLedgerModel,
     CustomerModel,
     NotificationModel,
@@ -38,6 +40,11 @@ _VELOCITY_WINDOW_DAYS = 30
 _DEAD_STOCK_DAYS = 30
 
 
+def _now() -> datetime:
+    """The current instant (tests move it)."""
+    return datetime.now(UTC)
+
+
 class SqlInsightService(InsightService):
     def __init__(self, session: Session) -> None:
         self._s = session
@@ -45,7 +52,7 @@ class SqlInsightService(InsightService):
     # ---- compute ---------------------------------------------------------
     def insights(self, *, actor: User, branch_id: str) -> list[Insight]:
         require_permission(_POLICY, actor, Permission.REPORT_VIEW, branch_id)
-        now = datetime.now(UTC)
+        now = _now()
         out: list[Insight] = []
         out.extend(self._stock_insights(branch_id, now))
         out.extend(self._debt_insights())
@@ -153,13 +160,18 @@ class SqlInsightService(InsightService):
             )
         return out
 
+    def _zone(self, branch_id: str) -> str:
+        branch = self._s.get(BranchModel, branch_id)
+        return branch.timezone if branch else DEFAULT_BRANCH_ZONE
+
     def _digest(self, branch_id: str, now: datetime) -> Insight:
-        start = datetime(now.year, now.month, now.day, tzinfo=UTC)
+        start, end = business_day(self._zone(branch_id), now)  # the branch's today
         sales = self._s.scalars(
             select(SaleModel).where(
                 SaleModel.branch_id == branch_id,
                 SaleModel.status == "settled",
                 SaleModel.occurred_at >= start,
+                SaleModel.occurred_at < end,
             )
         ).all()
         return Insight(
@@ -191,7 +203,8 @@ class SqlInsightService(InsightService):
 
     def refresh(self, *, actor: User, branch_id: str) -> int:
         require_permission(_POLICY, actor, Permission.REPORT_VIEW, branch_id)
-        day = datetime.now(UTC).strftime("%Y-%m-%d")
+        # One alert per branch-local day.
+        day = branch_wall_clock(self._zone(branch_id), _now()).strftime("%Y-%m-%d")
         created = 0
         for ins in self.insights(actor=actor, branch_id=branch_id):
             if ins.code == "insight.digest":

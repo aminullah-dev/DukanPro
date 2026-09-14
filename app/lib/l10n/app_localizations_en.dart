@@ -1032,4 +1032,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get auditUserLogout => 'Signed out';
+
+  @override
+  String get solarMonth1 => 'Hamal';
+
+  @override
+  String get solarMonth2 => 'Sawr';
+
+  @override
+  String get solarMonth3 => 'Jawza';
+
+  @override
+  String get solarMonth4 => 'Saratan';
+
+  @override
+  String get solarMonth5 => 'Asad';
+
+  @override
+  String get solarMonth6 => 'Sunbula';
+
+  @override
+  String get solarMonth7 => 'Mizan';
+
+  @override
+  String get solarMonth8 => 'Aqrab';
+
+  @override
+  String get solarMonth9 => 'Qaws';
+
+  @override
+  String get solarMonth10 => 'Jadi';
+
+  @override
+  String get solarMonth11 => 'Dalw';
+
+  @override
+  String get solarMonth12 => 'Hut';
+
+  @override
+  String solarDate(String day, String month, String year) {
+    return '$day $month $year';
+  }
+
+  @override
+  String dateAndTime(String date, String time) {
+    return '$date, $time';
+  }
 }

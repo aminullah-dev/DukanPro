@@ -103,6 +103,7 @@ void main() {
     expect(data.totalMinor, 104000);
     expect(data.lines.single.name, 'Soap');
     expect(data.lines.single.qtyLabel, '×2');
+    expect(data.stamp, receiptStamp(defaultBranchZone, sale.occurredAt));
   });
 
   test('isWideLayout flips at the tablet/desktop breakpoint', () {

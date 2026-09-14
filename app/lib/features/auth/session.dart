@@ -71,3 +71,27 @@ final shopNameProvider = Provider<String>((ref) {
     return 'DukanPro';
   }
 });
+
+/// The active branch's entry in the cached profile (its default branch), or null.
+Map<String, dynamic>? _activeBranchOf(Ref ref) {
+  final profile = switch (ref.watch(authControllerProvider)) {
+    AuthLoggedIn(:final profile) || AuthLocked(:final profile) => profile,
+    _ => null,
+  };
+  if (profile == null) return null;
+  try {
+    final branches = (jsonDecode(profile.branches) as List).cast<Map<String, dynamic>>();
+    if (branches.isEmpty) return null;
+    return branches.firstWhere((b) => b['branch_id'] == profile.defaultBranchId, orElse: () => branches.first);
+  } on Object {
+    return null;
+  }
+}
+
+/// The active branch's time zone: its business day, and the clock every time
+/// on screen and on receipts is read in. Kabul's until a profile names one.
+final branchZoneProvider =
+    Provider<String>((ref) => _activeBranchOf(ref)?['timezone'] as String? ?? defaultBranchZone);
+
+/// The active branch's currency: new prices and typed amounts are in it.
+final shopCurrencyProvider = Provider<String>((ref) => _activeBranchOf(ref)?['currency'] as String? ?? 'AFN');

@@ -1029,6 +1029,52 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get auditUserLogout => 'خارج شد';
+
+  @override
+  String get solarMonth1 => 'حمل';
+
+  @override
+  String get solarMonth2 => 'ثور';
+
+  @override
+  String get solarMonth3 => 'جوزا';
+
+  @override
+  String get solarMonth4 => 'سرطان';
+
+  @override
+  String get solarMonth5 => 'اسد';
+
+  @override
+  String get solarMonth6 => 'سنبله';
+
+  @override
+  String get solarMonth7 => 'میزان';
+
+  @override
+  String get solarMonth8 => 'عقرب';
+
+  @override
+  String get solarMonth9 => 'قوس';
+
+  @override
+  String get solarMonth10 => 'جدی';
+
+  @override
+  String get solarMonth11 => 'دلو';
+
+  @override
+  String get solarMonth12 => 'حوت';
+
+  @override
+  String solarDate(String day, String month, String year) {
+    return '$day $month $year';
+  }
+
+  @override
+  String dateAndTime(String date, String time) {
+    return '$date، $time';
+  }
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -2055,4 +2101,50 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get auditUserLogout => 'خارج شد';
+
+  @override
+  String get solarMonth1 => 'حمل';
+
+  @override
+  String get solarMonth2 => 'ثور';
+
+  @override
+  String get solarMonth3 => 'جوزا';
+
+  @override
+  String get solarMonth4 => 'سرطان';
+
+  @override
+  String get solarMonth5 => 'اسد';
+
+  @override
+  String get solarMonth6 => 'سنبله';
+
+  @override
+  String get solarMonth7 => 'میزان';
+
+  @override
+  String get solarMonth8 => 'عقرب';
+
+  @override
+  String get solarMonth9 => 'قوس';
+
+  @override
+  String get solarMonth10 => 'جدی';
+
+  @override
+  String get solarMonth11 => 'دلو';
+
+  @override
+  String get solarMonth12 => 'حوت';
+
+  @override
+  String solarDate(String day, String month, String year) {
+    return '$day $month $year';
+  }
+
+  @override
+  String dateAndTime(String date, String time) {
+    return '$date، $time';
+  }
 }

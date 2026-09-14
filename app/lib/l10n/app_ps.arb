@@ -293,5 +293,19 @@
   "auditUserDisabled": "کارمند غیر فعال شو",
   "auditUserEnabled": "کارمند فعال شو",
   "auditUserLoginFailed": "ناکامه ننوتنه",
-  "auditUserLogout": "ووت"
+  "auditUserLogout": "ووت",
+  "solarMonth1": "وری",
+  "solarMonth2": "غویی",
+  "solarMonth3": "غبرګولی",
+  "solarMonth4": "چنګاښ",
+  "solarMonth5": "زمری",
+  "solarMonth6": "وږی",
+  "solarMonth7": "تله",
+  "solarMonth8": "لړم",
+  "solarMonth9": "لیندۍ",
+  "solarMonth10": "مرغومی",
+  "solarMonth11": "سلواغه",
+  "solarMonth12": "کب",
+  "solarDate": "{day} {month} {year}",
+  "dateAndTime": "{date}، {time}"
 }

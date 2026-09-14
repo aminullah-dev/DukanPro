@@ -13,12 +13,15 @@ from pathlib import Path
 
 APP_LIB = Path(__file__).resolve().parent.parent / "app" / "lib"
 
-RULES = [
-    (re.compile(r"""Text\(\s*(['"])\$\{?(e|err|error)\}?\1"""), "an exception's text: show ErrorMessage(e) or appErrorText"),
+RULES = [  # (pattern, why, files where it is the one right place)
+    (re.compile(r"""Text\(\s*(['"])\$\{?(e|err|error)\}?\1"""), "an exception's text: show ErrorMessage(e) or appErrorText", set()),
     # An error's or sync issue's code (a barcode's `code` is data and may show).
-    (re.compile(r"\$\{(e|err|error|issue|failure)\.code!?\}"), "an error code inside a string: use errorCodeText"),
-    (re.compile(r"Text\(\s*(e|err|error|issue|failure)\.code!?\s*[,)]"), "an error code as text: use errorCodeText"),
-    (re.compile(r"'My Shop'|'Unlock DukanPro'"), "an English literal: add an ARB key"),
+    (re.compile(r"\$\{(e|err|error|issue|failure)\.code!?\}"), "an error code inside a string: use errorCodeText", set()),
+    (re.compile(r"Text\(\s*(e|err|error|issue|failure)\.code!?\s*[,)]"), "an error code as text: use errorCodeText", set()),
+    (re.compile(r"'My Shop'|'Unlock DukanPro'"), "an English literal: add an ARB key", set()),
+    (re.compile(r"DateFormat[.(]"), "a date on the device's clock or calendar: use formatDate/formatTime",
+     {"widgets/dates.dart"}),
+    (re.compile(r"TimeOfDay\.fromDateTime\("), "a time on the device's clock: use formatTime", set()),
 ]
 
 
@@ -28,8 +31,8 @@ def main() -> int:
         if "l10n" in path.relative_to(APP_LIB).parts:
             continue
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            for pattern, why in RULES:
-                if pattern.search(line):
+            for pattern, why, home in RULES:
+                if str(path.relative_to(APP_LIB)) not in home and pattern.search(line):
                     found.append(f"{path.relative_to(APP_LIB.parent)}:{number}: {why}\n    {line.strip()}")
     for f in found:
         print(f"✗ {f}", file=sys.stderr)

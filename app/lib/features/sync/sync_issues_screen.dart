@@ -1,9 +1,10 @@
 import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/dates.dart';
+import '../auth/session.dart';
 import '../../widgets/error_text.dart';
 import 'sync_providers.dart';
 
@@ -27,6 +28,7 @@ class SyncIssuesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final zone = ref.watch(branchZoneProvider);
     final l = AppLocalizations.of(context);
     final issues = ref.watch(syncIssuesProvider);
     final engine = ref.read(syncEngineProvider);
@@ -50,7 +52,7 @@ class SyncIssuesScreen extends ConsumerWidget {
                       '${_what(l, issue.table)} · ${conflict ? l.syncIssueConflict : l.syncIssueRejected}',
                     ),
                     subtitle: Text(
-                      '${DateFormat.yMd().add_Hm().format(issue.createdAt.toLocal())}'
+                      '${formatDateTime(l, issue.createdAt, zone)}'
                       '${issue.code == null ? '' : ' · ${errorCodeText(l, issue.code!)}'}',
                     ),
                     trailing: Wrap(spacing: 4, children: [

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../widgets/error_text.dart';
+import '../pos/receipt_builder.dart';
+import '../auth/session.dart';
 import '../../widgets/shell_scope.dart';
 import '../auth/auth_controller.dart';
 import '../auth/providers.dart';
@@ -59,7 +61,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final bytes = const EscPosEncoder().encode(ReceiptData(
       shopName: 'DukanPro',
       number: l.testPrint,
-      dateTime: DateTime.now(),
+      stamp: receiptStamp(ref.read(branchZoneProvider), DateTime.now()),
       lines: const [ReceiptLineData(name: 'TEST', qtyLabel: '×1', lineTotalMinor: 0)],
       subtotalMinor: 0, totalMinor: 0, paidMinor: 0, changeMinor: 0,
     ));

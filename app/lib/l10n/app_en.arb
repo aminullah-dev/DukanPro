@@ -310,5 +310,21 @@
   "auditUserDisabled": "Employee disabled",
   "auditUserEnabled": "Employee enabled",
   "auditUserLoginFailed": "Failed sign-in",
-  "auditUserLogout": "Signed out"
+  "auditUserLogout": "Signed out",
+  "solarMonth1": "Hamal",
+  "solarMonth2": "Sawr",
+  "solarMonth3": "Jawza",
+  "solarMonth4": "Saratan",
+  "solarMonth5": "Asad",
+  "solarMonth6": "Sunbula",
+  "solarMonth7": "Mizan",
+  "solarMonth8": "Aqrab",
+  "solarMonth9": "Qaws",
+  "solarMonth10": "Jadi",
+  "solarMonth11": "Dalw",
+  "solarMonth12": "Hut",
+  "solarDate": "{day} {month} {year}",
+  "@solarDate": { "placeholders": { "day": { "type": "String" }, "month": { "type": "String" }, "year": { "type": "String" } } },
+  "dateAndTime": "{date}, {time}",
+  "@dateAndTime": { "placeholders": { "date": { "type": "String" }, "time": { "type": "String" } } }
 }

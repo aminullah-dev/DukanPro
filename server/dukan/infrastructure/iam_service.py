@@ -19,7 +19,11 @@ from sqlalchemy.orm import Session
 from dukan.application.access import require_any_permission, require_permission
 from dukan.application.dto import BranchRole
 from dukan.application.iam import BranchView, EmployeeView, IamService
-from dukan.domain.branches import assert_branch_active, assert_not_last_active_branch
+from dukan.domain.branches import (
+    assert_branch_active,
+    assert_branch_settings_valid,
+    assert_not_last_active_branch,
+)
 from dukan.domain.identity import (
     BranchAssignment,
     Permission,
@@ -484,6 +488,7 @@ class SqlIamService(IamService):
         # Opening a branch is a shop-wide act: branch.manage in every branch.
         require_permission(_POLICY, actor, Permission.BRANCH_MANAGE, branch_id)
         require_everywhere(self._s, actor, Permission.BRANCH_MANAGE)
+        assert_branch_settings_valid(timezone=timezone, currency_default=currency_default)
         owners = self._shop_owners() | {actor.id}
         m = BranchModel(
             id=new_id(),

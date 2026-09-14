@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/dates.dart';
+import '../auth/session.dart';
 import 'sync_issues_screen.dart';
 import 'sync_providers.dart';
 
@@ -60,7 +61,7 @@ class SyncStatusCard extends ConsumerWidget {
     } else if (status.pending > 0) {
       summary = l.syncPending(status.pending);
     } else if (status.lastSyncedAt != null) {
-      summary = l.lastSyncedAt(DateFormat.Hm().format(status.lastSyncedAt!));
+      summary = l.lastSyncedAt(formatTime(l, status.lastSyncedAt!, ref.watch(branchZoneProvider)));
     } else {
       summary = l.syncUpToDate;
     }

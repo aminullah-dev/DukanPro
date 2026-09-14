@@ -1864,6 +1864,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Signed out'**
   String get auditUserLogout;
+
+  /// No description provided for @solarMonth1.
+  ///
+  /// In en, this message translates to:
+  /// **'Hamal'**
+  String get solarMonth1;
+
+  /// No description provided for @solarMonth2.
+  ///
+  /// In en, this message translates to:
+  /// **'Sawr'**
+  String get solarMonth2;
+
+  /// No description provided for @solarMonth3.
+  ///
+  /// In en, this message translates to:
+  /// **'Jawza'**
+  String get solarMonth3;
+
+  /// No description provided for @solarMonth4.
+  ///
+  /// In en, this message translates to:
+  /// **'Saratan'**
+  String get solarMonth4;
+
+  /// No description provided for @solarMonth5.
+  ///
+  /// In en, this message translates to:
+  /// **'Asad'**
+  String get solarMonth5;
+
+  /// No description provided for @solarMonth6.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunbula'**
+  String get solarMonth6;
+
+  /// No description provided for @solarMonth7.
+  ///
+  /// In en, this message translates to:
+  /// **'Mizan'**
+  String get solarMonth7;
+
+  /// No description provided for @solarMonth8.
+  ///
+  /// In en, this message translates to:
+  /// **'Aqrab'**
+  String get solarMonth8;
+
+  /// No description provided for @solarMonth9.
+  ///
+  /// In en, this message translates to:
+  /// **'Qaws'**
+  String get solarMonth9;
+
+  /// No description provided for @solarMonth10.
+  ///
+  /// In en, this message translates to:
+  /// **'Jadi'**
+  String get solarMonth10;
+
+  /// No description provided for @solarMonth11.
+  ///
+  /// In en, this message translates to:
+  /// **'Dalw'**
+  String get solarMonth11;
+
+  /// No description provided for @solarMonth12.
+  ///
+  /// In en, this message translates to:
+  /// **'Hut'**
+  String get solarMonth12;
+
+  /// No description provided for @solarDate.
+  ///
+  /// In en, this message translates to:
+  /// **'{day} {month} {year}'**
+  String solarDate(String day, String month, String year);
+
+  /// No description provided for @dateAndTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{date}, {time}'**
+  String dateAndTime(String date, String time);
 }
 
 class _AppLocalizationsDelegate

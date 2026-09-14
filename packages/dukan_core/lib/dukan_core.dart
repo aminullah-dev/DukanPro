@@ -11,6 +11,7 @@ export 'shared/clock.dart';
 export 'shared/money.dart';
 export 'shared/errors.dart';
 export 'shared/result.dart';
+export 'shared/solar_hijri.dart';
 
 // domain
 export 'domain/branches.dart';

@@ -300,18 +300,21 @@ class SqlAuthService(AuthService):
 
     def profile(self, user: User) -> AuthenticatedUser:
         branch_ids = {a.branch_id for a in user.assignments}
-        names: dict[str, str] = {}
+        rows: dict[str, BranchModel] = {}
         if branch_ids:
             for b in self._s.scalars(select(BranchModel).where(BranchModel.id.in_(branch_ids))):
-                names[b.id] = b.name
-        branches = tuple(
-            BranchRole(
-                branch_id=a.branch_id,
-                branch_name=names.get(a.branch_id, ""),
-                role_name=a.role_name,
+                rows[b.id] = b
+
+        def role(branch_id: str, role_name: str) -> BranchRole:
+            b = rows.get(branch_id)
+            if b is None:
+                return BranchRole(branch_id=branch_id, branch_name="", role_name=role_name)
+            return BranchRole(
+                branch_id=branch_id, branch_name=b.name, role_name=role_name,
+                timezone=b.timezone, currency=b.currency_default,
             )
-            for a in user.assignments
-        )
+
+        branches = tuple(role(a.branch_id, a.role_name) for a in user.assignments)
         return AuthenticatedUser(
             id=user.id,
             username=user.username,

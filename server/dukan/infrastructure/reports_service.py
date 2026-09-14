@@ -9,9 +9,11 @@ from sqlalchemy.orm import Session
 
 from dukan.application.access import require_permission
 from dukan.application.reports import DashboardView, ReportsService, TopSellerView
+from dukan.domain.branches import DEFAULT_BRANCH_ZONE, business_day
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.domain.sales import line_total_minor
 from dukan.infrastructure.db.models import (
+    BranchModel,
     CustomerLedgerModel,
     ProductModel,
     SaleLineModel,
@@ -24,20 +26,27 @@ _POLICY = PermissionPolicy()
 _LOW_STOCK_THRESHOLD = 5
 
 
+def _now() -> datetime:
+    """The current instant (tests move it)."""
+    return datetime.now(UTC)
+
+
 class SqlReportsService(ReportsService):
     def __init__(self, session: Session) -> None:
         self._s = session
 
     def dashboard(self, *, actor: User, branch_id: str) -> DashboardView:
         require_permission(_POLICY, actor, Permission.REPORT_VIEW, branch_id)
-        now = datetime.now(UTC)
-        start = datetime(now.year, now.month, now.day, tzinfo=UTC)
+        # "Today" is the branch's business day, not UTC's (docs/domain/branches.md).
+        branch = self._s.get(BranchModel, branch_id)
+        start, end = business_day(branch.timezone if branch else DEFAULT_BRANCH_ZONE, _now())
 
         sales = self._s.scalars(
             select(SaleModel).where(
                 SaleModel.branch_id == branch_id,
                 SaleModel.status == "settled",
                 SaleModel.occurred_at >= start,
+                SaleModel.occurred_at < end,
             )
         ).all()
         sales_today = sum(s.total_minor for s in sales)

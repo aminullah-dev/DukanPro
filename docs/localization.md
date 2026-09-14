@@ -64,3 +64,4 @@ Money and quantity fields accept Persian (۰-۹) and Arabic-Indic (٠-٩) digits
 - **The chosen language is saved** on the device and used from the next launch, the sign-in screen included.
 - **Pashto borrows the Persian Cupertino strings.** Flutter ships none for Pashto, so this is what keeps the copy and paste menu working on iOS and macOS.
 - **No English defaults:** first-run setup requires a shop name (the server refuses a blank one), and the biometric prompt is translated.
+- **Dates and times are read on the branch's clock**, never the device's: the zone comes from the branch in the profile. Dari and Pashto show the Solar Hijri date with Persian digits ("۲۰ سنبله ۱۴۰۵، ۱۴:۳۰"), English the Gregorian one (`app/lib/widgets/dates.dart`). The calendar is `SolarHijriDate` in dukan_core, tested against known dates and day by day for 1390–1420. A receipt prints both calendars in ASCII: `1405-06-20 14:30 (2026-09-11)`.

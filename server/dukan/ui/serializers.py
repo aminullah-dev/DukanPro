@@ -24,6 +24,8 @@ def profile_dict(p: AuthenticatedUser) -> dict:
                 "branch_id": b.branch_id,
                 "branch_name": b.branch_name,
                 "role_name": b.role_name,
+                "timezone": b.timezone,
+                "currency": b.currency,
             }
             for b in p.branches
         ],

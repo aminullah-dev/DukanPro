@@ -16,7 +16,7 @@ final localReportsProvider = Provider<LocalReports>(
 
 final dashboardProvider = FutureProvider<DashboardData>((ref) {
   final branch = ref.watch(sessionActorProvider)?.branchId ?? '';
-  return ref.watch(localReportsProvider).dashboard(branch);
+  return ref.watch(localReportsProvider).dashboard(branch, zone: ref.watch(branchZoneProvider));
 });
 
 String _afn(int minor) => formatQuantity(minor, 2); // integers, never a float
