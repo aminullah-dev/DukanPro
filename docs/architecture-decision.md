@@ -59,6 +59,13 @@ The **FastAPI + PostgreSQL backend stays aligned** with the family's `api-servic
 - The **server is authoritative; the client validates optimistically** — never the reverse.
 - Hardware and per-OS concerns live behind owned interfaces (`dukan_hardware`) and platform channels; see [`docs/localization.md`](localization.md) and the Phase 0 plan's "platform-specific exceptions".
 
+## Server data rules
+
+- **Frozen migrations.** An Alembic revision is plain DDL and never reads the live models, so every model change comes with a new revision. The tests upgrade an empty database to head and compare it with the models, walk every revision with a row in every table, and downgrade to base and back. CI runs them on SQLite and on PostgreSQL.
+- **64-bit money.** Money (minor units) and quantities are `BIGINT`, bounded at the API by `MONEY_MAX` (2^53 − 1, exact as a JSON number). Counters and versions stay 32-bit.
+- **One error shape.** Every failure answers `{error: {code, context}}`: domain errors with their code, a malformed request `REQUEST_INVALID` (422), anything unexpected `INTERNAL` (500), with the traceback only in the server log.
+- **One connection per request.** Authentication hands its database connection back before the endpoint runs. The PostgreSQL pool covers the request threads and replaces dropped connections.
+
 ## Validate early (tracked risks)
 
 - **Pashto text shaping** in Flutter's text engine (`ټ ډ ړ ږ ښ ګ ڼ`) — prototype prose + a printed receipt on every target; bundle a vetted Naskh font; add golden tests.

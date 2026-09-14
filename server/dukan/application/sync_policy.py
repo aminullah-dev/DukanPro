@@ -31,7 +31,7 @@ from dukan.domain.inventory import StockReason, adjust_stock
 from dukan.domain.purchasing import SupplierEntryType
 from dukan.domain.sales import PaymentMethod, assert_discount_valid, line_total_minor
 from dukan.shared.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
-from dukan.shared.limits import INT32_MAX, INT32_MIN
+from dukan.shared.limits import INT32_MAX, INT32_MIN, MONEY_MAX
 
 POLICY = PermissionPolicy()
 PULL_LIMIT_MAX = 1000
@@ -148,7 +148,7 @@ _INSERT: dict[str, dict[str, _Field]] = {
         "name": _str(200, required=True),
         "unit_id": _uuid(required=True),
         "category_id": _MUST_BE_NULL,
-        "sell_price_minor": _int(lo=0),
+        "sell_price_minor": _int(lo=0, hi=MONEY_MAX),
         "sell_currency": _CURRENCY_F,
         "cost_minor": _MUST_BE_NULL,
         "cost_currency": _MUST_BE_NULL,
@@ -164,7 +164,7 @@ _INSERT: dict[str, dict[str, _Field]] = {
     "customers": {
         "name": _str(128, required=True),
         "phone": _str(32, nullable=True),
-        "credit_limit_minor": _int(lo=0, nullable=True),
+        "credit_limit_minor": _int(lo=0, hi=MONEY_MAX, nullable=True),
         "currency": _CURRENCY_F,
         "is_active": _BOOL,
     },
@@ -177,7 +177,7 @@ _INSERT: dict[str, dict[str, _Field]] = {
     "stock_movements": {
         "product_id": _uuid(required=True),
         "branch_id": _uuid(required=True),
-        "qty_delta": _int(required=True),
+        "qty_delta": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),
         "reason": _enum([r.value for r in StockReason], required=True),
         "ref_type": _enum(["sale"], nullable=True),
         "ref_id": _uuid(nullable=True),
@@ -189,36 +189,37 @@ _INSERT: dict[str, dict[str, _Field]] = {
         "customer_id": _uuid(nullable=True),
         "status": _enum(["settled"]),
         "currency": _CURRENCY_F,
-        "discount_minor": _int(lo=0),
-        "subtotal_minor": _int(lo=0, required=True),
-        "tax_minor": _int(lo=0),
-        "total_minor": _int(lo=0, required=True),
-        "paid_minor": _int(lo=0, required=True),
-        "change_minor": _int(lo=0),
+        "discount_minor": _int(lo=0, hi=MONEY_MAX),
+        "subtotal_minor": _int(lo=0, hi=MONEY_MAX, required=True),
+        "tax_minor": _int(lo=0, hi=MONEY_MAX),
+        "total_minor": _int(lo=0, hi=MONEY_MAX, required=True),
+        "paid_minor": _int(lo=0, hi=MONEY_MAX, required=True),
+        "change_minor": _int(lo=0, hi=MONEY_MAX),
     },
     "sale_lines": {
         "sale_id": _uuid(required=True),
         "product_id": _uuid(required=True),
         "name": _str(200, required=True),
-        "qty_minor": _int(lo=1, required=True),
+        "qty_minor": _int(lo=1, hi=MONEY_MAX, required=True),
         "decimal_places": _int(lo=0, hi=6),
-        "unit_price_minor": _int(lo=0, required=True),
-        "unit_cost_minor": _int(),  # accepted but ignored: the server re-derives it
-        "line_total_minor": _int(lo=0, required=True),
+        "unit_price_minor": _int(lo=0, hi=MONEY_MAX, required=True),
+        # accepted but ignored: the server re-derives it
+        "unit_cost_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX),
+        "line_total_minor": _int(lo=0, hi=MONEY_MAX, required=True),
         "currency": _CURRENCY_F,
     },
     "payments": {
         "sale_id": _uuid(required=True),
         "method": _enum([m.value for m in PaymentMethod], required=True),
-        "amount_minor": _int(lo=1, required=True),
+        "amount_minor": _int(lo=1, hi=MONEY_MAX, required=True),
         "currency": _CURRENCY_F,
-        "tendered_minor": _int(lo=0, nullable=True),
-        "change_minor": _int(lo=0, nullable=True),
+        "tendered_minor": _int(lo=0, hi=MONEY_MAX, nullable=True),
+        "change_minor": _int(lo=0, hi=MONEY_MAX, nullable=True),
     },
     "customer_ledger": {
         "customer_id": _uuid(required=True),
         "type": _enum([t.value for t in LedgerEntryType], required=True),
-        "amount_minor": _int(lo=1, required=True),
+        "amount_minor": _int(lo=1, hi=MONEY_MAX, required=True),
         "currency": _CURRENCY_F,
         "ref_type": _enum(["sale", "manual"], nullable=True),
         "ref_id": _uuid(nullable=True),
@@ -226,7 +227,7 @@ _INSERT: dict[str, dict[str, _Field]] = {
     "supplier_ledger": {
         "supplier_id": _uuid(required=True),
         "type": _enum([t.value for t in SupplierEntryType], required=True),
-        "amount_minor": _int(lo=1, required=True),
+        "amount_minor": _int(lo=1, hi=MONEY_MAX, required=True),
         "currency": _CURRENCY_F,
         "ref_type": _MUST_BE_NULL,
         "ref_id": _MUST_BE_NULL,
@@ -236,14 +237,14 @@ _INSERT: dict[str, dict[str, _Field]] = {
 _UPDATE: dict[str, dict[str, _Field]] = {
     "products": {
         "name": _str(200, required=True),
-        "sell_price_minor": _int(lo=0),
+        "sell_price_minor": _int(lo=0, hi=MONEY_MAX),
         "sell_currency": _CURRENCY_F,
         "is_active": _BOOL,
     },
     "customers": {
         "name": _str(128),
         "phone": _str(32, nullable=True),
-        "credit_limit_minor": _int(lo=0, nullable=True),
+        "credit_limit_minor": _int(lo=0, hi=MONEY_MAX, nullable=True),
         "is_active": _BOOL,
     },
 }

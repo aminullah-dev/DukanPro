@@ -20,6 +20,7 @@ from dukan.infrastructure.db.models import (
     ProcessedOpModel,
     ProductModel,
 )
+from dukan.shared.limits import MONEY_MAX
 
 PW = "pw12345678"
 SEED_UNITS = [("piece", 0), ("kg", 3), ("litre", 3), ("dozen", 0), ("meter", 2)]
@@ -357,7 +358,7 @@ def test_malformed_ops_are_rejected_one_by_one(client: TestClient) -> None:
          "SYNC_FIELD_INVALID"),
         (product_op(unit, sku="T1", track_stock=1), "SYNC_FIELD_INVALID"),
         (product_op(unit, sku="T2", sell_price_minor=True), "SYNC_FIELD_INVALID"),
-        (product_op(unit, sku="T3", sell_price_minor=2**31), "SYNC_FIELD_INVALID"),
+        (product_op(unit, sku="T3", sell_price_minor=MONEY_MAX + 1), "SYNC_FIELD_INVALID"),
         (product_op(unit, sku="T4", sell_price_minor=-1), "SYNC_FIELD_INVALID"),
         (product_op(unit, sku="T5", name="x" * 201), "SYNC_FIELD_INVALID"),
         (product_op(unit, sku="T6", name="   "), "SYNC_FIELD_INVALID"),
@@ -603,13 +604,24 @@ def test_rest_inputs_are_bounded_to_their_columns(client: TestClient) -> None:
     assert long_name.status_code == 422
     assert long_name.json()["error"]["code"] == "REQUEST_INVALID"
     huge = client.post("/products", headers=shop.owner, json={
-        "sku": "A", "name": "x", "unit_id": unit, "sell_price_minor": 2**31})
+        "sku": "A", "name": "x", "unit_id": unit, "sell_price_minor": 2**53})
     assert huge.status_code == 422
     login = client.post("/auth/login", json={"username": "owner", "password": PW,
                                              "device_id": "d" * 129})
     assert login.status_code == 422 and login.json()["error"]["code"] == "REQUEST_INVALID"
     envelope = client.post("/sync/push", headers=shop.owner, json={"device_id": "d" * 129, "ops": []})
     assert envelope.status_code == 422
+
+
+def test_large_amounts_fit(client: TestClient) -> None:
+    # Over 21.5 million AFN in minor units: past a 32-bit integer.
+    shop = Shop(client)
+    r = client.post("/products", headers=shop.owner, json={
+        "sku": "BIG", "name": "Generator", "unit_id": shop.units["piece"],
+        "sell_price_minor": 2_500_000_000})
+    assert r.status_code == 200, r.text
+    _, ops = sale_ops(shop.branch, shop.product(), price=2_600_000_000, qty=1)
+    assert outcomes(shop.push(shop.owner, *ops)) == [("applied", None)] * 4
 
 
 def test_read_fields_are_real_business_columns() -> None:

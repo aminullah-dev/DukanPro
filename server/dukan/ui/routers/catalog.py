@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from dukan.application.catalog import CatalogService
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_catalog_service, get_current_actor
-from dukan.ui.fields import Currency, Id, Int32, Str64, Str200
+from dukan.ui.fields import Currency, Id, Money, Str64, Str200
 from dukan.ui.serializers import product_view_dict
 
 router = APIRouter(tags=["catalog"])
@@ -24,7 +24,7 @@ class CreateProductRequest(BaseModel):
     sku: Str64
     name: Str200
     unit_id: Id
-    sell_price_minor: Int32
+    sell_price_minor: Money
     currency: Currency = "AFN"
     category_id: Id | None = None
     track_stock: bool = True
@@ -33,7 +33,7 @@ class CreateProductRequest(BaseModel):
 
 class UpdateProductRequest(BaseModel):
     name: Str200 | None = None
-    sell_price_minor: Int32 | None = None
+    sell_price_minor: Money | None = None
     is_active: bool | None = None
 
 
@@ -43,7 +43,7 @@ class AddBarcodeRequest(BaseModel):
 
 class AdjustStockRequest(BaseModel):
     product_id: Id
-    qty_delta: Int32
+    qty_delta: Money
 
 
 @router.get("/units")

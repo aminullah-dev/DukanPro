@@ -20,6 +20,7 @@ from dukan.application.sync_policy import (
 )
 from dukan.domain.identity import BranchAssignment, User, UserStatus
 from dukan.shared.errors import AppError
+from dukan.shared.limits import MONEY_MAX
 
 U = "0190f0e0-0000-7000-8000-000000000000"
 B1, B2 = "0190f0e0-0000-7000-8000-0000000000b1", "0190f0e0-0000-7000-8000-0000000000b2"
@@ -44,13 +45,13 @@ def _movement(**over: object) -> dict[str, object]:
     return {"product_id": U, "branch_id": U, "qty_delta": 1, "reason": "purchase", **over}
 
 
-@pytest.mark.parametrize("value", [True, 1.0, "1", None, 2**31, -(2**31) - 1])
+@pytest.mark.parametrize("value", [True, 1.0, "1", None, MONEY_MAX + 1, -MONEY_MAX - 1])
 def test_int_fields_are_strict(value: object) -> None:
     code = _code(lambda: clean_fields("stock_movements", "insert", _movement(qty_delta=value)))
     assert code == "SYNC_FIELD_INVALID"
 
 
-@pytest.mark.parametrize("value", [2**31 - 1, -(2**31)])
+@pytest.mark.parametrize("value", [MONEY_MAX, -MONEY_MAX])
 def test_int_bounds_are_inclusive(value: int) -> None:
     assert clean_fields("stock_movements", "insert", _movement(qty_delta=value))["qty_delta"] == value
 

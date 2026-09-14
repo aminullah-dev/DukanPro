@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from dukan.application.sales import PaymentInput, SaleLineInput, SalesService
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_current_actor, get_sales_service
-from dukan.ui.fields import Id, Int32, Str8, Str200
+from dukan.ui.fields import Id, Money, Str8, Str200
 from dukan.ui.serializers import sale_view_dict, shift_view_dict
 
 router = APIRouter(tags=["sales"])
@@ -22,29 +22,29 @@ BranchHeader = Annotated[str | None, Header()]
 
 class LineReq(BaseModel):
     product_id: Id
-    qty_minor: Int32
+    qty_minor: Money
 
 
 class PayReq(BaseModel):
     method: Str8 = "cash"
-    amount_minor: Int32
-    tendered_minor: Int32 | None = None
+    amount_minor: Money
+    tendered_minor: Money | None = None
 
 
 class SettleSaleRequest(BaseModel):
     lines: list[LineReq]
-    discount_minor: Int32 = 0
+    discount_minor: Money = 0
     payments: list[PayReq]
     shift_id: Id | None = None
     customer_id: Id | None = None
 
 
 class OpenShiftRequest(BaseModel):
-    opening_float_minor: Int32 = 0
+    opening_float_minor: Money = 0
 
 
 class CloseShiftRequest(BaseModel):
-    counted_cash_minor: Int32
+    counted_cash_minor: Money
 
 
 class VoidSaleRequest(BaseModel):
