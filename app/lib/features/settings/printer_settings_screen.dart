@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import '../auth/auth_controller.dart';
 import '../auth/providers.dart';
 import 'settings_providers.dart';
@@ -78,7 +79,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final l = AppLocalizations.of(context);
     final async = ref.watch(printerSettingsControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l.printerSettings)),
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.printerSettings)),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),
@@ -219,6 +220,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text(l.confirmPasswordTitle),
       content: TextField(
         controller: _field,

@@ -1,8 +1,10 @@
+import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import '../../widgets/locale_toggle.dart';
 import '../auth/providers.dart';
 import '../auth/session.dart';
@@ -16,7 +18,7 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) {
   return ref.watch(localReportsProvider).dashboard(branch);
 });
 
-String _afn(int minor) => (minor / 100).toStringAsFixed(2);
+String _afn(int minor) => formatQuantity(minor, 2); // integers, never a float
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -27,6 +29,7 @@ class DashboardScreen extends ConsumerWidget {
     final async = ref.watch(dashboardProvider);
     return Scaffold(
       appBar: AppBar(
+        leading: ShellScope.menuButton(context),
         title: Text(l.dashboard),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: () => ref.invalidate(dashboardProvider)),
@@ -40,13 +43,17 @@ class DashboardScreen extends ConsumerWidget {
         data: (d) => ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            GridView.count(
-              crossAxisCount: 2,
+            // Tiles take the height their text needs at any text size, not a
+            // fraction of their width (a phone's narrow tile would overflow).
+            GridView(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.9,
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 280,
+                mainAxisExtent: 112 * (MediaQuery.textScalerOf(context).scale(14) / 14).clamp(1.0, 2.0),
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+              ),
               children: [
                 _Tile(label: l.salesToday, value: '${_afn(d.salesTodayMinor)} AFN', icon: Icons.today, color: const Color(0xFF0F6B5C)),
                 _Tile(
@@ -102,7 +109,11 @@ class _Tile extends StatelessWidget {
               Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
             ]),
             const SizedBox(height: 8),
-            Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            ),
             if (note != null)
               Text(note!, style: Theme.of(context).textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
           ],

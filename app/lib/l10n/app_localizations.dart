@@ -965,6 +965,12 @@ abstract class AppLocalizations {
   /// **'Voided'**
   String get voided;
 
+  /// No description provided for @language.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get language;
+
   /// No description provided for @errSessionEnded.
   ///
   /// In en, this message translates to:

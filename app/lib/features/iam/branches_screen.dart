@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/iam_api.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import 'iam_providers.dart';
 import 'iam_ui.dart';
 
@@ -14,7 +15,7 @@ class BranchesScreen extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final async = ref.watch(branchesControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l.branches)),
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.branches)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _add(context, ref, l),
         icon: const Icon(Icons.add_business_outlined),
@@ -123,6 +124,7 @@ class _BranchNameDialogState extends State<_BranchNameDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text(widget.title),
       content: TextField(
         controller: _name,

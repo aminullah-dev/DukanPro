@@ -155,8 +155,12 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _unitId,
+                  isExpanded: true,
                   decoration: InputDecoration(labelText: l.unit, border: const OutlineInputBorder()),
-                  items: [for (final u in unitRows) DropdownMenuItem(value: u.id, child: Text(u.name))],
+                  items: [
+                    for (final u in unitRows)
+                      DropdownMenuItem(value: u.id, child: Text(u.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  ],
                   onChanged: _isNew ? (v) => setState(() => _unitId = v) : null,
                 ),
                 const SizedBox(height: 12),

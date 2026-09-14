@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import '../auth/session.dart';
 import 'catalog_providers.dart';
 import 'product_edit_screen.dart';
@@ -36,7 +37,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
     final async = ref.watch(productsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l.products)),
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.products)),
       floatingActionButton: canManage
           ? FloatingActionButton.extended(
               onPressed: () => _open(const ProductEditScreen()),

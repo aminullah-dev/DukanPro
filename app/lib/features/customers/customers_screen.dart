@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
@@ -114,7 +115,7 @@ class CustomersScreen extends ConsumerWidget {
     final canWriteOff = actor?.can(Permission.debtWriteOff) ?? false;
     final async = ref.watch(customersProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l.customers)),
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.customers)),
       floatingActionButton: canManage
           ? FloatingActionButton.extended(
               onPressed: () => _add(context, ref), icon: const Icon(Icons.person_add), label: Text(l.addCustomer))
@@ -206,6 +207,7 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text(l.addCustomer),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: _name, decoration: InputDecoration(labelText: l.customerName)),
@@ -277,6 +279,7 @@ class _CreditLimitDialogState extends State<_CreditLimitDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text('${l.setCreditLimit} · ${widget.customer.name}'),
       content: TextField(
         controller: _limit,
@@ -330,6 +333,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     final l = AppLocalizations.of(context);
     final balance = ref.watch(customerBalanceProvider(widget.customer.id));
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text('${widget.writeOff ? l.writeOffDebt : l.recordPayment} · ${widget.customer.name}'),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [

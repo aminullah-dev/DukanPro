@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../auth/providers.dart';
@@ -62,7 +63,7 @@ class SuppliersScreen extends ConsumerWidget {
     final canAdd = actor?.can(Permission.productManage) ?? false;
     final async = ref.watch(suppliersProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l.suppliers)),
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.suppliers)),
       floatingActionButton: canAdd
           ? FloatingActionButton.extended(
               onPressed: () => _add(context, ref),
@@ -123,6 +124,7 @@ class _AddSupplierDialogState extends State<_AddSupplierDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text(l.addSupplier),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: _name, autofocus: true, decoration: InputDecoration(labelText: l.supplierName)),
@@ -168,6 +170,7 @@ class _PayDialogState extends ConsumerState<_PayDialog> {
     final l = AppLocalizations.of(context);
     final balance = ref.watch(supplierBalanceProvider(widget.supplier.id));
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text('${l.paySupplier} · ${widget.supplier.name}'),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [

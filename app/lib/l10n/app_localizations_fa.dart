@@ -512,6 +512,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get voided => 'باطل‌شده';
 
   @override
+  String get language => 'زبان';
+
+  @override
   String get errSessionEnded =>
       'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
 
@@ -1248,6 +1251,9 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get voided => 'باطل‌شده';
+
+  @override
+  String get language => 'زبان';
 
   @override
   String get errSessionEnded =>

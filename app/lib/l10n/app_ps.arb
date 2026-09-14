@@ -144,6 +144,7 @@
   "searchCustomer": "پېرودونکی ولټوئ",
   "paid": "تادیه شوي",
   "voided": "باطل شوی",
+  "language": "ژبه",
   "errSessionEnded": "ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.",
   "biometricUnlockSetting": "د ګوتې په نښه خلاصول",
   "confirmPasswordTitle": "خپل پټنوم تایید کړئ",

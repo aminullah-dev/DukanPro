@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../auth/providers.dart';
@@ -108,7 +109,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
     final canCost = ref.watch(sessionActorProvider)?.can(Permission.purchaseCost) ?? false;
     final unitName = _product == null ? null : units?[_product!.unitId]?.name;
     return Scaffold(
-      appBar: AppBar(title: Text(l.receiveStock)),
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.receiveStock)),
       body: productsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),

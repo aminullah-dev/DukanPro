@@ -144,6 +144,7 @@
   "searchCustomer": "جستجوی مشتری",
   "paid": "پرداخت‌شده",
   "voided": "باطل‌شده",
+  "language": "زبان",
   "errSessionEnded": "دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.",
   "biometricUnlockSetting": "باز کردن با اثر انگشت",
   "confirmPasswordTitle": "رمز عبور خود را تأیید کنید",

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../../widgets/locale_toggle.dart';
@@ -433,7 +434,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: Text(l.pos), actions: [
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.pos), actions: [
         IconButton(
           icon: const Icon(Icons.receipt_long_outlined),
           tooltip: l.recentSales,
@@ -997,6 +998,7 @@ class _QtyDialogState extends State<_QtyDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true,
       title: Text('${l.editQuantity} · ${widget.line.product.name}'),
       content: TextField(
         controller: _qty,

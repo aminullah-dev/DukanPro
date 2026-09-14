@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shell_scope.dart';
 import 'audit_providers.dart';
 
 /// The audit trail (owner-only). Read-only list of who did what, when — the
@@ -16,6 +17,7 @@ class AuditLogScreen extends ConsumerWidget {
     final async = ref.watch(auditLogProvider);
     return Scaffold(
       appBar: AppBar(
+        leading: ShellScope.menuButton(context),
         title: Text(l.auditLog),
         actions: [
           IconButton(

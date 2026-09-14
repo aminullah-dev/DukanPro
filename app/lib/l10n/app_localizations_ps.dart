@@ -510,6 +510,9 @@ class AppLocalizationsPs extends AppLocalizations {
   String get voided => 'باطل شوی';
 
   @override
+  String get language => 'ژبه';
+
+  @override
   String get errSessionEnded =>
       'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
 

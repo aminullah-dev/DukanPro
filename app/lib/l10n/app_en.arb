@@ -153,6 +153,7 @@
   "searchCustomer": "Search customers",
   "paid": "Paid",
   "voided": "Voided",
+  "language": "Language",
   "errSessionEnded": "Your access has changed or ended. Sign in again.",
   "biometricUnlockSetting": "Unlock with fingerprint",
   "confirmPasswordTitle": "Confirm your password",

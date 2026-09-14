@@ -514,6 +514,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voided => 'Voided';
 
   @override
+  String get language => 'Language';
+
+  @override
   String get errSessionEnded =>
       'Your access has changed or ended. Sign in again.';
 
