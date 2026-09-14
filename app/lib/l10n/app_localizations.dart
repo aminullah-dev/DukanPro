@@ -659,6 +659,78 @@ abstract class AppLocalizations {
   /// **'Your session ended. Enter your password: the app keeps working offline and signs in again when it is online.'**
   String get errSessionEndedUnlock;
 
+  /// No description provided for @cashNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash now'**
+  String get cashNow;
+
+  /// No description provided for @onCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'On credit'**
+  String get onCredit;
+
+  /// No description provided for @deactivateCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Close account'**
+  String get deactivateCustomer;
+
+  /// No description provided for @reactivateCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen account'**
+  String get reactivateCustomer;
+
+  /// No description provided for @customerInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Account closed: no credit'**
+  String get customerInactive;
+
+  /// No description provided for @writeOffDebt.
+  ///
+  /// In en, this message translates to:
+  /// **'Write off debt'**
+  String get writeOffDebt;
+
+  /// No description provided for @profitMissingCost.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item sold without a cost} other{{count} items sold without a cost}}'**
+  String profitMissingCost(int count);
+
+  /// No description provided for @errCustomerInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'This customer\'s account is closed: no credit.'**
+  String get errCustomerInactive;
+
+  /// No description provided for @errDebtCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'This customer\'s debt is in another currency; credit is given only in their currency.'**
+  String get errDebtCurrency;
+
+  /// No description provided for @errOverCreditLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'This sale would take the customer over their credit limit.'**
+  String get errOverCreditLimit;
+
+  /// No description provided for @errDebtOverpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'That is more than the customer owes.'**
+  String get errDebtOverpayment;
+
+  /// No description provided for @errWriteOffTooMuch.
+  ///
+  /// In en, this message translates to:
+  /// **'You can write off at most what the customer owes.'**
+  String get errWriteOffTooMuch;
+
   /// No description provided for @errSessionEnded.
   ///
   /// In en, this message translates to:

@@ -14,7 +14,7 @@
 1. **On-hand is derived** by summing movements — never stored as a mutable running total. (This is what makes concurrent offline sales safe; see `sync-protocol.md`.)
 2. A StockMovement is **append-only and immutable**; corrections are new compensating movements, never edits.
 3. For a stock-tracked product, a sale, purchase receipt, transfer, or count post **must** create movements; a sale of a `track_stock=false` product creates none.
-4. **Single-device / online:** a sale that would drive on-hand below zero raises `STOCK_INSUFFICIENT` before committing. **Under offline partition:** oversell is *detected on sync*, not prevented (flagged for reconciliation).
+4. **Single-device / online:** a sale that would drive on-hand below zero raises `STOCK_INSUFFICIENT` before committing (`POST /sales`: lines of one product count together, products without stock tracking are not counted, and two online sales of one product take turns). **Under offline partition:** oversell is *detected on sync*, not prevented (flagged for reconciliation).
 5. Transfer quantities must be positive; a transfer cannot exceed source on-hand at post time (single-device rule).
 6. `unit_cost` on purchase/return movements feeds cost valuation; sale movements carry no cost (cost is read from valuation).
 

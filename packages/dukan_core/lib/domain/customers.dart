@@ -90,6 +90,30 @@ void assertDebtPaymentValid({required int amountMinor}) {
   }
 }
 
+/// A write-off forgives part or all of what the customer owes: a positive amount
+/// no larger than the balance. Raises [ValidationError] `DEBT_WRITE_OFF_INVALID`
+/// or [ConflictError] `DEBT_WRITE_OFF_EXCEEDS_BALANCE`.
+void assertWriteOffValid({required int amountMinor, required int balanceMinor}) {
+  if (amountMinor <= 0) throw ValidationError('DEBT_WRITE_OFF_INVALID', {'amount': amountMinor});
+  if (amountMinor > balanceMinor) {
+    throw ConflictError('DEBT_WRITE_OFF_EXCEEDS_BALANCE', {'amount': amountMinor, 'balance': balanceMinor});
+  }
+}
+
+/// Credit goes only to an active customer, in the customer's currency (ledgers
+/// never convert). Raises [ConflictError] `CUSTOMER_INACTIVE` or
+/// `DEBT_CURRENCY_MISMATCH`.
+void assertCustomerCanBuyOnCredit({
+  required bool isActive,
+  required String customerCurrency,
+  required String saleCurrency,
+}) {
+  if (!isActive) throw ConflictError('CUSTOMER_INACTIVE', const {});
+  if (saleCurrency != customerCurrency) {
+    throw ConflictError('DEBT_CURRENCY_MISMATCH', {'expected': customerCurrency, 'got': saleCurrency});
+  }
+}
+
 /// A credit limit is null (unlimited) or a non-negative amount. Raises
 /// [ValidationError] `CUSTOMER_CREDIT_LIMIT_INVALID`.
 void assertCreditLimitValid({required int? creditLimitMinor}) {

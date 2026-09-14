@@ -12,7 +12,7 @@ Reports are **queries/DTOs, not domain aggregates.** "Overdue", "dashboard", "to
 | Stock valuation | stock movements + cost | method = config (last / weighted avg) |
 | Debtor aging | customer ledger | buckets 0–30 / 31–60 / 61+ days |
 | Supplier balances | supplier ledger | per currency |
-| Profit | sale line totals − cost snapshot | cost read from valuation at sale time |
+| Profit | what the day's settled sales took (after discounts) − the goods' cost snapshot; lines sold without a cost are counted (`unknown_cost_lines`) | cost read from valuation at sale time |
 | Low-stock | derived on-hand vs reorder level | feeds notifications (Phase 9) |
 
 Read models are **projections over append-only ledgers**, so they are always reconstructable and never the authoritative store.

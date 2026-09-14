@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../../widgets/locale_toggle.dart';
 import '../auth/session.dart';
@@ -59,7 +60,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       final sale = result.credit
           ? await sales.settle(
               lines: lines, cashMinor: result.cashMinor, tenderedMinor: result.tenderedMinor,
-              customerId: result.customerId, customerCreditLimitMinor: result.creditLimit,
+              customerId: result.customerId,
               branchId: actor.branchId, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider),
             )
           : await sales.settleCash(
@@ -79,7 +80,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       }
     } on AppError catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${l.charge}: ${e.code}')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(moneyErrorText(l, e))));
       }
     }
   }
@@ -244,13 +245,11 @@ class _PayResult {
     required this.cashMinor,
     required this.tenderedMinor,
     this.customerId,
-    this.creditLimit,
   });
   final bool credit;
   final int cashMinor;
   final int tenderedMinor;
   final String? customerId;
-  final int? creditLimit;
 }
 
 class _PaymentDialog extends ConsumerStatefulWidget {
@@ -280,11 +279,22 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     }
   }
 
+  /// With a customer, the field is the cash paid now and the rest goes on
+  /// credit: picking one starts it at 0 instead of the total (and back again).
+  void _pick(Customer? c) {
+    final cash = _tenderedMinor;
+    if (c != null && _customer == null && cash == widget.totalMinor) _tendered.text = _afn(0);
+    if (c == null && _customer != null && cash == 0) _tendered.text = _afn(widget.totalMinor);
+    setState(() => _customer = c);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final tendered = _tenderedMinor;
     final change = tendered == null ? -1 : tendered - widget.totalMinor;
+    // What goes on the customer's account: the total less the cash paid now.
+    final onCredit = _customer == null || tendered == null ? 0 : widget.totalMinor - tendered;
     final customersAsync = ref.watch(customersProvider);
     return AlertDialog(
       title: Text(l.charge),
@@ -301,17 +311,26 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: l.tendered, border: const OutlineInputBorder(), suffixText: 'AFN',
+              labelText: _customer == null ? l.tendered : l.cashNow,
+              border: const OutlineInputBorder(),
+              suffixText: 'AFN',
               errorText: tendered == null ? l.errAmountInvalid : null,
             ),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 8),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(l.change),
-            Text(change >= 0 ? '${_afn(change)} AFN' : '—',
-                style: TextStyle(color: change >= 0 ? Colors.green.shade700 : Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
-          ]),
+          if (onCredit > 0)
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text(l.onCredit),
+              Text('${_afn(onCredit)} AFN',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
+            ])
+          else
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text(l.change),
+              Text(change >= 0 ? '${_afn(change)} AFN' : '—',
+                  style: TextStyle(color: change >= 0 ? Colors.green.shade700 : Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
+            ]),
           const SizedBox(height: 8),
           customersAsync.maybeWhen(
             data: (customers) => DropdownButtonFormField<String?>(
@@ -319,10 +338,11 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
               decoration: InputDecoration(labelText: l.credit, isDense: true),
               items: [
                 const DropdownMenuItem(value: null, child: Text('—')),
-                for (final c in customers) DropdownMenuItem(value: c.id, child: Text(c.name)),
+                // Credit goes only to open accounts.
+                for (final c in customers.where((c) => c.isActive))
+                  DropdownMenuItem(value: c.id, child: Text(c.name)),
               ],
-              onChanged: (id) => setState(
-                  () => _customer = id == null ? null : customers.firstWhere((c) => c.id == id)),
+              onChanged: (id) => _pick(id == null ? null : customers.firstWhere((c) => c.id == id)),
             ),
             orElse: () => const SizedBox.shrink(),
           ),
@@ -332,19 +352,18 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
         if (_customer != null)
           FilledButton.tonal(
-            onPressed: tendered == null
-                ? null
-                : () => Navigator.pop(
+            // Credit is for what is left after the cash paid now.
+            onPressed: onCredit > 0
+                ? () => Navigator.pop(
                       context,
                       _PayResult(
                         credit: true,
-                        // Cash toward a credit sale is at most its total; the rest is the debt.
-                        cashMinor: tendered > widget.totalMinor ? widget.totalMinor : tendered,
-                        tenderedMinor: tendered,
+                        cashMinor: tendered ?? 0,
+                        tenderedMinor: tendered ?? 0,
                         customerId: _customer!.id,
-                        creditLimit: _customer!.creditLimitMinor,
                       ),
-                    ),
+                    )
+                : null,
             child: Text(l.credit),
           ),
         FilledButton(

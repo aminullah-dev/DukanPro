@@ -23,7 +23,10 @@ String? numberErrorText(AppLocalizations l, Object error) => switch (error) {
       AppError(code: 'CATALOG_QTY_INVALID' || 'STOCK_INVALID_QTY') => l.errQtyInvalid,
       AppError(code: 'CATALOG_UNIT_PRECISION') => l.errQtyPrecision,
       AppError(code: 'SALE_TOTAL_TOO_LARGE' || 'GRN_TOTAL_TOO_LARGE') => l.errTotalTooLarge,
-      AppError(code: 'GRN_LINE_INVALID' || 'DEBT_PAYMENT_INVALID' || 'SALE_LINE_INVALID_QTY') =>
+      AppError(
+            code: 'GRN_LINE_INVALID' || 'DEBT_PAYMENT_INVALID' || 'DEBT_WRITE_OFF_INVALID' ||
+                'SALE_LINE_INVALID_QTY'
+          ) =>
         l.errMustBePositive,
       _ => null,
     };

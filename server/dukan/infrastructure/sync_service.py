@@ -128,7 +128,7 @@ class _SqlSyncReader:
             return None
         return CustomerRef(
             id=c.id, deleted=c.deleted_at is not None, currency=c.currency,
-            credit_limit_minor=c.credit_limit_minor,
+            credit_limit_minor=c.credit_limit_minor, is_active=c.is_active,
         )
 
     def customer_balance(self, customer_id: str) -> int:

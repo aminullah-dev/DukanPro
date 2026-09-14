@@ -20,7 +20,7 @@
 6. A settled sale is **immutable**; corrections are a **void** (reverses stock + payments + ledger) or a **refund** (new negative sale referencing the original). No in-place edits.
 7. Change is computed for cash tender; over-tender yields `change`, never a negative payment. Payments are cash or card: credit is the unpaid remainder (it needs a customer), never a payment. The payments never add up to more than the total.
 8. Payments are append-only; you cannot delete a payment, only void the sale or record a refund.
-9. A **void** needs `sale.void` (owner, manager) in the **sale's** branch and a reason, recorded in the audit entry. A sale whose shift is already closed cannot be voided (`SALE_SHIFT_CLOSED`): its cash was counted.
+9. A **void** needs `sale.void` (owner, manager) in the **sale's** branch and a reason, recorded in the audit entry. A sale whose shift is already closed cannot be voided (`SALE_SHIFT_CLOSED`): its cash was counted. A void of a credit sale also takes its charge back off the customer's ledger. Two voids of one sale, or a void and its shift's close, take turns (row locks).
 10. A discount lies between 0 and the subtotal (`SALE_DISCOUNT_INVALID`); any discount needs `sale.discount` and writes `discount.applied`.
 11. A shift closes once (`SHIFT_ALREADY_CLOSED`), by its own cashier or by someone with `report.view` in its branch. Reading a sale needs `sale.create` or `report.view` in the sale's branch.
 

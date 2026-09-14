@@ -225,9 +225,10 @@ _INSERT: dict[str, dict[str, _Field]] = {
     "customer_ledger": {
         "customer_id": _uuid(required=True),
         "type": _enum([t.value for t in LedgerEntryType], required=True),
-        "amount_minor": _int(lo=1, hi=MONEY_MAX, required=True),
+        # Signed: an adjustment (a write-off) lowers the debt with a negative amount.
+        "amount_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),
         "currency": _CURRENCY_F,
-        "ref_type": _enum(["sale", "manual"], nullable=True),
+        "ref_type": _enum(["sale", "manual", "write_off"], nullable=True),
         "ref_id": _uuid(nullable=True),
     },
     "supplier_ledger": {
@@ -392,6 +393,7 @@ class CustomerRef:
     deleted: bool
     currency: str
     credit_limit_minor: int | None
+    is_active: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -837,11 +839,18 @@ def _payments_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
 
 def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     entry = LedgerEntryType(v["type"])
-    if entry not in (LedgerEntryType.CHARGE, LedgerEntryType.PAYMENT):
-        # opening / adjustment (write-off): no app flow pushes them yet.
-        raise ValidationError("SYNC_OP_UNSUPPORTED", table="customer_ledger", type=entry.value)
     amount: int = v["amount_minor"]
     currency = v.get("currency", DEFAULT_CURRENCY)
+    if entry is LedgerEntryType.ADJUSTMENT:
+        return _write_off(ctx, v, amount, currency)
+    if entry is not LedgerEntryType.CHARGE and entry is not LedgerEntryType.PAYMENT:
+        # An opening balance: no app flow pushes one.
+        raise ValidationError("SYNC_OP_UNSUPPORTED", table="customer_ledger", type=entry.value)
+    if amount <= 0:
+        # Only an adjustment is signed; a charge or a payment is money one way.
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="customer_ledger", field="amount_minor", reason="range"
+        )
     if entry is LedgerEntryType.CHARGE:
         if v.get("ref_type") != "sale" or v.get("ref_id") is None:
             raise ValidationError("SYNC_FIELD_REQUIRED", table="customer_ledger", field="ref_id")
@@ -854,6 +863,11 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
             )
         if currency != sale.currency:
             raise ConflictError("SALE_CURRENCY_MISMATCH", expected=sale.currency, got=currency)
+        if customer.currency != sale.currency:
+            # Ledgers never convert: a customer's debt is in their own currency.
+            raise ConflictError(
+                "DEBT_CURRENCY_MISMATCH", expected=customer.currency, got=sale.currency
+            )
         _require_complete_lines(ctx, sale)
         if ctx.reader.sale_charges_total(sale.id) + amount > sale.total_minor - sale.paid_minor:
             raise ValidationError(
@@ -868,6 +882,9 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
             **_pick(v, "customer_id", "amount_minor", "currency", "ref_id"),
             "over_credit_limit": over_limit,
         }
+        if not customer.is_active:
+            # The till sold before it heard the account was closed: kept, flagged.
+            after = {**after, "customer_inactive": True}
         return ApplyPlan(
             v, sale.branch_id, sale.branch_id,
             AuditIntent("debt.charge_posted", "customer_ledger", after),
@@ -892,6 +909,33 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     return ApplyPlan(
         v, branch, None, AuditIntent("debt.payment_recorded", "customer_ledger", after)
     )
+
+
+def _write_off(ctx: _Ctx, v: dict[str, Any], amount: int, currency: str) -> ApplyPlan:
+    """A write-off from a device: a negative adjustment (it lowers the debt),
+    `ref_type` write_off, needing debt.write_off. Like a payment, one that outruns
+    the balance is flagged, not refused: another till may have taken a payment
+    meanwhile."""
+    if v.get("ref_type") != "write_off" or v.get("ref_id") is not None:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="customer_ledger", field="ref_type", reason="adjustment"
+        )
+    if amount >= 0:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="customer_ledger", field="amount_minor", reason="range"
+        )
+    branch = _active(ctx)
+    _need(ctx, Permission.DEBT_WRITE_OFF, branch)
+    _guard_insert(ctx)
+    customer = _customer(ctx, v["customer_id"])
+    if currency != customer.currency:
+        raise ConflictError("DEBT_CURRENCY_MISMATCH", expected=customer.currency, got=currency)
+    balance = ctx.reader.customer_balance(customer.id)
+    after = {
+        **_pick(v, "customer_id", "currency"), "amount": -amount,
+        "exceeds_balance": -amount > balance,
+    }
+    return ApplyPlan(v, branch, None, AuditIntent("debt.written_off", "customer_ledger", after))
 
 
 def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:

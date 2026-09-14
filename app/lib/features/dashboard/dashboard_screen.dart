@@ -49,7 +49,12 @@ class DashboardScreen extends ConsumerWidget {
               childAspectRatio: 1.9,
               children: [
                 _Tile(label: l.salesToday, value: '${_afn(d.salesTodayMinor)} AFN', icon: Icons.today, color: const Color(0xFF0F6B5C)),
-                _Tile(label: l.profit, value: '${_afn(d.profitTodayMinor)} AFN', icon: Icons.trending_up, color: const Color(0xFF1B7F4B)),
+                _Tile(
+                  label: l.profit, value: '${_afn(d.profitTodayMinor)} AFN', icon: Icons.trending_up,
+                  color: const Color(0xFF1B7F4B),
+                  // Lines sold without a cost count as free: say how many.
+                  note: d.unknownCostLines > 0 ? l.profitMissingCost(d.unknownCostLines) : null,
+                ),
                 _Tile(label: l.outstandingDebt, value: '${_afn(d.outstandingDebtMinor)} AFN', icon: Icons.account_balance_wallet, color: const Color(0xFFC2571F)),
                 _Tile(label: l.lowStock, value: '${d.lowStockCount}', icon: Icons.warning_amber, color: const Color(0xFFB5820B)),
               ],
@@ -75,8 +80,9 @@ class DashboardScreen extends ConsumerWidget {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.label, required this.value, required this.icon, required this.color});
+  const _Tile({required this.label, required this.value, required this.icon, required this.color, this.note});
   final String label;
+  final String? note;
   final String value;
   final IconData icon;
   final Color color;
@@ -97,6 +103,8 @@ class _Tile extends StatelessWidget {
             ]),
             const SizedBox(height: 8),
             Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            if (note != null)
+              Text(note!, style: Theme.of(context).textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),

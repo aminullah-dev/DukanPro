@@ -33,7 +33,7 @@ void main() {
 
     await sales.settle(
       lines: [_line(p.id, 52000, 2)], cashMinor: 0, customerId: c.id,
-      customerCreditLimitMinor: 200000, branchId: 'B1', actorId: 'u1', deviceId: 'app',
+      branchId: 'B1', actorId: 'u1', deviceId: 'app',
     );
     expect(await customers.balance(c.id), 104000);
     expect(await catalog.onHand(p.id, 'B1'), 38);
@@ -50,7 +50,7 @@ void main() {
     expect(
       () => sales.settle(
         lines: [_line(p.id, 52000, 2)], cashMinor: 0, customerId: c.id,
-        customerCreditLimitMinor: 50000, branchId: 'B1', actorId: 'u1', deviceId: 'app',
+        branchId: 'B1', actorId: 'u1', deviceId: 'app',
       ),
       throwsA(isA<ConflictError>().having((e) => e.code, 'code', 'SALE_OVER_CREDIT_LIMIT')),
     );

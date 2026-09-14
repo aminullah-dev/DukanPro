@@ -51,4 +51,15 @@ void main() {
     }
     assertDebtPaymentValid(amountMinor: 1);
   });
+
+  test('write-offs and who may buy on credit', () {
+    Matcher code(String c) => throwsA(isA<AppError>().having((e) => e.code, 'code', c));
+    expect(() => assertWriteOffValid(amountMinor: 0, balanceMinor: 300), code('DEBT_WRITE_OFF_INVALID'));
+    expect(() => assertWriteOffValid(amountMinor: 301, balanceMinor: 300), code('DEBT_WRITE_OFF_EXCEEDS_BALANCE'));
+    assertWriteOffValid(amountMinor: 300, balanceMinor: 300);
+    expect(() => assertCustomerCanBuyOnCredit(isActive: false, customerCurrency: 'AFN', saleCurrency: 'AFN'),
+        code('CUSTOMER_INACTIVE'));
+    expect(() => assertCustomerCanBuyOnCredit(isActive: true, customerCurrency: 'AFN', saleCurrency: 'USD'),
+        code('DEBT_CURRENCY_MISMATCH'));
+  });
 }

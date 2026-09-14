@@ -340,6 +340,53 @@ class AppLocalizationsPs extends AppLocalizations {
       'ستاسو ناسته پای ته ورسېده. خپل پټنوم ولیکئ: اپ له انټرنېټ پرته هم کار کوي او کله چې آنلاین شي بیا ننوځي.';
 
   @override
+  String get cashNow => 'همدا اوس نغدي';
+
+  @override
+  String get onCredit => 'په اُدهار';
+
+  @override
+  String get deactivateCustomer => 'حساب بندول';
+
+  @override
+  String get reactivateCustomer => 'حساب بیا پرانیستل';
+
+  @override
+  String get customerInactive => 'حساب بند: اُدهار نشته';
+
+  @override
+  String get writeOffDebt => 'پور بښل';
+
+  @override
+  String profitMissingCost(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count توکي د پېر بیې پرته پلورل شوي',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get errCustomerInactive =>
+      'د دې پېرودونکي حساب بند دی: اُدهار نه ورکول کېږي.';
+
+  @override
+  String get errDebtCurrency =>
+      'د دې پېرودونکي پور په بله اسعارو دی؛ اُدهار یوازې د هغه په اسعارو ورکول کېږي.';
+
+  @override
+  String get errOverCreditLimit =>
+      'دا پلور به د پېرودونکي د اُدهار له حد څخه واوړي.';
+
+  @override
+  String get errDebtOverpayment => 'دا مبلغ د پېرودونکي له پور څخه زیات دی.';
+
+  @override
+  String get errWriteOffTooMuch =>
+      'تر ټولو زیات د پېرودونکي د پور په اندازه بښل کېدای شي.';
+
+  @override
   String get errSessionEnded =>
       'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
 

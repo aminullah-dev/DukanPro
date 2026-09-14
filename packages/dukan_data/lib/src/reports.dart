@@ -27,12 +27,16 @@ class DashboardData {
     required this.outstandingDebtMinor,
     required this.lowStockCount,
     required this.topSellers,
+    this.unknownCostLines = 0,
   });
   final int salesTodayMinor;
   final int profitTodayMinor;
   final int outstandingDebtMinor;
   final int lowStockCount;
   final List<TopSeller> topSellers;
+
+  /// Today's lines sold without a cost: profit counts them as free.
+  final int unknownCostLines;
 }
 
 int _pow10(int n) {
@@ -69,13 +73,13 @@ final class LocalReports {
     final salesToday = todaySales.fold<int>(0, (sum, s) => sum + s.totalMinor);
     final todayIds = todaySales.map((s) => s.id).toSet();
 
-    final lines = await _db.select(_db.saleLines).get();
-    var profit = 0;
+    final lines = await (_db.select(_db.saleLines)..where((t) => t.saleId.isIn(todayIds))).get();
+    var costs = 0;
+    var unknownCost = 0;
     final sellers = <String, TopSeller>{};
     for (final ln in lines) {
-      if (!todayIds.contains(ln.saleId)) continue;
-      final costTotal = lineTotalMinor(ln.unitCostMinor, ln.qtyMinor, ln.decimalPlaces);
-      profit += ln.lineTotalMinor - costTotal;
+      costs += lineTotalMinor(ln.unitCostMinor, ln.qtyMinor, ln.decimalPlaces);
+      if (ln.unitCostMinor == 0) unknownCost++; // sold before any cost was known
       final prev = sellers[ln.productId];
       sellers[ln.productId] = TopSeller(
         ln.name, (prev?.qtyMinor ?? 0) + ln.qtyMinor,
@@ -108,10 +112,12 @@ final class LocalReports {
 
     return DashboardData(
       salesTodayMinor: salesToday,
-      profitTodayMinor: profit,
+      // What the sales took (after discounts), less what the goods cost.
+      profitTodayMinor: salesToday - costs,
       outstandingDebtMinor: debt,
       lowStockCount: lowCount,
       topSellers: top.take(5).toList(),
+      unknownCostLines: unknownCost,
     );
   }
 }

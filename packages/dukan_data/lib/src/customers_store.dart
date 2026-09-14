@@ -54,6 +54,52 @@ final class LocalCustomers {
     });
   }
 
+  /// Close a customer's account to credit, or reopen it: a manager's decision,
+  /// offered with customer.credit and checked again by the server.
+  Future<void> setActive(
+    Customer c,
+    bool isActive, {
+    required String actorId,
+    required String deviceId,
+  }) async {
+    await _db.transaction(() async {
+      await (_db.update(_db.customers)..where((t) => t.id.equals(c.id))).write(CustomersCompanion(
+            isActive: Value(isActive),
+            updatedBy: Value(actorId),
+            updatedAt: Value(DateTime.now().toUtc()),
+            version: Value(c.version + 1),
+          ));
+      await _rec.record(
+        table: 'customers', rowId: c.id, op: 'update', baseVersion: c.version,
+        data: {'is_active': isActive}, actorId: actorId, deviceId: deviceId,
+      );
+    });
+  }
+
+  /// Forgive part or all of what a customer owes: a negative adjustment on the
+  /// append-only ledger, never more than the balance. Offered with
+  /// debt.write_off; the server checks again.
+  Future<void> writeOff({
+    required Customer customer,
+    required int amountMinor,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    assertWriteOffValid(amountMinor: amountMinor, balanceMinor: await balance(customer.id));
+    final ledgerId = newId();
+    await _db.transaction(() async {
+      await _db.into(_db.customerLedger).insert(CustomerLedgerCompanion.insert(
+            id: ledgerId, customerId: customer.id, type: 'adjustment', amountMinor: -amountMinor,
+            currency: Value(customer.currency), refType: const Value('write_off'),
+            createdBy: Value(actorId),
+          ));
+      await _rec.record(table: 'customer_ledger', rowId: ledgerId, op: 'insert', data: {
+        'customer_id': customer.id, 'type': 'adjustment', 'amount_minor': -amountMinor,
+        'currency': customer.currency, 'ref_type': 'write_off',
+      }, actorId: actorId, deviceId: deviceId);
+    });
+  }
+
   Future<List<Customer>> list({String? search}) async {
     final q = _db.select(_db.customers)..where((t) => t.deletedAt.isNull());
     if (search != null && search.isNotEmpty) {

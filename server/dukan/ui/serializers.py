@@ -129,6 +129,7 @@ def customer_view_dict(v: CustomerView) -> dict:
         "currency": v.currency,
         "balance_minor": v.balance_minor,
         "version": v.version,
+        "is_active": v.is_active,
     }
 
 
@@ -190,6 +191,7 @@ def dashboard_view_dict(v: DashboardView) -> dict:
         "profit_today_minor": v.profit_today_minor,
         "outstanding_debt_minor": v.outstanding_debt_minor,
         "low_stock_count": v.low_stock_count,
+        "unknown_cost_lines": v.unknown_cost_lines,
         "top_sellers": [
             {
                 "name": t.name, "qty_minor": t.qty_minor, "decimal_places": t.decimal_places,

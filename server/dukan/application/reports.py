@@ -24,6 +24,7 @@ class DashboardView:
     outstanding_debt_minor: int
     low_stock_count: int
     top_sellers: tuple[TopSellerView, ...]
+    unknown_cost_lines: int  # today's lines sold without a cost: profit counts them as free
 
 
 class ReportsService(Protocol):

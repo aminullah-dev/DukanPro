@@ -49,13 +49,17 @@ class SqlReportsService(ReportsService):
         ).all()
         unit_of = {p.id: units.get(p.unit_id) for p in products}
 
-        profit = 0
+        costs = 0
+        unknown_cost = 0
         sellers: dict[str, TopSellerView] = {}
-        for ln in self._s.scalars(select(SaleLineModel)):
-            if ln.sale_id not in today_ids:
-                continue
-            cost = line_total_minor(ln.unit_cost_minor, ln.qty_minor, ln.decimal_places)
-            profit += ln.line_total_minor - cost
+        today_lines: list[SaleLineModel] = (
+            list(self._s.scalars(select(SaleLineModel).where(SaleLineModel.sale_id.in_(today_ids))))
+            if today_ids else []
+        )
+        for ln in today_lines:
+            costs += line_total_minor(ln.unit_cost_minor, ln.qty_minor, ln.decimal_places)
+            if ln.unit_cost_minor == 0:
+                unknown_cost += 1  # sold before any cost was known
             prev = sellers.get(ln.product_id)
             unit = unit_of.get(ln.product_id)
             sellers[ln.product_id] = TopSellerView(
@@ -90,8 +94,10 @@ class SqlReportsService(ReportsService):
         top = sorted(sellers.values(), key=lambda t: -t.revenue_minor)[:5]
         return DashboardView(
             sales_today_minor=sales_today,
-            profit_today_minor=profit,
+            # What the sales took (after discounts), less what the goods cost.
+            profit_today_minor=sales_today - costs,
             outstanding_debt_minor=debt,
             low_stock_count=low,
             top_sellers=tuple(top),
+            unknown_cost_lines=unknown_cost,
         )

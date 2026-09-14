@@ -8,7 +8,11 @@ from collections.abc import Callable
 import pytest
 
 from dukan.domain.catalog import BUILTIN_UNITS, assert_price_valid, quantity_to_minor
-from dukan.domain.customers import assert_debt_payment_valid
+from dukan.domain.customers import (
+    assert_customer_can_buy_on_credit,
+    assert_debt_payment_valid,
+    assert_write_off_valid,
+)
 from dukan.domain.numbers import NumberProblem, money_to_minor, parse_scaled
 from dukan.domain.purchasing import ReceiptLine, assert_receivable
 from dukan.domain.sales import (
@@ -135,3 +139,21 @@ def test_built_in_units_have_the_same_ids_everywhere() -> None:
         "dozen": ("00000000-0000-7000-8000-000000000004", 0),
         "meter": ("00000000-0000-7000-8000-000000000005", 2),
     }
+
+
+def test_write_offs_and_who_may_buy_on_credit() -> None:
+    # The same rows as packages/dukan_core/test/customers_test.dart.
+    assert _code(lambda: assert_write_off_valid(amount_minor=0, balance_minor=300)) == (
+        "DEBT_WRITE_OFF_INVALID"
+    )
+    assert _code(lambda: assert_write_off_valid(amount_minor=301, balance_minor=300)) == (
+        "DEBT_WRITE_OFF_EXCEEDS_BALANCE"
+    )
+    assert_write_off_valid(amount_minor=300, balance_minor=300)
+    assert _code(lambda: assert_customer_can_buy_on_credit(
+        is_active=False, customer_currency="AFN", sale_currency="AFN"
+    )) == "CUSTOMER_INACTIVE"
+    assert _code(lambda: assert_customer_can_buy_on_credit(
+        is_active=True, customer_currency="AFN", sale_currency="USD"
+    )) == "DEBT_CURRENCY_MISMATCH"
+

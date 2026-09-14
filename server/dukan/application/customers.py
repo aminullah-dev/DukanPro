@@ -17,6 +17,7 @@ class CustomerView:
     currency: str
     balance_minor: int
     version: int
+    is_active: bool
 
 
 class CustomerService(Protocol):
@@ -37,5 +38,13 @@ class CustomerService(Protocol):
     ) -> CustomerView: ...
 
     def record_payment(
+        self, *, actor: User, branch_id: str, customer_id: str, amount_minor: int
+    ) -> CustomerView: ...
+
+    def set_active(
+        self, *, actor: User, branch_id: str, customer_id: str, is_active: bool, version: int
+    ) -> CustomerView: ...
+
+    def write_off(
         self, *, actor: User, branch_id: str, customer_id: str, amount_minor: int
     ) -> CustomerView: ...

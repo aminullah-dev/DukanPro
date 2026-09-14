@@ -343,6 +343,52 @@ class AppLocalizationsFa extends AppLocalizations {
       'نشست شما پایان یافت. رمز عبور خود را وارد کنید: برنامه بدون اینترنت هم کار می‌کند و وقتی آنلاین شد دوباره وارد می‌شود.';
 
   @override
+  String get cashNow => 'نقد همین حالا';
+
+  @override
+  String get onCredit => 'به نسیه';
+
+  @override
+  String get deactivateCustomer => 'بستن حساب';
+
+  @override
+  String get reactivateCustomer => 'بازکردن دوبارهٔ حساب';
+
+  @override
+  String get customerInactive => 'حساب بسته: بدون نسیه';
+
+  @override
+  String get writeOffDebt => 'بخشیدن قرض';
+
+  @override
+  String profitMissingCost(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count قلم بدون قیمت خرید فروخته شده',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get errCustomerInactive =>
+      'حساب این مشتری بسته است و نسیه داده نمی‌شود.';
+
+  @override
+  String get errDebtCurrency =>
+      'بدهی این مشتری به ارز دیگری است؛ نسیه فقط به ارز خود او داده می‌شود.';
+
+  @override
+  String get errOverCreditLimit => 'این فروش از سقف نسیهٔ مشتری بیشتر می‌شود.';
+
+  @override
+  String get errDebtOverpayment => 'این مبلغ از بدهی مشتری بیشتر است.';
+
+  @override
+  String get errWriteOffTooMuch =>
+      'حداکثر به اندازهٔ بدهی مشتری می‌توان بخشید.';
+
+  @override
   String get errSessionEnded =>
       'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
 
@@ -910,6 +956,52 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String get errSessionEndedUnlock =>
       'نشست شما پایان یافت. رمز عبور خود را وارد کنید: برنامه بدون اینترنت هم کار می‌کند و وقتی آنلاین شد دوباره وارد می‌شود.';
+
+  @override
+  String get cashNow => 'نقد همین حالا';
+
+  @override
+  String get onCredit => 'به نسیه';
+
+  @override
+  String get deactivateCustomer => 'بستن حساب';
+
+  @override
+  String get reactivateCustomer => 'بازکردن دوبارهٔ حساب';
+
+  @override
+  String get customerInactive => 'حساب بسته: بدون نسیه';
+
+  @override
+  String get writeOffDebt => 'بخشیدن قرض';
+
+  @override
+  String profitMissingCost(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count قلم بدون قیمت خرید فروخته شده',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get errCustomerInactive =>
+      'حساب این مشتری بسته است و نسیه داده نمی‌شود.';
+
+  @override
+  String get errDebtCurrency =>
+      'بدهی این مشتری به ارز دیگری است؛ نسیه فقط به ارز خود او داده می‌شود.';
+
+  @override
+  String get errOverCreditLimit => 'این فروش از سقف نسیهٔ مشتری بیشتر می‌شود.';
+
+  @override
+  String get errDebtOverpayment => 'این مبلغ از بدهی مشتری بیشتر است.';
+
+  @override
+  String get errWriteOffTooMuch =>
+      'حداکثر به اندازهٔ بدهی مشتری می‌توان بخشید.';
 
   @override
   String get errSessionEnded =>

@@ -3,12 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import '../auth/providers.dart';
 import 'customers_providers.dart';
 
 String _afn(int minor) => formatQuantity(minor, 2);
+
+enum _CustomerAction { creditLimit, toggleActive, writeOff }
+
+Widget? _subtitle(AppLocalizations l, Customer c) {
+  final parts = [if (c.phone != null) c.phone!, if (!c.isActive) l.customerInactive];
+  return parts.isEmpty ? null : Text(parts.join(' · '));
+}
 
 class CustomersScreen extends ConsumerWidget {
   const CustomersScreen({super.key});
@@ -51,8 +59,41 @@ class CustomersScreen extends ConsumerWidget {
         ..invalidate(customerBalanceProvider(c.id));
     } on AppError catch (e) {
       if (context.mounted) {
-        final message = numberErrorText(AppLocalizations.of(context), e) ?? e.code;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(moneyErrorText(AppLocalizations.of(context), e))));
+      }
+    }
+  }
+
+  /// Close an account to credit, or reopen it (customer.credit).
+  Future<void> _setActive(WidgetRef ref, Customer c, bool active) async {
+    final actor = ref.read(sessionActorProvider);
+    if (actor == null) return;
+    await ref
+        .read(localCustomersProvider)
+        .setActive(c, active, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
+    ref.invalidate(customersProvider);
+  }
+
+  /// Forgive part or all of a customer's debt (debt.write_off).
+  Future<void> _writeOff(BuildContext context, WidgetRef ref, Customer c) async {
+    final actor = ref.read(sessionActorProvider);
+    if (actor == null) return;
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (_) => _PaymentDialog(customer: c, writeOff: true),
+    );
+    if (amount == null) return;
+    try {
+      await ref.read(localCustomersProvider).writeOff(
+            customer: c, amountMinor: amount, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
+      ref
+        ..invalidate(customersProvider)
+        ..invalidate(customerBalanceProvider(c.id));
+    } on AppError catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(moneyErrorText(AppLocalizations.of(context), e))));
       }
     }
   }
@@ -63,6 +104,7 @@ class CustomersScreen extends ConsumerWidget {
     final actor = ref.watch(sessionActorProvider);
     final canManage = actor?.can(Permission.saleCreate) ?? false;
     final canCredit = actor?.can(Permission.customerCredit) ?? false;
+    final canWriteOff = actor?.can(Permission.debtWriteOff) ?? false;
     final async = ref.watch(customersProvider);
     return Scaffold(
       appBar: AppBar(title: Text(l.customers)),
@@ -81,15 +123,28 @@ class CustomersScreen extends ConsumerWidget {
                 itemBuilder: (context, i) {
                   final c = customers[i];
                   return ListTile(
-                    title: Text(c.name),
-                    subtitle: c.phone != null ? Text(c.phone!) : null,
+                    title: Text(c.name, style: c.isActive ? null : TextStyle(color: Theme.of(context).disabledColor)),
+                    subtitle: _subtitle(l, c),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                       _BalanceChip(customerId: c.id),
-                      if (canCredit)
-                        IconButton(
-                          icon: const Icon(Icons.credit_score_outlined),
-                          tooltip: l.setCreditLimit,
-                          onPressed: () => _setCredit(context, ref, c),
+                      if (canCredit || canWriteOff)
+                        PopupMenuButton<_CustomerAction>(
+                          onSelected: (a) => switch (a) {
+                            _CustomerAction.creditLimit => _setCredit(context, ref, c),
+                            _CustomerAction.toggleActive => _setActive(ref, c, !c.isActive),
+                            _CustomerAction.writeOff => _writeOff(context, ref, c),
+                          },
+                          itemBuilder: (_) => [
+                            if (canCredit)
+                              PopupMenuItem(value: _CustomerAction.creditLimit, child: Text(l.setCreditLimit)),
+                            if (canCredit)
+                              PopupMenuItem(
+                                value: _CustomerAction.toggleActive,
+                                child: Text(c.isActive ? l.deactivateCustomer : l.reactivateCustomer),
+                              ),
+                            if (canWriteOff)
+                              PopupMenuItem(value: _CustomerAction.writeOff, child: Text(l.writeOffDebt)),
+                          ],
                         ),
                     ]),
                     onTap: canManage ? () => _pay(context, ref, c) : null,
@@ -243,9 +298,12 @@ class _CreditLimitDialogState extends State<_CreditLimitDialog> {
   }
 }
 
+/// An amount against a customer's balance: a payment, or debt forgiven
+/// ([writeOff]).
 class _PaymentDialog extends ConsumerStatefulWidget {
-  const _PaymentDialog({required this.customer});
+  const _PaymentDialog({required this.customer, this.writeOff = false});
   final Customer customer;
+  final bool writeOff;
   @override
   ConsumerState<_PaymentDialog> createState() => _PaymentDialogState();
 }
@@ -264,7 +322,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     final l = AppLocalizations.of(context);
     final balance = ref.watch(customerBalanceProvider(widget.customer.id));
     return AlertDialog(
-      title: Text('${l.recordPayment} · ${widget.customer.name}'),
+      title: Text('${widget.writeOff ? l.writeOffDebt : l.recordPayment} · ${widget.customer.name}'),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(l.balance),

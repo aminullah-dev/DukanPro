@@ -56,6 +56,10 @@ class Shop:
         return login["tokens"]["access_token"], r.json()["id"]
 
     def sell(self, token: str, branch: str | None = None, **extra: Any) -> Response:
+        # An online sale takes only stock that is there; these tests are about who
+        # may sell, so the unit sold is put on the shelf first.
+        self.c.post("/stock/adjust", headers=_h(self.owner_token, branch),
+                    json={"product_id": self.pid, "qty_delta": 1})
         return self.c.post("/sales", headers=_h(token, branch), json={
             "lines": [{"product_id": self.pid, "qty_minor": 1}],
             "payments": [{"method": "cash", "amount_minor": 5000}],

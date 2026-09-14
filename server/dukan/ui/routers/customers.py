@@ -35,6 +35,15 @@ class CreditLimitRequest(BaseModel):
     version: Int32
 
 
+class StatusRequest(BaseModel):
+    is_active: bool
+    version: Int32
+
+
+class WriteOffRequest(BaseModel):
+    amount_minor: Money
+
+
 @router.get("/customers")
 def list_customers(
     actor: Actor, svc: Customers, search: str | None = None, x_branch_id: BranchHeader = None
@@ -96,5 +105,37 @@ def record_payment(
         svc.record_payment(
             actor=actor, branch_id=active_branch(actor, x_branch_id),
             customer_id=customer_id, amount_minor=body.amount_minor,
+        )
+    )
+
+
+@router.put("/customers/{customer_id}/status")
+def set_status(
+    customer_id: str,
+    body: StatusRequest,
+    actor: Actor,
+    svc: Customers,
+    x_branch_id: BranchHeader = None,
+) -> dict:
+    return customer_view_dict(
+        svc.set_active(
+            actor=actor, branch_id=active_branch(actor, x_branch_id), customer_id=customer_id,
+            is_active=body.is_active, version=body.version,
+        )
+    )
+
+
+@router.post("/customers/{customer_id}/write-offs")
+def write_off(
+    customer_id: str,
+    body: WriteOffRequest,
+    actor: Actor,
+    svc: Customers,
+    x_branch_id: BranchHeader = None,
+) -> dict:
+    return customer_view_dict(
+        svc.write_off(
+            actor=actor, branch_id=active_branch(actor, x_branch_id), customer_id=customer_id,
+            amount_minor=body.amount_minor,
         )
     )

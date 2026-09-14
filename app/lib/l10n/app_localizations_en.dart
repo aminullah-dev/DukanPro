@@ -342,6 +342,54 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your session ended. Enter your password: the app keeps working offline and signs in again when it is online.';
 
   @override
+  String get cashNow => 'Cash now';
+
+  @override
+  String get onCredit => 'On credit';
+
+  @override
+  String get deactivateCustomer => 'Close account';
+
+  @override
+  String get reactivateCustomer => 'Reopen account';
+
+  @override
+  String get customerInactive => 'Account closed: no credit';
+
+  @override
+  String get writeOffDebt => 'Write off debt';
+
+  @override
+  String profitMissingCost(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items sold without a cost',
+      one: '1 item sold without a cost',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get errCustomerInactive =>
+      'This customer\'s account is closed: no credit.';
+
+  @override
+  String get errDebtCurrency =>
+      'This customer\'s debt is in another currency; credit is given only in their currency.';
+
+  @override
+  String get errOverCreditLimit =>
+      'This sale would take the customer over their credit limit.';
+
+  @override
+  String get errDebtOverpayment => 'That is more than the customer owes.';
+
+  @override
+  String get errWriteOffTooMuch =>
+      'You can write off at most what the customer owes.';
+
+  @override
   String get errSessionEnded =>
       'Your access has changed or ended. Sign in again.';
 

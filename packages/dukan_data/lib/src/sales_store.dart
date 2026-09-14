@@ -31,14 +31,13 @@ final class LocalSales {
   }
 
   /// General settle. When [customerId] is set, the remainder (total − cashMinor)
-  /// posts to the customer ledger, enforcing [customerCreditLimitMinor].
+  /// posts to the customer ledger: the customer must be active, owe in the sale's currency and stay within their credit limit.
   Future<SaleRow> settle({
     required List<SaleLine> lines,
     int discountMinor = 0,
     required int cashMinor,
     int? tenderedMinor,
     String? customerId,
-    int? customerCreditLimitMinor,
     required String branchId,
     required String actorId,
     required String deviceId,
@@ -62,10 +61,19 @@ final class LocalSales {
           method: PaymentMethod.cash, amountMinor: paid, tenderedMinor: onCredit ? null : tendered);
     }
     final remainder = onCredit ? (totals.totalMinor - cashMinor) : 0;
-    if (onCredit && remainder > 0) {
+    final creditId = customerId;
+    if (creditId != null && remainder > 0) {
+      // The customer's own row decides, not what the screen showed.
+      final customer = await (_db.select(_db.customers)
+            ..where((t) => t.id.equals(creditId) & t.deletedAt.isNull()))
+          .getSingleOrNull();
+      if (customer == null) throw NotFoundError('CUSTOMER_NOT_FOUND', {'customer_id': creditId});
+      assertCustomerCanBuyOnCredit(
+        isActive: customer.isActive, customerCurrency: customer.currency, saleCurrency: currency,
+      );
       assertWithinCreditLimit(
-        balanceMinor: await _customerBalance(customerId),
-        chargeMinor: remainder, creditLimitMinor: customerCreditLimitMinor,
+        balanceMinor: await _customerBalance(creditId),
+        chargeMinor: remainder, creditLimitMinor: customer.creditLimitMinor,
       );
     }
     final change = onCredit ? 0 : (tendered - totals.totalMinor);
