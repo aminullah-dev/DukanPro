@@ -164,6 +164,14 @@ final class LocalSales {
     }
   }
 
+  /// The latest sales on this device in [branchId], newest first: to reprint a
+  /// receipt.
+  Future<List<SaleRow>> recent({required String branchId, int limit = 30}) => (_db.select(_db.sales)
+        ..where((t) => t.branchId.equals(branchId) & t.deletedAt.isNull())
+        ..orderBy([(t) => OrderingTerm.desc(t.occurredAt)])
+        ..limit(limit))
+      .get();
+
   Future<List<SaleLineRow>> saleLinesFor(String saleId) =>
       (_db.select(_db.saleLines)..where((t) => t.saleId.equals(saleId))).get();
 

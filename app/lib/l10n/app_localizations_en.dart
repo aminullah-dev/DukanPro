@@ -492,6 +492,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errNotStockTracked => 'This product\'s stock is not tracked.';
 
   @override
+  String get recentSales => 'Recent sales';
+
+  @override
+  String get noRecentSales => 'No sales yet';
+
+  @override
+  String get receivedOk => 'Received into stock';
+
+  @override
+  String get drawerFailed =>
+      'The receipt printed, but the cash drawer did not open.';
+
+  @override
+  String get searchCustomer => 'Search customers';
+
+  @override
+  String get paid => 'Paid';
+
+  @override
+  String get voided => 'Voided';
+
+  @override
   String get errSessionEnded =>
       'Your access has changed or ended. Sign in again.';
 

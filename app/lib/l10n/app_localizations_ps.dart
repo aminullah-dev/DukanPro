@@ -489,6 +489,27 @@ class AppLocalizationsPs extends AppLocalizations {
   String get errNotStockTracked => 'د دې توکي زېرمه نه څارل کېږي.';
 
   @override
+  String get recentSales => 'وروستي پلورونه';
+
+  @override
+  String get noRecentSales => 'تر اوسه پلور نشته';
+
+  @override
+  String get receivedOk => 'زېرمې ته ور زیات شو';
+
+  @override
+  String get drawerFailed => 'رسید چاپ شو، خو د پیسو صندوق خلاص نه شو.';
+
+  @override
+  String get searchCustomer => 'پېرودونکی ولټوئ';
+
+  @override
+  String get paid => 'تادیه شوي';
+
+  @override
+  String get voided => 'باطل شوی';
+
+  @override
   String get errSessionEnded =>
       'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
 

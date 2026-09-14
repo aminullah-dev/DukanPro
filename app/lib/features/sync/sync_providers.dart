@@ -7,9 +7,7 @@ import '../../composition.dart';
 import '../../infrastructure/auth_api.dart' show AuthApiException, NetworkException;
 import '../auth/providers.dart';
 import '../auth/session.dart';
-import '../catalog/catalog_providers.dart';
-import '../customers/customers_providers.dart';
-import '../dashboard/dashboard_screen.dart' show dashboardProvider;
+import '../read_models.dart';
 
 /// The sync engine, wired from the Drift database, the (overridden) sync
 /// client, and this device's id. See docs/sync-protocol.md.
@@ -131,13 +129,7 @@ class SyncController extends Notifier<SyncStatus> {
   }
 
   /// Invalidate the local read models so rows pulled from the server appear.
-  void _refreshReadModels() {
-    ref.invalidate(productsProvider);
-    ref.invalidate(unitsProvider);
-    ref.invalidate(customersProvider);
-    ref.invalidate(suppliersProvider);
-    ref.invalidate(dashboardProvider);
-  }
+  void _refreshReadModels() => refreshReadModels(ref.invalidate);
 }
 
 /// Ops the server conflicted or rejected, newest first; refetched as the

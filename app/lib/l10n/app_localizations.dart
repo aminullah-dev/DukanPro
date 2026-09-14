@@ -923,6 +923,48 @@ abstract class AppLocalizations {
   /// **'This product\'s stock is not tracked.'**
   String get errNotStockTracked;
 
+  /// No description provided for @recentSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent sales'**
+  String get recentSales;
+
+  /// No description provided for @noRecentSales.
+  ///
+  /// In en, this message translates to:
+  /// **'No sales yet'**
+  String get noRecentSales;
+
+  /// No description provided for @receivedOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Received into stock'**
+  String get receivedOk;
+
+  /// No description provided for @drawerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The receipt printed, but the cash drawer did not open.'**
+  String get drawerFailed;
+
+  /// No description provided for @searchCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Search customers'**
+  String get searchCustomer;
+
+  /// No description provided for @paid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get paid;
+
+  /// No description provided for @voided.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided'**
+  String get voided;
+
   /// No description provided for @errSessionEnded.
   ///
   /// In en, this message translates to:

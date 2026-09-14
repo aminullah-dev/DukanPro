@@ -491,6 +491,27 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errNotStockTracked => 'موجودی این کالا دنبال نمی‌شود.';
 
   @override
+  String get recentSales => 'فروش‌های اخیر';
+
+  @override
+  String get noRecentSales => 'هنوز فروشی نیست';
+
+  @override
+  String get receivedOk => 'به موجودی افزوده شد';
+
+  @override
+  String get drawerFailed => 'رسید چاپ شد، اما صندوق پول باز نشد.';
+
+  @override
+  String get searchCustomer => 'جستجوی مشتری';
+
+  @override
+  String get paid => 'پرداخت‌شده';
+
+  @override
+  String get voided => 'باطل‌شده';
+
+  @override
   String get errSessionEnded =>
       'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
 
@@ -1206,6 +1227,27 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get errNotStockTracked => 'موجودی این جنس دنبال نمی‌شود.';
+
+  @override
+  String get recentSales => 'فروش‌های اخیر';
+
+  @override
+  String get noRecentSales => 'هنوز فروشی نیست';
+
+  @override
+  String get receivedOk => 'به موجودی افزوده شد';
+
+  @override
+  String get drawerFailed => 'رسید چاپ شد، اما صندوق پول باز نشد.';
+
+  @override
+  String get searchCustomer => 'جستجوی مشتری';
+
+  @override
+  String get paid => 'پرداخت‌شده';
+
+  @override
+  String get voided => 'باطل‌شده';
 
   @override
   String get errSessionEnded =>
