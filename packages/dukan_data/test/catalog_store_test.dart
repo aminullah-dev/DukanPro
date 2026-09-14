@@ -49,4 +49,10 @@ void main() {
     expect(units.map((u) => u.name), containsAll(['piece', 'kg']));
     expect((await catalog.listUnits()).length, units.length);
   });
+
+  test('the built-in units have fixed ids and are not queued for sync', () async {
+    final units = await catalog.listUnits();
+    expect({for (final u in units) u.name: u.id}, {for (final u in builtInUnits) u.name: u.id});
+    expect((await DriftSyncOutbox(db).pending()).where((o) => o.aggregateType == 'units'), isEmpty);
+  });
 }

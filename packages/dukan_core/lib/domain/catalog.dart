@@ -108,3 +108,14 @@ String formatQuantity(int minor, int decimalPlaces) {
   final frac = (magnitude % unit).toString().padLeft(decimalPlaces, '0');
   return '${negative ? '-' : ''}$whole.$frac';
 }
+
+/// The units every shop starts with. Their ids are the same on every device and
+/// on the server (server/dukan/domain/catalog.py BUILTIN_UNITS), so seeding them
+/// again never makes a second "kg".
+const builtInUnits = <Unit>[
+  Unit(id: '00000000-0000-7000-8000-000000000001', name: 'piece', decimalPlaces: 0),
+  Unit(id: '00000000-0000-7000-8000-000000000002', name: 'kg', decimalPlaces: 3),
+  Unit(id: '00000000-0000-7000-8000-000000000003', name: 'litre', decimalPlaces: 3),
+  Unit(id: '00000000-0000-7000-8000-000000000004', name: 'dozen', decimalPlaces: 0),
+  Unit(id: '00000000-0000-7000-8000-000000000005', name: 'meter', decimalPlaces: 2),
+];

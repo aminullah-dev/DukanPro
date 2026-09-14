@@ -435,6 +435,13 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errGeneric => 'مشکلی پیش آمد. دوباره تلاش کنید.';
 
   @override
+  String get errUnitUnknown =>
+      'واحد این کالا هنوز بارگذاری نشده است. همگام‌سازی کنید و دوباره امتحان کنید.';
+
+  @override
+  String get editQuantity => 'تغییر مقدار';
+
+  @override
   String get errAmountInvalid => 'مبلغ را مانند ۲۵۰ یا ۲۵۰٫۵۰ وارد کنید.';
 
   @override
@@ -965,6 +972,13 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get errGeneric => 'مشکلی پیش آمد. دوباره تلاش کنید.';
+
+  @override
+  String get errUnitUnknown =>
+      'واحد این کالا هنوز بارگذاری نشده است. همگام‌سازی کنید و دوباره امتحان کنید.';
+
+  @override
+  String get editQuantity => 'تغییر مقدار';
 
   @override
   String get errAmountInvalid => 'مبلغ را مانند ۲۵۰ یا ۲۵۰٫۵۰ وارد کنید.';

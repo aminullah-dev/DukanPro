@@ -31,9 +31,6 @@ from dukan.shared.ids import new_id
 from dukan.shared.money import Money
 
 _POLICY = PermissionPolicy()
-_DEFAULT_UNITS = [("piece", 0), ("kg", 3), ("litre", 3), ("dozen", 0), ("meter", 2)]
-
-
 class SqlCatalogService(CatalogService):
     def __init__(self, session: Session) -> None:
         self._s = session
@@ -89,12 +86,9 @@ class SqlCatalogService(CatalogService):
 
     # ---- CatalogService ---------------------------------------------------
     def list_units(self) -> list[dict]:
+        # The built-in units are seeded at bootstrap and by migration 0011, with
+        # fixed ids; reading never writes.
         rows = self._s.scalars(select(UnitModel).where(UnitModel.deleted_at.is_(None))).all()
-        if not rows:
-            for name, dp in _DEFAULT_UNITS:
-                self._s.add(UnitModel(id=new_id(), name=name, decimal_places=dp))
-            self._s.commit()
-            rows = self._s.scalars(select(UnitModel).where(UnitModel.deleted_at.is_(None))).all()
         return [{"id": u.id, "name": u.name, "decimal_places": u.decimal_places} for u in rows]
 
     def create_product(

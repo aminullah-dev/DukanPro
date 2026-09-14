@@ -82,7 +82,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (p.trackStock) _OnHandBadge(productId: p.id, branchId: actor?.branchId ?? ''),
+                          if (p.trackStock) _OnHandBadge(productId: p.id, branchId: actor?.branchId ?? '', unitId: p.unitId),
                           const SizedBox(width: 10),
                           Text(
                             '${(p.sellPrice.amountMinor / 100).toStringAsFixed(2)} ${p.sellPrice.currency}',
@@ -109,18 +109,21 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
 }
 
 class _OnHandBadge extends ConsumerWidget {
-  const _OnHandBadge({required this.productId, required this.branchId});
+  const _OnHandBadge({required this.productId, required this.branchId, required this.unitId});
   final String productId;
   final String branchId;
+  final String unitId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final async = ref.watch(onHandProvider((productId, branchId)));
+    final unit = ref.watch(unitsByIdProvider).value?[unitId];
     return async.maybeWhen(
+      // In the product's unit: 2.500 kg, not 2500.
       data: (n) => Chip(
         visualDensity: VisualDensity.compact,
-        label: Text('${l.onHand}: $n'),
+        label: Text('${l.onHand}: ${unit == null ? '…' : '${formatQuantity(n, unit.decimalPlaces)} ${unit.name}'}'),
       ),
       orElse: () => const SizedBox.shrink(),
     );

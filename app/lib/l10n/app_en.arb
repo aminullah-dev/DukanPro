@@ -131,6 +131,8 @@
   "errBranchLastActive": "You can't deactivate the only active branch.",
   "errUsernameTaken": "This username is already taken.",
   "errGeneric": "Something went wrong. Please try again.",
+  "errUnitUnknown": "This product's unit isn't loaded yet. Sync, then try again.",
+  "editQuantity": "Change quantity",
   "errAmountInvalid": "Enter an amount such as 250 or 250.50.",
   "errQtyInvalid": "Enter a quantity such as 3 or 2.5.",
   "errQtyPrecision": "This unit does not take that many decimal places.",

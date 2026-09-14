@@ -170,20 +170,18 @@ final class LocalCatalog {
   final DriftStockRepository stock;
   final SyncRecorder _rec;
 
-  Future<List<UnitRow>> listUnits({String actorId = 'system', String deviceId = 'app'}) async {
+  /// The units, with the built-in ones seeded on first use. They carry the
+  /// same fixed ids as on the server and every other device, so they are not
+  /// queued for sync and never duplicate.
+  Future<List<UnitRow>> listUnits() async {
     var rows = await (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
     if (rows.isEmpty) {
-      const defaults = [('piece', 0), ('kg', 3), ('litre', 3), ('dozen', 0), ('meter', 2)];
       await _db.transaction(() async {
-        for (final u in defaults) {
-          final id = newId();
+        for (final u in builtInUnits) {
           await _db.into(_db.units).insert(
-                UnitsCompanion.insert(id: id, name: u.$1, decimalPlaces: Value(u.$2)),
+                UnitsCompanion.insert(id: u.id, name: u.name, decimalPlaces: Value(u.decimalPlaces)),
+                mode: InsertMode.insertOrIgnore,
               );
-          await _rec.record(
-            table: 'units', rowId: id, op: 'insert',
-            data: {'name': u.$1, 'decimal_places': u.$2}, actorId: actorId, deviceId: deviceId,
-          );
         }
       });
       rows = await (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();

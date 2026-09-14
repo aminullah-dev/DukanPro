@@ -1,4 +1,5 @@
 import 'package:dukan_core/dukan_core.dart';
+import 'package:dukan_data/dukan_data.dart' show UnitRow;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -61,6 +62,13 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
     }
   }
 
+  UnitRow? _unitOf(List<UnitRow> rows) {
+    for (final u in rows) {
+      if (u.id == widget.product.unitId) return u;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -75,13 +83,9 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),
         data: (unitRows) {
-          var decimalPlaces = 0;
-          for (final u in unitRows) {
-            if (u.id == widget.product.unitId) {
-              decimalPlaces = u.decimalPlaces;
-              break;
-            }
-          }
+          final unit = _unitOf(unitRows);
+          if (unit == null) return Center(child: Text(l.errUnitUnknown));
+          final decimalPlaces = unit.decimalPlaces;
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -89,7 +93,7 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
                 leading: const Icon(Icons.inventory_2_outlined),
                 title: Text(l.onHand),
                 trailing: Text(
-                  onHand.maybeWhen(data: (n) => '$n', orElse: () => '…'),
+                  onHand.maybeWhen(data: (n) => '${formatQuantity(n, decimalPlaces)} ${unit.name}', orElse: () => '…'),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),

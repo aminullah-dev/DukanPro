@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from dukan.domain.sales import line_total_minor
 from dukan.shared.errors import ValidationError
 
 
@@ -46,13 +47,19 @@ def supplier_balance(entries: Iterable[SupplierLedgerEntry]) -> int:
 
 @dataclass(frozen=True, slots=True)
 class ReceiptLine:
+    """qty_minor in the unit's minor granularity (10**decimal_places) at
+    unit_cost_minor per whole unit."""
+
     product_id: str
     qty_minor: int
     unit_cost_minor: int
+    decimal_places: int
 
     @property
     def line_cost(self) -> int:
-        return self.unit_cost_minor * self.qty_minor
+        """Quantity x cost at the unit's scale, ROUND_HALF_UP like a sale line:
+        2.500 kg at 40.00 is 100.00."""
+        return line_total_minor(self.unit_cost_minor, self.qty_minor, self.decimal_places)
 
 
 def assert_receivable(line: ReceiptLine) -> None:

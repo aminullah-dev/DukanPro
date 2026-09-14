@@ -4,9 +4,18 @@ import 'package:dukan_core/dukan_core.dart';
 import '../database.dart';
 
 class TopSeller {
-  const TopSeller(this.name, this.qtyMinor);
+  const TopSeller(this.name, this.qtyMinor, {this.decimalPlaces = 0, this.unitName = '', this.revenueMinor = 0});
   final String name;
   final int qtyMinor;
+  final int decimalPlaces;
+  final String unitName;
+  final int revenueMinor;
+
+  /// The quantity for people: "1.500 kg", not 1500.
+  String get qtyLabel {
+    final qty = formatQuantity(qtyMinor, decimalPlaces);
+    return unitName.isEmpty ? qty : '$qty $unitName';
+  }
 }
 
 /// Read-model projection for the dashboard. Computed from the local ledgers
@@ -26,18 +35,32 @@ class DashboardData {
   final List<TopSeller> topSellers;
 }
 
+int _pow10(int n) {
+  var r = 1;
+  for (var i = 0; i < n; i++) {
+    r *= 10;
+  }
+  return r;
+}
+
 /// Reporting queries over the local database. Reports are projections, not
 /// aggregates — always reconstructable from the ledgers.
 final class LocalReports {
   LocalReports(this._db);
   final AppDatabase _db;
 
+  /// [lowStockThreshold] is in whole units of each product's unit: 5 kg is
+  /// 5000 grams, 5 pieces is 5.
   Future<DashboardData> dashboard(String branchId, {int lowStockThreshold = 5}) async {
     final now = DateTime.now();
     bool isToday(DateTime d) {
       final local = d.toLocal();
       return local.year == now.year && local.month == now.month && local.day == now.day;
     }
+
+    final units = {for (final u in await _db.select(_db.units).get()) u.id: u};
+    final products = await (_db.select(_db.products)..where((t) => t.deletedAt.isNull())).get();
+    final unitOf = {for (final p in products) p.id: units[p.unitId]};
 
     final settled = await (_db.select(_db.sales)
           ..where((t) => t.branchId.equals(branchId) & t.status.equals('settled')))
@@ -48,20 +71,24 @@ final class LocalReports {
 
     final lines = await _db.select(_db.saleLines).get();
     var profit = 0;
-    final sellers = <String, (String, int)>{};
+    final sellers = <String, TopSeller>{};
     for (final ln in lines) {
       if (!todayIds.contains(ln.saleId)) continue;
       final costTotal = lineTotalMinor(ln.unitCostMinor, ln.qtyMinor, ln.decimalPlaces);
       profit += ln.lineTotalMinor - costTotal;
       final prev = sellers[ln.productId];
-      sellers[ln.productId] = (ln.name, (prev?.$2 ?? 0) + ln.qtyMinor);
+      sellers[ln.productId] = TopSeller(
+        ln.name, (prev?.qtyMinor ?? 0) + ln.qtyMinor,
+        decimalPlaces: ln.decimalPlaces,
+        unitName: unitOf[ln.productId]?.name ?? '',
+        revenueMinor: (prev?.revenueMinor ?? 0) + ln.lineTotalMinor,
+      );
     }
 
     final ledger = await (_db.select(_db.customerLedger)..where((t) => t.deletedAt.isNull())).get();
     final debt = ledger.fold<int>(
         0, (sum, e) => sum + (e.type == 'payment' ? -e.amountMinor : e.amountMinor));
 
-    final products = await (_db.select(_db.products)..where((t) => t.deletedAt.isNull())).get();
     final moves = await (_db.select(_db.stockMovements)
           ..where((t) => t.branchId.equals(branchId) & t.deletedAt.isNull()))
         .get();
@@ -71,11 +98,13 @@ final class LocalReports {
     }
     var lowCount = 0;
     for (final p in products) {
-      if (p.trackStock && (onHand[p.id] ?? 0) <= lowStockThreshold) lowCount++;
+      if (!p.trackStock || !p.isActive) continue;
+      final scale = _pow10(units[p.unitId]?.decimalPlaces ?? 0);
+      if ((onHand[p.id] ?? 0) <= lowStockThreshold * scale) lowCount++;
     }
 
-    final top = sellers.entries.map((e) => TopSeller(e.value.$1, e.value.$2)).toList()
-      ..sort((a, b) => b.qtyMinor.compareTo(a.qtyMinor));
+    // Ranked by revenue: 2 kg of rice and 500 soaps are not comparable counts.
+    final top = sellers.values.toList()..sort((a, b) => b.revenueMinor.compareTo(a.revenueMinor));
 
     return DashboardData(
       salesTodayMinor: salesToday,

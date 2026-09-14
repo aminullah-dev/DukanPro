@@ -189,5 +189,11 @@ def dashboard_view_dict(v: DashboardView) -> dict:
         "profit_today_minor": v.profit_today_minor,
         "outstanding_debt_minor": v.outstanding_debt_minor,
         "low_stock_count": v.low_stock_count,
-        "top_sellers": [{"name": t.name, "qty_minor": t.qty_minor} for t in v.top_sellers],
+        "top_sellers": [
+            {
+                "name": t.name, "qty_minor": t.qty_minor, "decimal_places": t.decimal_places,
+                "unit_name": t.unit_name, "revenue_minor": t.revenue_minor,
+            }
+            for t in v.top_sellers
+        ],
     }

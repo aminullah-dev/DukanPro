@@ -101,7 +101,7 @@ def test_every_revision_upgrades_with_rows_in_every_table(empty_database_url: st
     with engine.connect() as conn:
         for table in sorted(seeded):
             count = conn.execute(sa.text(f'SELECT COUNT(*) FROM "{table}"')).scalar_one()
-            assert count == 1, table
+            assert count >= 1, table  # 0011 adds the built-in units
     engine.dispose()
 
 

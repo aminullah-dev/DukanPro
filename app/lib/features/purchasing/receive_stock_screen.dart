@@ -7,7 +7,6 @@ import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
 import '../customers/customers_providers.dart';
-import '../pos/pos_providers.dart';
 
 class ReceiveStockScreen extends ConsumerStatefulWidget {
   const ReceiveStockScreen({super.key});
@@ -42,7 +41,12 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
       return;
     }
     final product = products.firstWhere((p) => p.id == _productId);
-    final dp = ref.read(unitDecimalsProvider).maybeWhen(data: (m) => m[product.unitId] ?? 0, orElse: () => 0);
+    final unit = ref.read(unitsByIdProvider).value?[product.unitId];
+    if (unit == null) {
+      setState(() => _error = l.errUnitUnknown);
+      return;
+    }
+    final dp = unit.decimalPlaces;
     // A cost or a supplier bill needs purchase.cost; without it, or with no cost
     // typed, a receipt only moves stock.
     final canCost = actor.can(Permission.purchaseCost);
@@ -52,6 +56,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
         productId: product.id,
         qtyMinor: quantityToMinor(_qty.text, dp),
         unitCostMinor: canCost ? (amountOrNull(_cost.text) ?? 0) : 0,
+        decimalPlaces: dp,
       );
       assertReceivable(line);
     } on AppError catch (e) {
@@ -83,6 +88,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final productsAsync = ref.watch(productsProvider);
+    ref.watch(unitsByIdProvider); // loaded before the first receipt
     final suppliersAsync = ref.watch(suppliersProvider);
     final canCost = ref.watch(sessionActorProvider)?.can(Permission.purchaseCost) ?? false;
     return Scaffold(

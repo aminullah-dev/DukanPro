@@ -11,7 +11,10 @@ from dukan.domain.identity import User
 @dataclass(frozen=True, slots=True)
 class TopSellerView:
     name: str
-    qty_minor: int
+    qty_minor: int  # in the unit's minor granularity (10**decimal_places)
+    decimal_places: int = 0
+    unit_name: str = ""
+    revenue_minor: int = 0
 
 
 @dataclass(frozen=True, slots=True)

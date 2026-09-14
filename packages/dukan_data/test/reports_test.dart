@@ -44,4 +44,37 @@ void main() {
     expect(d.topSellers.first.name, 'Soap');
     expect(d.topSellers.first.qtyMinor, 3);
   });
+
+  test('low stock counts whole units of active products; top sellers rank by revenue', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+    final catalog = LocalCatalog(db);
+    final sales = LocalSales(db);
+    final reports = LocalReports(db);
+    final units = {for (final u in await catalog.listUnits()) u.name: u.id};
+    final rice = Product(id: newId(), sku: 'R1', name: 'Rice', unitId: units['kg']!, sellPrice: Money(8000, 'AFN'));
+    final soap = Product(id: newId(), sku: 'S1', name: 'Soap', unitId: units['piece']!, sellPrice: Money(5000, 'AFN'));
+    final old = Product(
+      id: newId(), sku: 'O1', name: 'Old', unitId: units['piece']!, sellPrice: Money(100, 'AFN'), isActive: false,
+    );
+    for (final p in [rice, soap, old]) {
+      await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    }
+    await catalog.adjust(productId: rice.id, branchId: 'B1', qtyDelta: 4000, actorId: 'u1', deviceId: 'app');
+    await catalog.adjust(productId: soap.id, branchId: 'B1', qtyDelta: 40, actorId: 'u1', deviceId: 'app');
+    // 1.500 kg of rice (120.00) and 3 soaps (150.00).
+    await sales.settleCash(
+      lines: [
+        SaleLine(productId: rice.id, name: 'Rice', qtyMinor: 1500, decimalPlaces: 3, unitPriceMinor: 8000,
+            unitCostMinor: 0, currency: 'AFN'),
+        SaleLine(productId: soap.id, name: 'Soap', qtyMinor: 3, decimalPlaces: 0, unitPriceMinor: 5000,
+            unitCostMinor: 0, currency: 'AFN'),
+      ],
+      tenderedMinor: 27000, branchId: 'B1', actorId: 'u1', deviceId: 'app',
+    );
+
+    final d = await reports.dashboard('B1');
+    expect(d.lowStockCount, 1); // 2.5 kg of rice; the inactive product does not count
+    expect(d.topSellers.map((s) => (s.name, s.qtyLabel)), [('Soap', '3 piece'), ('Rice', '1.500 kg')]);
+  });
 }

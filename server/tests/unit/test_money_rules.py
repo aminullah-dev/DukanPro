@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 import pytest
 
-from dukan.domain.catalog import assert_price_valid, quantity_to_minor
+from dukan.domain.catalog import BUILTIN_UNITS, assert_price_valid, quantity_to_minor
 from dukan.domain.customers import assert_debt_payment_valid
 from dukan.domain.numbers import NumberProblem, money_to_minor, parse_scaled
 from dukan.domain.purchasing import ReceiptLine, assert_receivable
@@ -113,8 +113,25 @@ def test_debt_payments_receipts_and_prices() -> None:
     assert _code(lambda: assert_debt_payment_valid(amount_minor=0)) == "DEBT_PAYMENT_INVALID"
     assert _code(lambda: assert_debt_payment_valid(amount_minor=-500)) == "DEBT_PAYMENT_INVALID"
     for qty, cost in [(0, 100), (-5, 100), (5, -1)]:
-        line = ReceiptLine(product_id="p", qty_minor=qty, unit_cost_minor=cost)
+        line = ReceiptLine(product_id="p", qty_minor=qty, unit_cost_minor=cost, decimal_places=0)
         assert _code(lambda line=line: assert_receivable(line)) == "GRN_LINE_INVALID"
-    assert_receivable(ReceiptLine(product_id="p", qty_minor=5, unit_cost_minor=0))
+    assert_receivable(ReceiptLine(product_id="p", qty_minor=5, unit_cost_minor=0, decimal_places=0))
     assert _code(lambda: assert_price_valid(sell_price_minor=-1)) == "CATALOG_PRICE_INVALID"
     assert_price_valid(sell_price_minor=0)
+
+
+def test_a_receipt_line_costs_its_weight_not_its_grams() -> None:
+    # The same rows as packages/dukan_core/test/customers_test.dart.
+    piece = ReceiptLine(product_id="p", qty_minor=10, unit_cost_minor=40000, decimal_places=0)
+    rice = ReceiptLine(product_id="p", qty_minor=2500, unit_cost_minor=4000, decimal_places=3)
+    assert (piece.line_cost, rice.line_cost) == (400000, 10000)  # 2.500 kg at 40.00 is 100.00
+
+
+def test_built_in_units_have_the_same_ids_everywhere() -> None:
+    assert {u.name: (u.id, u.decimal_places) for u in BUILTIN_UNITS} == {
+        "piece": ("00000000-0000-7000-8000-000000000001", 0),
+        "kg": ("00000000-0000-7000-8000-000000000002", 3),
+        "litre": ("00000000-0000-7000-8000-000000000003", 3),
+        "dozen": ("00000000-0000-7000-8000-000000000004", 0),
+        "meter": ("00000000-0000-7000-8000-000000000005", 2),
+    }

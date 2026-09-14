@@ -17,6 +17,7 @@ from dukan.infrastructure.db.models import (
     SaleLineModel,
     SaleModel,
     StockMovementModel,
+    UnitModel,
 )
 
 _POLICY = PermissionPolicy()
@@ -42,15 +43,26 @@ class SqlReportsService(ReportsService):
         sales_today = sum(s.total_minor for s in sales)
         today_ids = {s.id for s in sales}
 
+        units = {u.id: u for u in self._s.scalars(select(UnitModel))}
+        products = self._s.scalars(
+            select(ProductModel).where(ProductModel.deleted_at.is_(None))
+        ).all()
+        unit_of = {p.id: units.get(p.unit_id) for p in products}
+
         profit = 0
-        sellers: dict[str, tuple[str, int]] = {}
+        sellers: dict[str, TopSellerView] = {}
         for ln in self._s.scalars(select(SaleLineModel)):
             if ln.sale_id not in today_ids:
                 continue
             cost = line_total_minor(ln.unit_cost_minor, ln.qty_minor, ln.decimal_places)
             profit += ln.line_total_minor - cost
             prev = sellers.get(ln.product_id)
-            sellers[ln.product_id] = (ln.name, (prev[1] if prev else 0) + ln.qty_minor)
+            unit = unit_of.get(ln.product_id)
+            sellers[ln.product_id] = TopSellerView(
+                name=ln.name, qty_minor=(prev.qty_minor if prev else 0) + ln.qty_minor,
+                decimal_places=ln.decimal_places, unit_name=unit.name if unit else "",
+                revenue_minor=(prev.revenue_minor if prev else 0) + ln.line_total_minor,
+            )
 
         ledger = self._s.scalars(
             select(CustomerLedgerModel).where(CustomerLedgerModel.deleted_at.is_(None))
@@ -58,8 +70,8 @@ class SqlReportsService(ReportsService):
         debt = sum(-e.amount_minor if e.type == "payment" else e.amount_minor for e in ledger)
 
         low = 0
-        for p in self._s.scalars(select(ProductModel).where(ProductModel.deleted_at.is_(None))):
-            if not p.track_stock:
+        for p in products:
+            if not p.track_stock or not p.is_active:
                 continue
             on_hand = self._s.scalar(
                 select(func.coalesce(func.sum(StockMovementModel.qty_delta), 0)).where(
@@ -68,14 +80,18 @@ class SqlReportsService(ReportsService):
                     StockMovementModel.deleted_at.is_(None),
                 )
             ) or 0
-            if int(on_hand) <= _LOW_STOCK_THRESHOLD:
+            # The threshold is in whole units: 5 kg is 5000 grams.
+            unit = units.get(p.unit_id)
+            scale = 10 ** (unit.decimal_places if unit else 0)
+            if int(on_hand) <= _LOW_STOCK_THRESHOLD * scale:
                 low += 1
 
-        top = sorted(sellers.values(), key=lambda t: -t[1])[:5]
+        # Ranked by revenue: 2 kg of rice and 500 soaps are not comparable counts.
+        top = sorted(sellers.values(), key=lambda t: -t.revenue_minor)[:5]
         return DashboardView(
             sales_today_minor=sales_today,
             profit_today_minor=profit,
             outstanding_debt_minor=debt,
             low_stock_count=low,
-            top_sellers=tuple(TopSellerView(name=n, qty_minor=q) for n, q in top),
+            top_sellers=tuple(top),
         )

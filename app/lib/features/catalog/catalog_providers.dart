@@ -19,6 +19,13 @@ final unitsProvider = FutureProvider<List<UnitRow>>(
   (ref) => ref.watch(localCatalogProvider).listUnits(),
 );
 
+/// unitId → unit (name, decimal places). Screens watch it, so a quantity is
+/// never read in the wrong unit while the units load.
+final unitsByIdProvider = FutureProvider<Map<String, UnitRow>>((ref) async {
+  final units = await ref.watch(unitsProvider.future);
+  return {for (final u in units) u.id: u};
+});
+
 /// On-hand for a product in a branch: (productId, branchId).
 final onHandProvider = FutureProvider.family<int, (String, String)>(
   (ref, key) => ref.watch(localCatalogProvider).onHand(key.$1, key.$2),

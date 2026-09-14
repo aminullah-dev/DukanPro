@@ -5,6 +5,7 @@
 library;
 
 import '../shared/errors.dart';
+import 'sales.dart' show lineTotalMinor;
 
 enum SupplierEntryType { bill, payment, adjustment }
 
@@ -54,14 +55,23 @@ final class SupplierLedgerEntry {
 int supplierBalance(Iterable<SupplierLedgerEntry> entries) =>
     entries.fold(0, (sum, e) => sum + e.signed);
 
-/// One line of a goods receipt: qty received at a unit cost (minor units).
+/// One line of a goods receipt: [qtyMinor] in the unit's minor granularity
+/// (10^[decimalPlaces]) at [unitCostMinor] per whole unit.
 final class ReceiptLine {
-  const ReceiptLine({required this.productId, required this.qtyMinor, required this.unitCostMinor});
+  const ReceiptLine({
+    required this.productId,
+    required this.qtyMinor,
+    required this.unitCostMinor,
+    required this.decimalPlaces,
+  });
   final String productId;
   final int qtyMinor;
   final int unitCostMinor;
+  final int decimalPlaces;
 
-  int get lineCost => unitCostMinor * qtyMinor;
+  /// Quantity × cost at the unit's scale, ROUND_HALF_UP like a sale line: 2.500
+  /// kg at 40.00 is 100.00.
+  int get lineCost => lineTotalMinor(unitCostMinor, qtyMinor, decimalPlaces);
 }
 
 /// A received line adds a positive quantity at a cost of zero or more (zero: a

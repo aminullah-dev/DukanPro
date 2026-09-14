@@ -431,6 +431,13 @@ class AppLocalizationsPs extends AppLocalizations {
   String get errGeneric => 'یوه ستونزه رامنځته شوه. بیا هڅه وکړئ.';
 
   @override
+  String get errUnitUnknown =>
+      'د دې توکي واحد لا نه دی راغلی. همغږي یې کړئ، بیا هڅه وکړئ.';
+
+  @override
+  String get editQuantity => 'مقدار بدلول';
+
+  @override
   String get errAmountInvalid => 'مبلغ لکه ۲۵۰ یا ۲۵۰٫۵۰ ولیکئ.';
 
   @override

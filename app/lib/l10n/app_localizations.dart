@@ -839,6 +839,18 @@ abstract class AppLocalizations {
   /// **'Something went wrong. Please try again.'**
   String get errGeneric;
 
+  /// No description provided for @errUnitUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'This product\'s unit isn\'t loaded yet. Sync, then try again.'**
+  String get errUnitUnknown;
+
+  /// No description provided for @editQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Change quantity'**
+  String get editQuantity;
+
   /// No description provided for @errAmountInvalid.
   ///
   /// In en, this message translates to:

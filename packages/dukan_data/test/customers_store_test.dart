@@ -63,7 +63,7 @@ void main() {
     await purchasing.createSupplier(s, actorId: 'u1', deviceId: 'app');
     await purchasing.receiveGoods(
       supplierId: s.id,
-      lines: [ReceiptLine(productId: p.id, qtyMinor: 10, unitCostMinor: 40000)],
+      lines: [ReceiptLine(productId: p.id, qtyMinor: 10, unitCostMinor: 40000, decimalPlaces: 0)],
       branchId: 'B1', actorId: 'u1', deviceId: 'app',
     );
     expect(await catalog.onHand(p.id, 'B1'), 10);
@@ -78,7 +78,7 @@ void main() {
     await purchasing.createSupplier(s, actorId: 'u1', deviceId: 'app');
     await purchasing.receiveGoods(
       supplierId: s.id,
-      lines: [ReceiptLine(productId: p.id, qtyMinor: 5, unitCostMinor: 0)],
+      lines: [ReceiptLine(productId: p.id, qtyMinor: 5, unitCostMinor: 0, decimalPlaces: 0)],
       branchId: 'B1', actorId: 'u1', deviceId: 'app',
     );
     expect(await catalog.onHand(p.id, 'B1'), 5);
@@ -110,7 +110,7 @@ void main() {
     );
     await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
     await purchasing.receiveGoods(
-      lines: [ReceiptLine(productId: p.id, qtyMinor: 3, unitCostMinor: 0)],
+      lines: [ReceiptLine(productId: p.id, qtyMinor: 3, unitCostMinor: 0, decimalPlaces: 0)],
       branchId: 'B1', actorId: 'u1', deviceId: 'app',
     );
     expect(await catalog.onHand(p.id, 'B1'), 3);
@@ -138,7 +138,7 @@ void main() {
     );
     await expectLater(
       purchasing.receiveGoods(
-        lines: [ReceiptLine(productId: p.id, qtyMinor: -5, unitCostMinor: 100)],
+        lines: [ReceiptLine(productId: p.id, qtyMinor: -5, unitCostMinor: 100, decimalPlaces: 0)],
         branchId: 'B1', actorId: 'u1', deviceId: 'app',
       ),
       code('GRN_LINE_INVALID'),
@@ -151,5 +151,20 @@ void main() {
       code('CATALOG_PRICE_INVALID'),
     );
     expect((await DriftSyncOutbox(db).pending()).length, before);
+  });
+
+  test('a kg receipt bills the supplier for the weight, not the grams', () async {
+    final units = {for (final u in await catalog.listUnits()) u.name: u.id};
+    final p = Product(id: newId(), sku: 'RICE', name: 'Rice', unitId: units['kg']!, sellPrice: Money(8000, 'AFN'));
+    await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    final s = Supplier(id: newId(), name: 'Wholesaler');
+    await purchasing.createSupplier(s, actorId: 'u1', deviceId: 'app');
+    await purchasing.receiveGoods(
+      supplierId: s.id,
+      lines: [ReceiptLine(productId: p.id, qtyMinor: 2500, unitCostMinor: 4000, decimalPlaces: 3)],
+      branchId: 'B1', actorId: 'u1', deviceId: 'app',
+    );
+    expect(await catalog.onHand(p.id, 'B1'), 2500);
+    expect(await purchasing.supplierBalance(s.id), 10000); // 2.500 kg at 40.00 is 100.00
   });
 }

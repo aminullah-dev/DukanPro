@@ -65,7 +65,7 @@ class DashboardScreen extends ConsumerWidget {
                   dense: true,
                   leading: const Icon(Icons.star_outline),
                   title: Text(s.name),
-                  trailing: Text('${s.qtyMinor}'),
+                  trailing: Text(s.qtyLabel),
                 ),
           ],
         ),

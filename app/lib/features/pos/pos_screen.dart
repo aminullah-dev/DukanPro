@@ -25,8 +25,23 @@ class PosScreen extends ConsumerStatefulWidget {
 class _PosScreenState extends ConsumerState<PosScreen> {
   String _query = '';
 
-  int _dpFor(Product p) =>
-      ref.read(unitDecimalsProvider).maybeWhen(data: (m) => m[p.unitId] ?? 0, orElse: () => 0);
+  /// Adds [p] in its unit. While the units are not loaded, or the product's
+  /// unit is missing, nothing is added and the cashier is told why, rather than
+  /// selling kilograms as whole pieces.
+  void _add(Product p) {
+    final unit = ref.read(unitsByIdProvider).value?[p.unitId];
+    if (unit == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).errUnitUnknown)));
+      return;
+    }
+    ref.read(posCartProvider.notifier).add(p, unit.decimalPlaces, unitName: unit.name);
+  }
+
+  Future<void> _editQty(int i, CartLine line) async {
+    final qty = await showDialog<int>(context: context, builder: (_) => _QtyDialog(line: line));
+    if (qty != null) ref.read(posCartProvider.notifier).setQty(i, qty);
+  }
 
   Future<void> _charge(int total) async {
     final actor = ref.read(sessionActorProvider);
@@ -70,7 +85,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   Future<void> _addByBarcode(String code) async {
     final p = await ref.read(localCatalogProvider).products.findByBarcode(code.trim());
-    if (p != null) ref.read(posCartProvider.notifier).add(p, _dpFor(p));
+    if (p != null && mounted) _add(p);
   }
 
   @override
@@ -84,6 +99,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     });
     final productsAsync = ref.watch(productsProvider);
     final cart = ref.watch(posCartProvider);
+    ref.watch(unitsByIdProvider); // loaded before the first tap
     final total = cart.fold<int>(0, (s, l) => s + l.lineTotal);
 
     return Scaffold(
@@ -106,7 +122,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     onChanged: (v) => setState(() => _query = v),
                     onSubmitted: (code) async {
                       final p = await ref.read(localCatalogProvider).products.findByBarcode(code.trim());
-                      if (p != null) ref.read(posCartProvider.notifier).add(p, _dpFor(p));
+                      if (p != null && mounted) _add(p);
                     },
                   ),
                 ),
@@ -130,7 +146,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           return Card(
                             clipBehavior: Clip.antiAlias,
                             child: InkWell(
-                              onTap: canSell ? () => ref.read(posCartProvider.notifier).add(p, _dpFor(p)) : null,
+                              onTap: canSell ? () => _add(p) : null,
                               child: Padding(
                                 padding: const EdgeInsets.all(10),
                                 child: Column(
@@ -179,7 +195,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => ref.read(posCartProvider.notifier).dec(i)),
-                                  Text(line.qtyLabel),
+                                  TextButton(onPressed: () => _editQty(i, line), child: Text(line.qtyLabel)),
                                   IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => ref.read(posCartProvider.notifier).inc(i)),
                                 ],
                               ),
@@ -410,6 +426,59 @@ class _ReceiptDialog extends ConsumerWidget {
           label: Text(l.printReceipt),
         ),
         FilledButton(onPressed: () => Navigator.pop(context), child: Text(l.newSale)),
+      ],
+    );
+  }
+}
+
+/// Type a cart line's quantity, e.g. 0.750 kg of sugar, in Persian or Latin
+/// digits.
+class _QtyDialog extends StatefulWidget {
+  const _QtyDialog({required this.line});
+  final CartLine line;
+  @override
+  State<_QtyDialog> createState() => _QtyDialogState();
+}
+
+class _QtyDialogState extends State<_QtyDialog> {
+  late final _qty =
+      TextEditingController(text: formatQuantity(widget.line.qtyMinor, widget.line.decimalPlaces));
+  String? _error;
+
+  @override
+  void dispose() {
+    _qty.dispose();
+    super.dispose();
+  }
+
+  void _save(AppLocalizations l) {
+    try {
+      final qty = quantityToMinor(_qty.text, widget.line.decimalPlaces);
+      if (qty <= 0) {
+        setState(() => _error = l.errMustBePositive);
+        return;
+      }
+      Navigator.pop(context, qty);
+    } on AppError catch (e) {
+      setState(() => _error = numberErrorText(l, e) ?? l.errQtyInvalid);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text('${l.editQuantity} · ${widget.line.product.name}'),
+      content: TextField(
+        controller: _qty,
+        autofocus: true,
+        keyboardType: TextInputType.numberWithOptions(decimal: widget.line.decimalPlaces > 0),
+        decoration: InputDecoration(suffixText: widget.line.unitName, errorText: _error),
+        onSubmitted: (_) => _save(l),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        FilledButton(onPressed: () => _save(l), child: Text(l.save)),
       ],
     );
   }

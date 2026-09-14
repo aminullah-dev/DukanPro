@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from dukan.application.auth import AuthService
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens, BranchRole
 from dukan.config import Settings
+from dukan.domain.catalog import BUILTIN_UNITS
 from dukan.domain.identity import (
     BUILTIN_ROLE_PERMISSIONS,
     BranchAssignment,
@@ -29,6 +30,7 @@ from dukan.infrastructure.db.models import (
     BranchModel,
     RoleModel,
     SessionModel,
+    UnitModel,
     UserModel,
 )
 from dukan.infrastructure.security import passwords, tokens
@@ -132,6 +134,11 @@ class SqlAuthService(AuthService):
         assert_password_strong(password=password)
         for name, perms in BUILTIN_ROLE_PERMISSIONS.items():
             self._s.add(RoleModel(id=new_id(), name=name, permissions=[p.value for p in perms]))
+        for unit in BUILTIN_UNITS:  # the same ids as on every device
+            if self._s.get(UnitModel, unit.id) is None:
+                self._s.add(
+                    UnitModel(id=unit.id, name=unit.name, decimal_places=unit.decimal_places)
+                )
         branch = BranchModel(id=new_id(), name=shop_name)
         self._s.add(branch)
         owner = UserModel(

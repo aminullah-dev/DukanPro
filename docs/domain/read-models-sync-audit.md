@@ -64,3 +64,8 @@ Offline ledger entries still apply when they break a limit that would be enforce
 ## Sync class
 
 Audit: **append-only ledger**, synced up to the server, never edited. Outbox: client-local, consumed by sync.
+
+## Quantities in reports
+
+- Low stock counts active, stock-tracked products at or below 5 whole units of their unit (5 kg is 5000 g).
+- Top sellers rank by revenue, since 2 kg of rice and 500 soaps are not comparable counts. Each carries its quantity with the unit's decimal places and name, and shows as "1.500 kg".

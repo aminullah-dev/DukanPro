@@ -434,6 +434,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errGeneric => 'Something went wrong. Please try again.';
 
   @override
+  String get errUnitUnknown =>
+      'This product\'s unit isn\'t loaded yet. Sync, then try again.';
+
+  @override
+  String get editQuantity => 'Change quantity';
+
+  @override
   String get errAmountInvalid => 'Enter an amount such as 250 or 250.50.';
 
   @override

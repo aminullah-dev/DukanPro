@@ -20,6 +20,18 @@ class Unit:
     decimal_places: int
 
 
+# The units every shop starts with. Their ids are the same on the server and on
+# every device (packages/dukan_core/lib/domain/catalog.dart builtInUnits), so
+# seeding them again never makes a second "kg".
+BUILTIN_UNITS: tuple[Unit, ...] = (
+    Unit(id="00000000-0000-7000-8000-000000000001", name="piece", decimal_places=0),
+    Unit(id="00000000-0000-7000-8000-000000000002", name="kg", decimal_places=3),
+    Unit(id="00000000-0000-7000-8000-000000000003", name="litre", decimal_places=3),
+    Unit(id="00000000-0000-7000-8000-000000000004", name="dozen", decimal_places=0),
+    Unit(id="00000000-0000-7000-8000-000000000005", name="meter", decimal_places=2),
+)
+
+
 @dataclass(frozen=True, slots=True)
 class Category:
     id: str

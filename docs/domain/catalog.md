@@ -20,6 +20,13 @@
 4. Deactivating a product (`is_active=false`) hides it from new sales but never deletes history (soft delete / flag).
 5. Selling price below cost is **allowed but flagged** (owner may sell at loss); it raises no error, but the sale records the margin for reporting.
 
+## Built-in units
+
+`piece` (0 decimal places), `kg` (3), `litre` (3), `dozen` (0) and `meter` (2) have fixed ids, the same on the server and on every device (`builtInUnits` / `BUILTIN_UNITS`).
+- The server seeds them at bootstrap and in migration 0011. A device seeds them on first use and does not sync them. Reading units never writes.
+- Custom units are ordinary synced rows.
+- A quantity is always read in its product's unit. A screen that cannot find the unit says so (it never assumes 0 decimal places), and the server answers `UNIT_NOT_FOUND`.
+
 ## Error codes
 
 | Code | When |

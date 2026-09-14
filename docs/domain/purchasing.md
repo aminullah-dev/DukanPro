@@ -36,6 +36,7 @@
 
 | Case | Given | Action | Expect |
 |---|---|---|---|
+| fractional receipt | kg unit (3 decimal places), cost 40.00 per kg | receive 2.500 kg | bill 100.00, not 100,000.00 (qty × cost at the unit's scale, half-up) |
 | receipt adds stock | PO line qty 10 @ cost 40 | receive 10 | stock +10, cost valuation updated |
 | over-receipt | ordered 10, received 8 | receive 5 | `PO_OVER_RECEIPT` (ordered 10, received 8) |
 | partial then full | ordered 10 | receive 6 then 4 | status partially_received → received |

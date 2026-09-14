@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../composition.dart';
 import '../auth/providers.dart';
-import '../catalog/catalog_providers.dart';
 import '../auth/session.dart';
 
 final localSalesProvider = Provider<LocalSales>((ref) => LocalSales(ref.watch(databaseProvider)));
@@ -13,12 +12,6 @@ final localSalesProvider = Provider<LocalSales>((ref) => LocalSales(ref.watch(da
 /// Hardware barcode scans (keyboard-wedge). POS listens and adds the matching
 /// product to the cart hands-free.
 final posScanProvider = StreamProvider<ScanEvent>((ref) => ref.watch(scannerProvider).scans());
-
-/// unitId → decimalPlaces, for converting cart counts to minor units.
-final unitDecimalsProvider = FutureProvider<Map<String, int>>((ref) async {
-  final units = await ref.watch(unitsProvider.future);
-  return {for (final u in units) u.id: u.decimalPlaces};
-});
 
 int _pow10(int n) {
   var r = 1;
@@ -29,16 +22,29 @@ int _pow10(int n) {
 }
 
 class CartLine {
-  const CartLine({required this.product, required this.qtyMinor, required this.decimalPlaces});
+  const CartLine({
+    required this.product,
+    required this.qtyMinor,
+    required this.decimalPlaces,
+    this.unitName = '',
+  });
   final Product product;
   final int qtyMinor;
   final int decimalPlaces;
+  final String unitName;
 
   int get lineTotal => lineTotalMinor(product.sellPrice.amountMinor, qtyMinor, decimalPlaces);
-  String get qtyLabel => formatQuantity(qtyMinor, decimalPlaces);
 
-  CartLine copyWith({int? qtyMinor}) =>
-      CartLine(product: product, qtyMinor: qtyMinor ?? this.qtyMinor, decimalPlaces: decimalPlaces);
+  /// "1.500 kg"; just the number when the unit has no name.
+  String get qtyLabel {
+    final qty = formatQuantity(qtyMinor, decimalPlaces);
+    return unitName.isEmpty ? qty : '$qty $unitName';
+  }
+
+  CartLine copyWith({int? qtyMinor}) => CartLine(
+        product: product, qtyMinor: qtyMinor ?? this.qtyMinor, decimalPlaces: decimalPlaces,
+        unitName: unitName,
+      );
 }
 
 class PosCart extends Notifier<List<CartLine>> {
@@ -48,7 +54,8 @@ class PosCart extends Notifier<List<CartLine>> {
     return const [];
   }
 
-  void add(Product product, int decimalPlaces) {
+  /// One more whole unit of [product] (1 piece, 1 kg), in its unit.
+  void add(Product product, int decimalPlaces, {String unitName = ''}) {
     final step = _pow10(decimalPlaces);
     final idx = state.indexWhere((l) => l.product.id == product.id);
     if (idx >= 0) {
@@ -56,7 +63,10 @@ class PosCart extends Notifier<List<CartLine>> {
       next[idx] = next[idx].copyWith(qtyMinor: next[idx].qtyMinor + step);
       state = next;
     } else {
-      state = [...state, CartLine(product: product, qtyMinor: step, decimalPlaces: decimalPlaces)];
+      state = [
+        ...state,
+        CartLine(product: product, qtyMinor: step, decimalPlaces: decimalPlaces, unitName: unitName),
+      ];
     }
   }
 
@@ -75,6 +85,17 @@ class PosCart extends Notifier<List<CartLine>> {
       next.removeAt(i);
     } else {
       next[i] = l.copyWith(qtyMinor: q);
+    }
+    state = next;
+  }
+
+  /// A quantity typed for line [i], e.g. 0.750 kg of sugar. Zero removes it.
+  void setQty(int i, int qtyMinor) {
+    final next = [...state];
+    if (qtyMinor <= 0) {
+      next.removeAt(i);
+    } else {
+      next[i] = next[i].copyWith(qtyMinor: qtyMinor);
     }
     state = next;
   }

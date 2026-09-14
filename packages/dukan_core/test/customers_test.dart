@@ -39,7 +39,9 @@ void main() {
   });
 
   test('receipt line cost', () {
-    expect(const ReceiptLine(productId: 'p', qtyMinor: 10, unitCostMinor: 40000).lineCost, 400000);
+    expect(const ReceiptLine(productId: 'p', qtyMinor: 10, unitCostMinor: 40000, decimalPlaces: 0).lineCost, 400000);
+    // 2.500 kg at 40.00 AFN/kg is a 100.00 AFN bill (server/tests/unit/test_money_rules.py).
+    expect(const ReceiptLine(productId: 'p', qtyMinor: 2500, unitCostMinor: 4000, decimalPlaces: 3).lineCost, 10000);
   });
 
   test('a debt payment is a positive amount', () {

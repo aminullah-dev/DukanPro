@@ -72,8 +72,11 @@ class SqlSalesService(SalesService):
         return f"INV-{year}-{count + 1:05d}"
 
     def _decimal_places(self, unit_id: str) -> int:
+        # Never 0 by default: 1.5 kg would be priced as 1500 whole kg.
         u = self._s.get(UnitModel, unit_id)
-        return u.decimal_places if u else 0
+        if u is None or u.deleted_at is not None:
+            raise ValidationError("UNIT_NOT_FOUND", unit_id=unit_id)
+        return u.decimal_places
 
     def _customer_balance(self, customer_id: str) -> int:
         rows = self._s.scalars(
