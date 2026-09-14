@@ -53,9 +53,9 @@ Future<void> main() async {
       scannerProvider.overrideWithValue(KeyboardWedgeScanner()),
     ],
   );
-  // A background request that finds the session over sends the app to sign-in.
-  refresher.onSessionEnded =
-      (code) => unawaited(container.read(authControllerProvider.notifier).sessionEnded(code));
+  // A background request that finds its session over ends it (see AuthController.sessionEnded).
+  refresher.onSessionEnded = (code, epoch) =>
+      unawaited(container.read(authControllerProvider.notifier).sessionEnded(code, epoch: epoch));
 
   runApp(UncontrolledProviderScope(container: container, child: const DukanProApp()));
 }

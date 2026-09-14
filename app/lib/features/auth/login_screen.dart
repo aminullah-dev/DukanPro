@@ -35,18 +35,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _busy = true);
     final controller = ref.read(authControllerProvider.notifier);
     final username = _username.text.trim();
-    if (_setup) {
-      await controller.bootstrap(
-        username: username,
-        password: _password.text,
-        displayName: _displayName.text.trim().isEmpty ? username : _displayName.text.trim(),
-        shopName: _shopName.text.trim().isEmpty ? 'My Shop' : _shopName.text.trim(),
-        setupCode: _setupCode.text.trim(),
-      );
-    } else {
-      await controller.loginOnline(username: username, password: _password.text);
+    try {
+      if (_setup) {
+        await controller.bootstrap(
+          username: username,
+          password: _password.text,
+          displayName: _displayName.text.trim().isEmpty ? username : _displayName.text.trim(),
+          shopName: _shopName.text.trim().isEmpty ? 'My Shop' : _shopName.text.trim(),
+          setupCode: _setupCode.text.trim(),
+        );
+      } else {
+        await controller.loginOnline(username: username, password: _password.text);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    if (mounted) setState(() => _busy = false);
   }
 
   void _toggleMode() {

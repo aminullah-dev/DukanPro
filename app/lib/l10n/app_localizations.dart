@@ -653,6 +653,12 @@ abstract class AppLocalizations {
   /// **'This total is too large to record. Check the quantity and price.'**
   String get errTotalTooLarge;
 
+  /// No description provided for @errSessionEndedUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session ended. Enter your password: the app keeps working offline and signs in again when it is online.'**
+  String get errSessionEndedUnlock;
+
   /// No description provided for @errSessionEnded.
   ///
   /// In en, this message translates to:

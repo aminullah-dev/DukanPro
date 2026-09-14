@@ -338,6 +338,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This total is too large to record. Check the quantity and price.';
 
   @override
+  String get errSessionEndedUnlock =>
+      'Your session ended. Enter your password: the app keeps working offline and signs in again when it is online.';
+
+  @override
   String get errSessionEnded =>
       'Your access has changed or ended. Sign in again.';
 

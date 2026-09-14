@@ -196,7 +196,8 @@ void main() {
 
   test('a session that ended renews with the password used to unlock', () async {
     final api = FakeAuthApi();
-    final c = makeContainer(FakeSecureStore(), api: api);
+    final store = FakeSecureStore();
+    final c = makeContainer(store, api: api);
     final controller = c.read(authControllerProvider.notifier);
     await controller.loginOnline(username: 'owner', password: 'correct');
     controller.lock();
@@ -207,23 +208,38 @@ void main() {
     expect(c.read(authControllerProvider), isA<AuthLoggedIn>());
     expect(api.loginCalls, 2);
 
-    // Reset on the server: the old password no longer signs in.
+    // Reset on the server: the old password no longer signs in, and nothing is
+    // left on the device to unlock with.
     api
       ..password = 'changed-by-owner'
       ..meErrors.add('SESSION_REVOKED');
     await controller.revalidate(password: 'correct');
-    expect((c.read(authControllerProvider) as AuthLoggedOut).error, 'SESSION_REVOKED');
+    expect((c.read(authControllerProvider) as AuthLoggedOut).error, 'INVALID_CREDENTIALS');
+    expect(await store.read(SecureKeys.passwordVerifier), isNull);
   });
 
-  test('without a password (PIN, fingerprint) an ended session needs an online sign-in', () async {
+  test('without a password (PIN, fingerprint) an ended session asks for the password', () async {
     final api = FakeAuthApi();
-    final c = makeContainer(FakeSecureStore(), api: api);
+    final store = FakeSecureStore();
+    final c = makeContainer(store, api: api);
     final controller = c.read(authControllerProvider.notifier);
     await controller.loginOnline(username: 'owner', password: 'correct');
+    await controller.setPin('1234');
     api.meErrors.add('REFRESH_INVALID');
     await controller.revalidate();
-    expect((c.read(authControllerProvider) as AuthLoggedOut).error, 'REFRESH_INVALID');
+    // Only the session ended: the till keeps its user and password, so it still
+    // unlocks offline, and that password signs in again once online.
+    expect((c.read(authControllerProvider) as AuthLocked).error, 'REFRESH_INVALID');
     expect(api.loginCalls, 1);
+    expect(await store.read(SecureKeys.refreshToken), isNull);
+    expect(await store.read(SecureKeys.passwordVerifier), isNotNull);
+    await controller.unlockWithPin('1234'); // a quick unlock cannot sign in again
+    expect((c.read(authControllerProvider) as AuthLocked).error, 'PASSWORD_REQUIRED');
+    await controller.unlockWithPassword('correct');
+    await controller.revalidate(password: 'correct');
+    expect(c.read(authControllerProvider), isA<AuthLoggedIn>());
+    expect(api.loginCalls, 2);
+    expect(await store.read(SecureKeys.refreshToken), 'r1');
   });
 
   test('sign-out does not wait for the server', () async {

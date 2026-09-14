@@ -336,6 +336,10 @@ class AppLocalizationsPs extends AppLocalizations {
       'دا ټولټال د ثبتولو لپاره ډېر لوی دی. شمېر او بیه وګورئ.';
 
   @override
+  String get errSessionEndedUnlock =>
+      'ستاسو ناسته پای ته ورسېده. خپل پټنوم ولیکئ: اپ له انټرنېټ پرته هم کار کوي او کله چې آنلاین شي بیا ننوځي.';
+
+  @override
   String get errSessionEnded =>
       'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
 

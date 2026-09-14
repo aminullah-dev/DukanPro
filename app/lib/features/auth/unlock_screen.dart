@@ -44,8 +44,11 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
     final controller = ref.read(authControllerProvider.notifier);
     final password = _secret.text;
     setState(() => _busy = true);
-    await controller.unlockWithPassword(password);
-    if (mounted) setState(() => _busy = false);
+    try {
+      await controller.unlockWithPassword(password);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
     // Once unlocked, confirm the user with the server if it is reachable; a
     // session that simply ended renews with this password.
     unawaited(controller.revalidate(password: password));
@@ -85,7 +88,12 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
               ),
               if (error != null) ...[
                 const SizedBox(height: 12),
-                Text(l.wrongSecret, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  // A wrong password, or a session the server ended: then the
+                  // password is what signs in again.
+                  error == 'WRONG_SECRET' ? l.wrongSecret : l.errSessionEndedUnlock,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: 20),
               FilledButton(

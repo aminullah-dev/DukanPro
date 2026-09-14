@@ -339,6 +339,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'این مجموع برای ثبت بیش از حد بزرگ است. تعداد و قیمت را بررسی کنید.';
 
   @override
+  String get errSessionEndedUnlock =>
+      'نشست شما پایان یافت. رمز عبور خود را وارد کنید: برنامه بدون اینترنت هم کار می‌کند و وقتی آنلاین شد دوباره وارد می‌شود.';
+
+  @override
   String get errSessionEnded =>
       'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
 
@@ -902,6 +906,10 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String get errTotalTooLarge =>
       'این مجموع برای ثبت بیش از حد بزرگ است. تعداد و قیمت را بررسی کنید.';
+
+  @override
+  String get errSessionEndedUnlock =>
+      'نشست شما پایان یافت. رمز عبور خود را وارد کنید: برنامه بدون اینترنت هم کار می‌کند و وقتی آنلاین شد دوباره وارد می‌شود.';
 
   @override
   String get errSessionEnded =>

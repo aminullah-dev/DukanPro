@@ -69,7 +69,11 @@ class AuthApiException implements Exception {
 
 /// Could not reach the server (the caller may fall back to offline unlock).
 class NetworkException implements Exception {
-  const NetworkException();
+  const NetworkException({this.maybeDelivered = false});
+
+  /// The request may have reached the server before the connection failed (no
+  /// answer in time): what it asked for may have happened.
+  final bool maybeDelivered;
 }
 
 abstract interface class AuthApi {
@@ -112,7 +116,12 @@ class DioAuthApi implements AuthApi {
         final err = (data['error'] as Map).cast<String, dynamic>();
         throw AuthApiException((err['code'] as String?) ?? 'UNKNOWN', statusCode: e.response?.statusCode);
       }
-      throw const NetworkException();
+      throw NetworkException(
+        maybeDelivered: switch (e.type) {
+          DioExceptionType.sendTimeout || DioExceptionType.receiveTimeout || DioExceptionType.unknown => true,
+          _ => false,
+        },
+      );
     }
   }
 

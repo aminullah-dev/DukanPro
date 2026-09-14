@@ -24,11 +24,19 @@ class AuthController extends Notifier<AuthState> {
   /// How far the clock may step back (a time sync) before it counts as set back.
   static const clockSkew = Duration(minutes: 5);
 
+  /// Answers that end the account on this device, not only its session: the
+  /// account is disabled, or the password the device keeps is no longer its own.
+  static const _accountEnded = {'USER_DISABLED', 'INVALID_CREDENTIALS'};
+
+  /// A revalidation that may sign in again with the unlock password.
+  Future<void>? _revalidating;
+
   @override
   AuthState build() => const AuthUnknown();
 
   SecureStore get _store => ref.read(secureStoreProvider);
   AuthApi get _api => ref.read(authApiProvider);
+  TokenRefresher get _refresher => ref.read(tokenRefresherProvider);
   PasswordVerifier get _verifier => ref.read(verifierProvider);
   DateTime _now() => ref.read(clockProvider)().toUtc();
   ProfileStore get _profiles => ProfileStore(ref.read(databaseProvider));
@@ -68,7 +76,16 @@ class AuthController extends Notifier<AuthState> {
       state = AuthLoggedOut(error: e.code, returnTo: returnTo);
     } on NetworkException {
       state = AuthLoggedOut(error: 'NETWORK', returnTo: returnTo);
+    } catch (e, st) {
+      state = AuthLoggedOut(error: _notSaved(e, st), returnTo: returnTo);
     }
+  }
+
+  /// The server answered, but the device could not keep the sign-in (a locked
+  /// keychain, a failing database): say so rather than leave a spinner.
+  String _notSaved(Object e, StackTrace st) {
+    developer.log('sign-in could not be saved', name: 'auth', error: e, stackTrace: st);
+    return 'STORAGE_UNAVAILABLE';
   }
 
   Future<void> bootstrap({
@@ -93,6 +110,8 @@ class AuthController extends Notifier<AuthState> {
       state = AuthLoggedOut(error: e.code);
     } on NetworkException {
       state = const AuthLoggedOut(error: 'NETWORK');
+    } catch (e, st) {
+      state = AuthLoggedOut(error: _notSaved(e, st));
     }
   }
 
@@ -104,7 +123,18 @@ class AuthController extends Notifier<AuthState> {
   Future<void> unlockWithPassword(String password) =>
       _unlock(SecureKeys.passwordVerifier, password);
 
-  Future<void> unlockWithPin(String pin) => _unlock(SecureKeys.pinVerifier, pin);
+  /// A quick unlock needs a live session: once the server has ended it, only
+  /// the password unlocks, because only the password can sign in again.
+  Future<void> unlockWithPin(String pin) async {
+    if (!await _hasSession()) {
+      final profile = await _profiles.current();
+      state = profile == null ? const AuthLoggedOut() : AuthLocked(profile, error: 'PASSWORD_REQUIRED');
+      return;
+    }
+    await _unlock(SecureKeys.pinVerifier, pin);
+  }
+
+  Future<bool> _hasSession() async => await _store.read(SecureKeys.refreshToken) != null;
 
   Future<void> _unlock(String key, String secret) async {
     final profile = await _profiles.current();
@@ -162,9 +192,13 @@ class AuthController extends Notifier<AuthState> {
     return true;
   }
 
+  /// Whether the fingerprint may unlock: the cached user opted in, and (as for
+  /// a PIN) the session is live.
   Future<bool> biometricEnabled() async {
     final profile = await _profiles.current();
-    return profile != null && await _store.read(SecureKeys.biometricUser) == profile.userId;
+    return profile != null &&
+        await _store.read(SecureKeys.biometricUser) == profile.userId &&
+        await _hasSession();
   }
 
   /// Opt in to biometric unlock, confirmed with the app password.
@@ -204,9 +238,19 @@ class AuthController extends Notifier<AuthState> {
   /// Offline, nothing changes. After a password unlock, pass that [password]:
   /// a session that simply ended (expired or revoked) then renews by signing in
   /// again with it.
-  Future<void> revalidate({String? password}) async {
+  Future<void> revalidate({String? password}) {
+    if (password == null) return _revalidate(null);
+    // Meanwhile, a request that finds the old session over waits for this
+    // (see sessionEnded).
+    return _revalidating ??= _revalidate(password).whenComplete(() => _revalidating = null);
+  }
+
+  Future<void> _revalidate(String? password) async {
     if (state is! AuthLoggedIn) return;
     try {
+      // The server ended this session earlier (see _end): only the password
+      // signs in again.
+      if (!await _hasSession()) throw const AuthApiException('REFRESH_INVALID');
       final profile = await _me();
       await _saveProfile(profile);
       await _markValidated();
@@ -217,9 +261,11 @@ class AuthController extends Notifier<AuthState> {
       final failed = password == null || e.code == 'USER_DISABLED'
           ? e.code
           : await _signInAgain(password, ended: e.code);
-      if (failed != null) await sessionEnded(failed);
+      if (failed != null) await _end(failed);
     } on NetworkException {
       // Offline: keep working from the cache.
+    } on StaleSessionException {
+      // Signed out, or another user signed in, meanwhile: nothing to confirm.
     }
   }
 
@@ -238,7 +284,7 @@ class AuthController extends Notifier<AuthState> {
       if (saved != null && state is AuthLoggedIn) state = AuthLoggedIn(saved);
       return saved == null ? ended : null;
     } on AuthApiException catch (e) {
-      return e.code == 'USER_DISABLED' ? e.code : ended;
+      return _accountEnded.contains(e.code) ? e.code : ended;
     } on NetworkException {
       return ended;
     }
@@ -255,17 +301,48 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  /// The server no longer accepts this session or account: wipe the saved
-  /// sign-in and ask for an online sign-in. Safe to call more than once.
-  Future<void> sessionEnded(String code) async {
+  /// A request found its session over (from the [TokenRefresher], with the
+  /// session it was sent in). While the unlock password may be signing in again,
+  /// that decides: an answer meant for the session it replaced is dropped. Safe
+  /// to call more than once.
+  Future<void> sessionEnded(String code, {int? epoch}) async {
+    final pending = _revalidating;
+    if (pending != null) {
+      try {
+        await pending;
+      } catch (_) {
+        // Its outcome is in the state; this answer still counts below.
+      }
+    }
+    if (epoch != null && epoch != _refresher.epoch) return;
+    await _end(code);
+  }
+
+  /// Ends the saved session. When only the session ended (expired, revoked, a
+  /// token rotated out), the account may be fine: the device keeps the user and
+  /// the password, so the till still unlocks offline within its window, and the
+  /// next password unlock signs in again. When the account ended, or the
+  /// password is no longer its own, nothing is left to unlock with.
+  Future<void> _end(String code) async {
     final s = state;
     if (s is AuthLoggedOut || s is AuthUnknown) return;
-    await _forget();
-    state = AuthLoggedOut(error: code);
+    final profile = await _profiles.current();
+    final keepsPassword = await _store.read(SecureKeys.passwordVerifier) != null;
+    if (_accountEnded.contains(code) || profile == null || !keepsPassword) {
+      await _forget();
+      state = AuthLoggedOut(error: code);
+      return;
+    }
+    await _refresher.newSession(() async {
+      await _store.delete(SecureKeys.refreshToken);
+      await _store.delete(SecureKeys.accessToken);
+    });
+    state = AuthLocked(profile, error: code);
   }
 
   /// Sign out: wipe the device first, then tell the server best-effort, so a
-  /// bad connection never keeps the app signed in.
+  /// bad connection never keeps the app signed in. The server ends the session
+  /// with this token, or with the one a renewal still in flight rotates it to.
   Future<void> logout() async {
     final refresh = await _store.read(SecureKeys.refreshToken);
     await _forget();
@@ -276,17 +353,19 @@ class AuthController extends Notifier<AuthState> {
   /// Remove every trace of the signed-in user from this device. The outbox
   /// stays: it syncs when its recorder signs in again.
   Future<void> _forget() async {
-    for (final k in [
-      SecureKeys.refreshToken,
-      SecureKeys.accessToken,
-      SecureKeys.passwordVerifier,
-      SecureKeys.pinVerifier,
-      SecureKeys.biometricUser,
-      SecureKeys.validatedAt,
-      SecureKeys.lastSeenAt,
-    ]) {
-      await _store.delete(k);
-    }
+    await _refresher.newSession(() async {
+      for (final k in [
+        SecureKeys.refreshToken,
+        SecureKeys.accessToken,
+        SecureKeys.passwordVerifier,
+        SecureKeys.pinVerifier,
+        SecureKeys.biometricUser,
+        SecureKeys.validatedAt,
+        SecureKeys.lastSeenAt,
+      ]) {
+        await _store.delete(k);
+      }
+    });
     await _profiles.clear();
   }
 
@@ -297,8 +376,10 @@ class AuthController extends Notifier<AuthState> {
       await _store.delete(SecureKeys.pinVerifier);
       await _store.delete(SecureKeys.biometricUser);
     }
-    await _store.write(SecureKeys.refreshToken, res.tokens.refreshToken);
-    await _store.write(SecureKeys.accessToken, res.tokens.accessToken);
+    await _refresher.newSession(() async {
+      await _store.write(SecureKeys.refreshToken, res.tokens.refreshToken);
+      await _store.write(SecureKeys.accessToken, res.tokens.accessToken);
+    });
     await _store.write(SecureKeys.passwordVerifier, await _verifier.derive(password));
     await _markValidated();
     await _saveProfile(res.user);

@@ -99,6 +99,7 @@
   "errOfflineExpired": "This device has been offline too long. Sign in online.",
   "errStorage": "This device's secure storage could not be read. Sign in again; if it keeps happening, restart the device.",
   "errTotalTooLarge": "This total is too large to record. Check the quantity and price.",
+  "errSessionEndedUnlock": "Your session ended. Enter your password: the app keeps working offline and signs in again when it is online.",
   "errSessionEnded": "Your access has changed or ended. Sign in again.",
   "biometricUnlockSetting": "Unlock with fingerprint",
   "confirmPasswordTitle": "Confirm your password",

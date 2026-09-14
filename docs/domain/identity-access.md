@@ -66,12 +66,15 @@ The server is authoritative; the device keeps just enough to work offline.
 - **One cached profile.** It is the server's answer for the one signed-in user, replaced (never merged) at every sign-in and revalidation.
 - **Revalidation.** After each unlock, when the server is reachable, the app re-reads `/auth/me`, refreshing the access token once if it expired.
   - New roles take effect at once.
-  - `USER_DISABLED`, `SESSION_REVOKED`, `REFRESH_INVALID` or `TOKEN_INVALID` wipe the saved sign-in and require an online sign-in.
+  - `USER_DISABLED`, or a password the server no longer takes when signing in again (`INVALID_CREDENTIALS`), wipes the saved sign-in and requires an online sign-in.
+  - `SESSION_REVOKED`, `REFRESH_INVALID` or `TOKEN_INVALID` end only the session: the tokens go, the user and the password stay, and the app returns to the lock screen. The password still unlocks offline within the offline window and signs in again once online; a PIN or fingerprint waits for that sign-in.
 - **Token renewal.** Every API client shares one refresher. A 401 `TOKEN_EXPIRED` renews the access token once (requests that fail together share the renewal) and retries the request.
-  - An answer that the session or account is over sends the app to sign-in; it is never shown as "offline".
-  - After a password unlock, a session that simply ended renews by signing in again with that password. After a PIN or fingerprint unlock it needs an online sign-in.
+  - An answer that the session or account is over ends it as above; it is never shown as "offline".
+  - After a password unlock, a session that ended renews by signing in again with that password. A request that meets the ended session meanwhile waits for that sign-in instead of undoing it.
+  - Each sign-in and sign-out starts a new session on the device. An answer to a request made in an earlier one (a renewed token, "account disabled") is dropped. Token writes run one at a time, so a renewal never writes back after a sign-out or over another user's sign-in.
+  - A refresh whose answer never came is asked for again at once: the server may have rotated the token already, and takes the old one back only within 60 seconds.
   - Requests time out (10 s to connect, 30 s to send or receive). Sign-out wipes the device first and tells the server best-effort.
-  - If secure storage cannot be read at startup, the sign-in screen says so (`STORAGE_UNAVAILABLE`) instead of an endless spinner.
+  - If secure storage cannot be read at startup, or a sign-in cannot be saved, the sign-in screen says so (`STORAGE_UNAVAILABLE`) instead of an endless spinner.
 - **Offline window.** Offline unlock works for 30 days after the server last confirmed the user, then fails with `OFFLINE_EXPIRED`.
   - The device remembers the latest time it has seen. A clock set back more than 5 minutes behind it also fails with `OFFLINE_EXPIRED`, so winding the clock back cannot keep the window open.
 - **Lock.** There is a Lock action, and the app locks itself when it goes to the background or sits idle for 10 minutes.

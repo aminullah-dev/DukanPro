@@ -61,7 +61,7 @@ void main() {
     await store.write(SecureKeys.refreshToken, 'r1');
     auth = _SlowAuth();
     ended = [];
-    final refresher = TokenRefresher(store: store, api: auth)..onSessionEnded = ended.add;
+    final refresher = TokenRefresher(store: store, api: auth)..onSessionEnded = (code, _) => ended.add(code);
     server = _Api();
     dio = authedDio('http://api.test', store: store, refresher: refresher)..httpClientAdapter = server;
   });
