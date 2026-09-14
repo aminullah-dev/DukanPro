@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from dukan.application.purchasing import PurchasingService, ReceiptLineInput
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_current_actor, get_purchasing_service
+from dukan.ui.fields import Id, Int32, Str32, Str128
 from dukan.ui.serializers import goods_receipt_view_dict, supplier_view_dict
 
 router = APIRouter(tags=["purchasing"])
@@ -20,18 +21,18 @@ BranchHeader = Annotated[str | None, Header()]
 
 
 class CreateSupplierRequest(BaseModel):
-    name: str
-    phone: str | None = None
+    name: Str128
+    phone: Str32 | None = None
 
 
 class ReceiptLineReq(BaseModel):
-    product_id: str
-    qty_minor: int
-    unit_cost_minor: int
+    product_id: Id
+    qty_minor: Int32
+    unit_cost_minor: Int32
 
 
 class ReceiveGoodsRequest(BaseModel):
-    supplier_id: str | None = None
+    supplier_id: Id | None = None
     lines: list[ReceiptLineReq]
 
 

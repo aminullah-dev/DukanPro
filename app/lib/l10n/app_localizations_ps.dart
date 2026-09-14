@@ -271,6 +271,17 @@ class AppLocalizationsPs extends AppLocalizations {
   }
 
   @override
+  String syncRejected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count بدلونونه د سرور له خوا رد شول',
+      one: '۱ بدلون د سرور له خوا رد شو',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String lastSyncedAt(String time) {
     return 'وروستۍ همغږي $time';
   }

@@ -241,6 +241,10 @@ class ProcessedOpModel(Base):
     __tablename__ = "processed_ops"
     op_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     result: Mapped[str] = mapped_column(String(12))
+    code: Mapped[str | None] = mapped_column(String(64), default=None)
+    server_seq: Mapped[int | None] = mapped_column(Integer, default=None)
+    actor_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    device_id: Mapped[str | None] = mapped_column(String(128), default=None)
     applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -253,6 +257,7 @@ class ChangeLogModel(Base):
     row_id: Mapped[str] = mapped_column(String(36))
     op: Mapped[str] = mapped_column(String(8))
     data: Mapped[dict] = mapped_column(JSON)
+    branch_id: Mapped[str | None] = mapped_column(String(36), default=None)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

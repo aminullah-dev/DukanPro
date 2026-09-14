@@ -75,14 +75,17 @@ class FakeAuthApi implements AuthApi {
   Future<ApiProfile> me(String accessToken) async => _profile('owner');
 }
 
-/// In-memory [SyncClient]: records pushed ops (all applied) and pulls nothing.
+/// In-memory [SyncClient]: records pushed ops and pulls nothing. Every op is
+/// applied unless [outcome] decides otherwise.
 class FakeSyncClient implements SyncClient {
+  FakeSyncClient({this.outcome});
+  final PushResult Function(OutboxOp op)? outcome;
   final List<OutboxOp> pushed = [];
 
   @override
   Future<List<PushResult>> push(List<OutboxOp> ops) async {
     pushed.addAll(ops);
-    return [for (final o in ops) PushResult(o.opId, OpOutcome.applied)];
+    return [for (final o in ops) outcome?.call(o) ?? PushResult(o.opId, OpOutcome.applied)];
   }
 
   @override

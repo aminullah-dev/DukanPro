@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:dukan_core/dukan_core.dart' show systemActorId;
 import 'package:dukan_sync/dukan_sync.dart';
 
 import '../database.dart';
@@ -9,6 +10,21 @@ String _s(Object? v) => v as String? ?? '';
 String? _sN(Object? v) => v as String?;
 bool _b(Object? v, {bool fallback = false}) => v as bool? ?? fallback;
 
+/// A pulled value, or absent when the server omitted the key (a field hidden
+/// from the pulling user, e.g. cost): the upsert then keeps the local value.
+Value<T> _opt<T>(Map<String, Object?> d, String key, T Function(Object?) read) =>
+    d.containsKey(key) ? Value(read(d[key])) : Value<T>.absent();
+
+/// Rejections the server does not record against the op, because they depend on
+/// state that can change: a parent row still queued by another user, a role
+/// granted later, an op pushed under another user's token, an unexpected server
+/// error. Nothing was applied, so the op stays pending and is re-sent on the
+/// next sync. Mirrors `is_cacheable` in server/dukan/application/sync_policy.py.
+bool _retryable(String? code) =>
+    code != null && (code.endsWith('_NOT_FOUND') || _retryableCodes.contains(code));
+
+const _retryableCodes = {'ACCESS_DENIED', 'SYNC_ACTOR_MISMATCH', 'BRANCH_REQUIRED', 'ROW_INVALID'};
+
 /// Drains the outbox to the server and applies server changes back — the
 /// offline-first sync loop. See docs/sync-protocol.md.
 final class SyncEngine {
@@ -17,14 +33,21 @@ final class SyncEngine {
   final SyncClient _client;
   final String deviceId;
 
-  Future<void> syncNow() async {
-    await pushPending();
-    await pullSince();
+  /// Pull pages per sync at most; the next sync resumes from the saved cursor.
+  static const maxPullPages = 50;
+
+  /// Pushes then pulls as [actorId], the signed-in user. Null pushes every
+  /// pending op and pulls through one device-wide cursor.
+  Future<void> syncNow({String? actorId}) async {
+    await pushPending(actorId: actorId);
+    await pullSince(actorId: actorId);
   }
 
   Future<int> pendingCount() => _countByStatus('pending');
 
   Future<int> conflictCount() => _countByStatus('conflict');
+
+  Future<int> rejectedCount() => _countByStatus('rejected');
 
   Future<int> _countByStatus(String status) async {
     final c = _db.outboxEntries.id.count();
@@ -35,9 +58,15 @@ final class SyncEngine {
     return row.read(c) ?? 0;
   }
 
-  Future<void> pushPending() async {
+  /// Pushes, in local_seq order, the pending ops [actorId] recorded plus the
+  /// system seeds. The server applies an op only under the token of the user
+  /// who recorded it, so another user's ops wait for that user's own sync.
+  Future<void> pushPending({String? actorId}) async {
     final outbox = DriftSyncOutbox(_db);
-    final pending = await outbox.pending();
+    final pending = [
+      for (final o in await outbox.pending())
+        if (actorId == null || o.actorId == actorId || o.actorId == systemActorId) o,
+    ];
     if (pending.isEmpty) return;
     final results = await _client.push(pending);
     for (final r in results) {
@@ -47,36 +76,46 @@ final class SyncEngine {
         case OpOutcome.conflict:
           await _setStatus(r.opId, 'conflict');
         case OpOutcome.rejected:
-          await _setStatus(r.opId, 'rejected');
+          if (!_retryable(r.code)) await _setStatus(r.opId, 'rejected');
       }
     }
   }
 
-  Future<void> pullSince() async {
-    final since = await _lastPulled();
-    final result = await _client.pull(sinceWatermark: since);
-    await _db.transaction(() async {
-      for (final change in result.changed) {
-        await _apply(
-          _s(change['table']),
-          _s(change['row_id']),
-          _s(change['op']),
-          (change['data'] as Map).cast<String, Object?>(),
-        );
-      }
-    });
-    await _setLastPulled(result.watermark);
+  /// Pulls every page since [actorId]'s cursor. The server returns only the rows
+  /// that user may read and moves the watermark past the rest, so each user
+  /// keeps their own cursor: a row hidden from one user still reaches this
+  /// device when another user syncs on it. A user's first cursor starts from
+  /// the device-wide one (pulls made before per-user cursors were unscoped).
+  Future<void> pullSince({String? actorId}) async {
+    final cursor = actorId == null ? deviceId : '$deviceId/$actorId';
+    var since = await _lastPulled(cursor) ?? await _lastPulled(deviceId) ?? 0;
+    for (var page = 0; page < maxPullPages; page++) {
+      final result = await _client.pull(sinceWatermark: since);
+      await _db.transaction(() async {
+        for (final change in result.changed) {
+          await _apply(
+            _s(change['table']),
+            _s(change['row_id']),
+            _s(change['op']),
+            (change['data'] as Map).cast<String, Object?>(),
+          );
+        }
+        if (result.watermark > since) await _setLastPulled(cursor, result.watermark);
+      });
+      if (result.watermark <= since) break; // caught up
+      since = result.watermark;
+    }
   }
 
-  Future<int> _lastPulled() async {
-    final row = await (_db.select(_db.syncStates)..where((t) => t.deviceId.equals(deviceId)))
+  Future<int?> _lastPulled(String cursor) async {
+    final row = await (_db.select(_db.syncStates)..where((t) => t.deviceId.equals(cursor)))
         .getSingleOrNull();
-    return row?.lastPulledSeq ?? 0;
+    return row?.lastPulledSeq;
   }
 
-  Future<void> _setLastPulled(int seq) async {
+  Future<void> _setLastPulled(String cursor, int seq) async {
     await _db.into(_db.syncStates).insertOnConflictUpdate(
-          SyncStatesCompanion.insert(deviceId: deviceId, lastPulledSeq: Value(seq)),
+          SyncStatesCompanion.insert(deviceId: cursor, lastPulledSeq: Value(seq)),
         );
   }
 
@@ -94,6 +133,9 @@ final class SyncEngine {
             sellPriceMinor: Value(_i(d['sell_price_minor'])),
             sellCurrency: Value(_s(d['sell_currency'])),
             isActive: Value(_b(d['is_active'], fallback: true)),
+            // The post-image carries the server's new version, so the next local
+            // edit sends a base_version the server's compare-and-set accepts.
+            version: _opt(d, 'version', _i),
           ));
         } else {
           await _db.into(_db.products).insertOnConflictUpdate(ProductsCompanion.insert(
@@ -101,9 +143,10 @@ final class SyncEngine {
             categoryId: Value(_sN(d['category_id'])),
             sellPriceMinor: Value(_i(d['sell_price_minor'])),
             sellCurrency: Value(_s(d['sell_currency'])),
-            costMinor: Value(_iN(d['cost_minor'])), costCurrency: Value(_sN(d['cost_currency'])),
+            costMinor: _opt(d, 'cost_minor', _iN), costCurrency: _opt(d, 'cost_currency', _sN),
             trackStock: Value(_b(d['track_stock'], fallback: true)),
             isActive: Value(_b(d['is_active'], fallback: true)),
+            version: _opt(d, 'version', _i),
           ));
         }
       case 'barcodes':
@@ -133,7 +176,7 @@ final class SyncEngine {
         await _db.into(_db.saleLines).insertOnConflictUpdate(SaleLinesCompanion.insert(
           id: id, saleId: _s(d['sale_id']), productId: _s(d['product_id']), name: _s(d['name']),
           qtyMinor: _i(d['qty_minor']), decimalPlaces: Value(_i(d['decimal_places'])),
-          unitPriceMinor: _i(d['unit_price_minor']), unitCostMinor: Value(_i(d['unit_cost_minor'])),
+          unitPriceMinor: _i(d['unit_price_minor']), unitCostMinor: _opt(d, 'unit_cost_minor', _i),
           lineTotalMinor: _i(d['line_total_minor']), currency: Value(_s(d['currency'])),
         ));
       case 'payments':

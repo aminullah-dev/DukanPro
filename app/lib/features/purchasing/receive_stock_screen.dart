@@ -44,7 +44,14 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
       setState(() => _error = 'QTY');
       return;
     }
-    final costMinor = ((double.tryParse(_cost.text) ?? 0) * 100).round();
+    final cost = double.tryParse(_cost.text) ?? 0;
+    // A receipt adds stock at a cost: the server rejects a zero or negative
+    // quantity and a negative cost, so the device must not record one.
+    if (qtyMinor <= 0 || !cost.isFinite || cost < 0) {
+      setState(() => _error = 'QTY');
+      return;
+    }
+    final costMinor = (cost * 100).round();
     setState(() {
       _busy = true;
       _error = null;

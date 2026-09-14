@@ -68,6 +68,10 @@ final class OutboxOp {
   final OutboxStatus status;
 }
 
+/// The [OutboxOp.actorId] of automatic device writes no user performed (the
+/// unit seed, `LocalCatalog.listUnits`): whoever syncs next may push them.
+const systemActorId = 'system';
+
 /// The client-side operation queue port.
 abstract interface class SyncOutbox {
   Future<void> enqueue(OutboxOp op);

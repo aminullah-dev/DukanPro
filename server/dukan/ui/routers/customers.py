@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from dukan.application.customers import CustomerService
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_current_actor, get_customer_service
+from dukan.ui.fields import Int32, Str32, Str128
 from dukan.ui.serializers import customer_view_dict
 
 router = APIRouter(tags=["customers"])
@@ -20,13 +21,13 @@ BranchHeader = Annotated[str | None, Header()]
 
 
 class CreateCustomerRequest(BaseModel):
-    name: str
-    phone: str | None = None
-    credit_limit_minor: int | None = None
+    name: Str128
+    phone: Str32 | None = None
+    credit_limit_minor: Int32 | None = None
 
 
 class PaymentRequest(BaseModel):
-    amount_minor: int
+    amount_minor: Int32
 
 
 @router.get("/customers")

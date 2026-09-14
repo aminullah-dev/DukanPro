@@ -149,7 +149,9 @@ final class LocalPurchasing {
           'product_id': l.productId, 'branch_id': branchId, 'qty_delta': l.qtyMinor, 'reason': 'purchase',
         }, actorId: actorId, deviceId: deviceId);
       }
-      if (supplierId != null) {
+      // A zero-cost receipt owes the supplier nothing (and the server rejects a
+      // zero bill), so it only moves stock.
+      if (supplierId != null && total > 0) {
         final ledgerId = newId();
         await _db.into(_db.supplierLedger).insert(SupplierLedgerCompanion.insert(
               id: ledgerId, supplierId: supplierId, type: 'bill', amountMinor: total,

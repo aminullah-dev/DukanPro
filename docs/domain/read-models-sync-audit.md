@@ -36,6 +36,22 @@ An audit entry is **not a log line** — it is an append-only business record, i
 
 **Written in the same transaction** as any change to money, stock quantity, pricing, permissions, license state, or deletion. An audit trail that can be missing when the write succeeded is worse than none, because it will be trusted.
 
+**Sync writes are audited too.** Every op `/sync/push` applies writes one entry in the same transaction:
+- `origin` is `sync`.
+- `actor_id` / `actor_role` are the pushing user and their role in the row's branch.
+- `after` carries a `_sync` block `{op_id, device_id, branch_id, recorded_by, recorded_at}`. `recorded_at` is the device's outbox time, kept for information only.
+
+The actions are:
+- `product.created`, `product.updated`, `product.price_changed`, `product.deactivated`
+- `barcode.added`, `unit.created`, `customer.created`, `supplier.created`
+- `stock.adjusted`, `stock.received`, `stock.sold`
+- `sale.settled`, `sale.line_added`, `payment.recorded`
+- `debt.charge_posted`, which flags `over_credit_limit`
+- `debt.payment_recorded`, which flags `overpaid`
+- `supplier.bill_posted`
+
+Offline ledger entries still apply when they break a limit that would be enforced online; the flag is what the owner reviews. See [`../sync-protocol.md`](../sync-protocol.md).
+
 ## Test table (audit)
 
 | Case | Given | Action | Expect |

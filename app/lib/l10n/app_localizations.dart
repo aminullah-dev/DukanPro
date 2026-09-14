@@ -563,6 +563,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 item needs review} other{{count} items need review}}'**
   String syncConflicts(int count);
 
+  /// No description provided for @syncRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 change was rejected by the server} other{{count} changes were rejected by the server}}'**
+  String syncRejected(int count);
+
   /// No description provided for @lastSyncedAt.
   ///
   /// In en, this message translates to:

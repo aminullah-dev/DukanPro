@@ -16,6 +16,10 @@ class OpInput:
     op: str  # insert | update
     data: dict[str, Any]
     base_version: int | None = None
+    # Device-recorded actor + time from the client outbox. A claim, never trusted
+    # for attribution: an op is applied only when actor_id equals the pusher.
+    actor_id: str | None = None
+    created_at: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +46,8 @@ class PullResult:
 
 
 class SyncService(Protocol):
-    def push(self, *, actor: User, device_id: str, ops: list[OpInput]) -> list[OpResult]: ...
+    def push(
+        self, *, actor: User, device_id: str, branch_id: str | None, ops: list[OpInput]
+    ) -> list[OpResult]: ...
 
-    def pull(self, *, since: int, limit: int) -> PullResult: ...
+    def pull(self, *, actor: User, since: int, limit: int) -> PullResult: ...

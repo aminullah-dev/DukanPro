@@ -101,6 +101,8 @@ final class LocalSales {
             ));
         await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
           'product_id': l.productId, 'branch_id': branchId, 'qty_delta': -l.qtyMinor, 'reason': 'sale',
+          // The server accepts a sale movement only against the sale it belongs to.
+          'ref_type': 'sale', 'ref_id': saleId,
         }, actorId: actorId, deviceId: deviceId);
       }
       if (paid > 0) {

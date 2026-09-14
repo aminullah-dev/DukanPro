@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../composition.dart';
 import '../../infrastructure/auth_api.dart' show NetworkException;
 import '../auth/providers.dart';
+import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
 import '../customers/customers_providers.dart';
 import '../dashboard/dashboard_screen.dart' show dashboardProvider;
@@ -23,12 +24,14 @@ class SyncStatus {
   const SyncStatus({
     this.pending = 0,
     this.conflicts = 0,
+    this.rejected = 0,
     this.syncing = false,
     this.lastSyncedAt,
     this.failed = false,
   });
   final int pending;
   final int conflicts;
+  final int rejected; // ops the server refused: their local effect is not on the server
   final bool syncing;
   final DateTime? lastSyncedAt;
   final bool failed;
@@ -36,6 +39,7 @@ class SyncStatus {
   SyncStatus copyWith({
     int? pending,
     int? conflicts,
+    int? rejected,
     bool? syncing,
     DateTime? lastSyncedAt,
     bool? failed,
@@ -43,6 +47,7 @@ class SyncStatus {
       SyncStatus(
         pending: pending ?? this.pending,
         conflicts: conflicts ?? this.conflicts,
+        rejected: rejected ?? this.rejected,
         syncing: syncing ?? this.syncing,
         lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
         failed: failed ?? this.failed,
@@ -63,14 +68,17 @@ class SyncController extends Notifier<SyncStatus> {
   Future<void> refreshPending() async {
     final pending = await _engine.pendingCount();
     final conflicts = await _engine.conflictCount();
-    state = state.copyWith(pending: pending, conflicts: conflicts);
+    final rejected = await _engine.rejectedCount();
+    state = state.copyWith(pending: pending, conflicts: conflicts, rejected: rejected);
   }
 
   Future<void> syncNow() async {
     if (state.syncing) return;
     state = state.copyWith(syncing: true, failed: false);
     try {
-      await _engine.syncNow();
+      // As the signed-in user: the server applies an op only under the token of
+      // the user who recorded it, and each user pulls through their own scope.
+      await _engine.syncNow(actorId: ref.read(sessionActorProvider)?.user.id);
       state = state.copyWith(syncing: false, lastSyncedAt: DateTime.now(), failed: false);
       _refreshReadModels();
     } on NetworkException {

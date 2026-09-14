@@ -124,13 +124,18 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
         FilledButton(
           onPressed: () {
-            if (_name.text.trim().isEmpty) return;
+            // Bounds mirror the server's columns so a saved customer is never
+            // rejected at sync: name ≤ 128, phone ≤ 32, credit limit ≥ 0.
+            final name = _name.text.trim();
+            final phone = _phone.text.trim();
             final limit = double.tryParse(_limit.text);
+            if (name.isEmpty || name.length > 128 || phone.length > 32) return;
+            if (limit != null && (!limit.isFinite || limit < 0)) return;
             Navigator.pop(
               context,
               Customer(
-                id: newId(), name: _name.text.trim(),
-                phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+                id: newId(), name: name,
+                phone: phone.isEmpty ? null : phone,
                 creditLimitMinor: limit == null ? null : (limit * 100).round(),
               ),
             );
@@ -181,7 +186,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
         FilledButton(
           onPressed: () {
             final v = double.tryParse(_amount.text);
-            if (v == null || v <= 0) return;
+            if (v == null || !v.isFinite || v <= 0) return;
             Navigator.pop(context, (v * 100).round());
           },
           child: Text(l.save),

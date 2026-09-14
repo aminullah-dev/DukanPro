@@ -246,7 +246,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -277,8 +277,36 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             await m.createTable(appSettings);
           }
+          if (from < 7) {
+            await _refLegacySaleMovements();
+          }
         },
       );
+
+  /// Sale stock movements the app recorded before v7 carry no ref to their
+  /// sale, and the hardened server rejects them (docs/sync-protocol.md,
+  /// "Rollout"). LocalSales.settle records a sale's ops contiguously in one
+  /// transaction, so a movement's sale is the nearest earlier `sales` op in the
+  /// same branch. Ops already sent are left as they are.
+  Future<void> _refLegacySaleMovements() async {
+    final ops = await (select(outboxEntries)..orderBy([(t) => OrderingTerm(expression: t.localSeq)])).get();
+    String? saleId;
+    String? saleBranch;
+    for (final op in ops) {
+      if (op.aggregateType == 'sales') {
+        saleId = op.aggregateId;
+        saleBranch = (jsonDecode(op.payload) as Map<String, Object?>)['branch_id'] as String?;
+        continue;
+      }
+      if (op.aggregateType != 'stock_movements' || op.status != OutboxStatus.pending.name) continue;
+      final data = jsonDecode(op.payload) as Map<String, Object?>;
+      if (data['reason'] != 'sale' || data['ref_id'] != null) continue;
+      if (saleId == null || data['branch_id'] != saleBranch) continue;
+      await (update(outboxEntries)..where((t) => t.id.equals(op.id))).write(OutboxEntriesCompanion(
+        payload: Value(jsonEncode({...data, 'ref_type': 'sale', 'ref_id': saleId})),
+      ));
+    }
+  }
 }
 
 /// Drift-backed implementation of the dukan_core [SyncOutbox] port.

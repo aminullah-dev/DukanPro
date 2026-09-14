@@ -6,6 +6,19 @@ import '../../l10n/app_localizations.dart';
 import '../auth/session.dart';
 import 'catalog_providers.dart';
 
+// Field bounds mirror the server's columns (docs/sync-protocol.md, "Push
+// validation"), so a product saved here is never rejected at sync.
+
+String? _requiredText(String? v, int maxLength) {
+  final t = (v ?? '').trim();
+  return (t.isEmpty || t.length > maxLength) ? '' : null;
+}
+
+String? _nonNegativeAmount(String? v) {
+  final amount = double.tryParse(v ?? '');
+  return (amount == null || !amount.isFinite || amount < 0) ? '' : null;
+}
+
 class ProductEditScreen extends ConsumerStatefulWidget {
   const ProductEditScreen({super.key, this.product});
   final Product? product;
@@ -113,14 +126,14 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                 TextFormField(
                   controller: _name,
                   decoration: InputDecoration(labelText: l.productName, border: const OutlineInputBorder()),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? '' : null,
+                  validator: (v) => _requiredText(v, 200),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _sku,
                   readOnly: !_isNew,
                   decoration: InputDecoration(labelText: l.sku, border: const OutlineInputBorder()),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? '' : null,
+                  validator: (v) => _requiredText(v, 64),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -134,13 +147,14 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                   controller: _price,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(labelText: l.price, suffixText: 'AFN', border: const OutlineInputBorder()),
-                  validator: (v) => double.tryParse(v ?? '') == null ? '' : null,
+                  validator: _nonNegativeAmount,
                 ),
                 const SizedBox(height: 12),
                 if (_isNew)
                   TextFormField(
                     controller: _barcode,
                     decoration: InputDecoration(labelText: l.barcodeLabel, border: const OutlineInputBorder()),
+                    validator: (v) => (v ?? '').trim().length > 64 ? '' : null,
                   ),
                 const SizedBox(height: 4),
                 SwitchListTile(

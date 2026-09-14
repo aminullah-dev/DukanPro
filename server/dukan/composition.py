@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterator
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from dukan.application.audit import AuditService
@@ -173,6 +174,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(
             status_code=exc.http_status,
             content={"error": {"code": exc.code, "context": exc.context}},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def _request_validation_handler(
+        _request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        fields = [".".join(str(p) for p in e.get("loc", ())) for e in exc.errors()]
+        return JSONResponse(
+            status_code=422,
+            content={"error": {"code": "REQUEST_INVALID", "context": {"fields": fields[:20]}}},
         )
 
     @app.middleware("http")

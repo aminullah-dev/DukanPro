@@ -1,0 +1,908 @@
+"""Sync apply policy: the application-layer gate every pushed op passes before
+infrastructure writes it (docs/sync-protocol.md, "Push validation").
+
+Per op it validates the envelope; cleans `data` against a strict per-table
+allow-list (types, lengths, ranges, enums, currency; server-owned columns are
+never accepted); authorizes the AUTHENTICATED pushing actor in the row's branch
+(branch rows) or the active branch (shop-wide rows); checks parents and domain
+invariants; and returns an ApplyPlan: the exact column values to write plus the
+audit intent. Pure: domain + shared + the access guard only. Lookups go through
+the SyncReader port, implemented in infrastructure.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Protocol
+
+from dukan.application.access import require_permission
+from dukan.application.sync import OpInput
+from dukan.domain.customers import (
+    LedgerEntryType,
+    assert_not_overpaid,
+    assert_within_credit_limit,
+)
+from dukan.domain.identity import Permission, PermissionPolicy, User
+from dukan.domain.inventory import StockReason, adjust_stock
+from dukan.domain.purchasing import SupplierEntryType
+from dukan.domain.sales import PaymentMethod, line_total_minor
+from dukan.shared.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
+from dukan.shared.limits import INT32_MAX, INT32_MIN
+
+POLICY = PermissionPolicy()
+PULL_LIMIT_MAX = 1000
+DEFAULT_CURRENCY = "AFN"
+
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+_CURRENCY = re.compile(r"[A-Z]{3}")
+
+MASTER_TABLES = frozenset({"products", "barcodes", "customers", "suppliers", "units", "categories"})
+LEDGER_TABLES = frozenset(
+    {"stock_movements", "sales", "sale_lines", "payments", "customer_ledger", "supplier_ledger"}
+)
+SYNC_TABLES = MASTER_TABLES | LEDGER_TABLES
+
+# RecordMixin columns: always server-owned, never taken from a pushed payload.
+SERVER_OWNED = frozenset(
+    {"id", "created_at", "updated_at", "deleted_at", "created_by", "updated_by", "version"}
+)
+
+# Business columns per table (+ `version` on master rows): the post-image written
+# to change_log, and the only keys a pull ever returns.
+READ_FIELDS: dict[str, tuple[str, ...]] = {
+    "products": (
+        "sku", "name", "unit_id", "category_id", "sell_price_minor", "sell_currency",
+        "cost_minor", "cost_currency", "track_stock", "is_active", "version",
+    ),
+    "barcodes": ("product_id", "code", "symbology", "version"),
+    "units": ("name", "decimal_places", "version"),
+    "categories": ("name", "parent_id", "version"),
+    "customers": ("name", "phone", "credit_limit_minor", "currency", "is_active", "version"),
+    "suppliers": ("name", "phone", "currency", "is_active", "version"),
+    "stock_movements": (
+        "product_id", "branch_id", "qty_delta", "reason", "ref_type", "ref_id", "occurred_at",
+    ),
+    "sales": (
+        "number", "branch_id", "shift_id", "customer_id", "status", "currency",
+        "discount_minor", "subtotal_minor", "tax_minor", "total_minor", "paid_minor",
+        "change_minor", "occurred_at",
+    ),
+    "sale_lines": (
+        "sale_id", "product_id", "name", "qty_minor", "decimal_places", "unit_price_minor",
+        "unit_cost_minor", "line_total_minor", "currency",
+    ),
+    "payments": (
+        "sale_id", "method", "amount_minor", "currency", "tendered_minor", "change_minor",
+    ),
+    "customer_ledger": (
+        "customer_id", "type", "amount_minor", "currency", "ref_type", "ref_id", "occurred_at",
+    ),
+    "supplier_ledger": (
+        "supplier_id", "type", "amount_minor", "currency", "ref_type", "ref_id", "occurred_at",
+    ),
+}
+
+# The fixed unit seed every fresh device records on first use (LocalCatalog.listUnits).
+CANONICAL_UNITS = frozenset({("piece", 0), ("kg", 3), ("litre", 3), ("dozen", 0), ("meter", 2)})
+
+
+class SyncConflict(ConflictError):
+    """Concurrency conflict on a master row (stale base_version, or an insert on a
+    row that already exists): the `conflict` outcome. Every other AppError raised
+    while planning an op is the `rejected` outcome."""
+
+
+def is_uuid(value: object) -> bool:
+    """Canonical lowercase 36-char UUID (any version: tests and legacy data use v4)."""
+    return isinstance(value, str) and _UUID.fullmatch(value) is not None
+
+
+# ── Per-table allow-lists ────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class _Field:
+    kind: str  # str | int | bool | uuid | currency | enum | null
+    required: bool = False  # insert: must be present; str: must be non-blank when present
+    nullable: bool = False
+    max_len: int = 0
+    lo: int = INT32_MIN
+    hi: int = INT32_MAX
+    choices: frozenset[str] = frozenset()
+
+
+def _str(max_len: int, *, required: bool = False, nullable: bool = False) -> _Field:
+    return _Field("str", required=required, nullable=nullable, max_len=max_len)
+
+
+def _int(
+    *, lo: int = INT32_MIN, hi: int = INT32_MAX, required: bool = False, nullable: bool = False
+) -> _Field:
+    return _Field("int", required=required, nullable=nullable, lo=lo, hi=hi)
+
+
+def _uuid(*, required: bool = False, nullable: bool = False) -> _Field:
+    return _Field("uuid", required=required, nullable=nullable)
+
+
+def _enum(values: Iterable[str], *, required: bool = False, nullable: bool = False) -> _Field:
+    return _Field("enum", required=required, nullable=nullable, choices=frozenset(values))
+
+
+_BOOL = _Field("bool")
+_CURRENCY_F = _Field("currency")
+_MUST_BE_NULL = _Field("null")  # key tolerated (the app sends it); value must be null
+
+_INSERT: dict[str, dict[str, _Field]] = {
+    "products": {
+        "sku": _str(64, required=True),
+        "name": _str(200, required=True),
+        "unit_id": _uuid(required=True),
+        "category_id": _MUST_BE_NULL,
+        "sell_price_minor": _int(lo=0),
+        "sell_currency": _CURRENCY_F,
+        "cost_minor": _MUST_BE_NULL,
+        "cost_currency": _MUST_BE_NULL,
+        "track_stock": _BOOL,
+        "is_active": _BOOL,
+    },
+    "barcodes": {
+        "product_id": _uuid(required=True),
+        "code": _str(64, required=True),
+        "symbology": _str(16),
+    },
+    "units": {"name": _str(48, required=True), "decimal_places": _int(lo=0, hi=6, required=True)},
+    "customers": {
+        "name": _str(128, required=True),
+        "phone": _str(32, nullable=True),
+        "credit_limit_minor": _int(lo=0, nullable=True),
+        "currency": _CURRENCY_F,
+        "is_active": _BOOL,
+    },
+    "suppliers": {
+        "name": _str(128, required=True),
+        "phone": _str(32, nullable=True),
+        "currency": _CURRENCY_F,
+        "is_active": _BOOL,
+    },
+    "stock_movements": {
+        "product_id": _uuid(required=True),
+        "branch_id": _uuid(required=True),
+        "qty_delta": _int(required=True),
+        "reason": _enum([r.value for r in StockReason], required=True),
+        "ref_type": _enum(["sale"], nullable=True),
+        "ref_id": _uuid(nullable=True),
+    },
+    "sales": {
+        "number": _str(32, required=True),
+        "branch_id": _uuid(required=True),
+        "shift_id": _MUST_BE_NULL,
+        "customer_id": _uuid(nullable=True),
+        "status": _enum(["settled"]),
+        "currency": _CURRENCY_F,
+        "discount_minor": _int(lo=0),
+        "subtotal_minor": _int(lo=0, required=True),
+        "tax_minor": _int(lo=0),
+        "total_minor": _int(lo=0, required=True),
+        "paid_minor": _int(lo=0, required=True),
+        "change_minor": _int(lo=0),
+    },
+    "sale_lines": {
+        "sale_id": _uuid(required=True),
+        "product_id": _uuid(required=True),
+        "name": _str(200, required=True),
+        "qty_minor": _int(lo=1, required=True),
+        "decimal_places": _int(lo=0, hi=6),
+        "unit_price_minor": _int(lo=0, required=True),
+        "unit_cost_minor": _int(lo=0),  # accepted for compatibility; the server re-derives it
+        "line_total_minor": _int(lo=0, required=True),
+        "currency": _CURRENCY_F,
+    },
+    "payments": {
+        "sale_id": _uuid(required=True),
+        "method": _enum([m.value for m in PaymentMethod], required=True),
+        "amount_minor": _int(lo=1, required=True),
+        "currency": _CURRENCY_F,
+        "tendered_minor": _int(lo=0, nullable=True),
+        "change_minor": _int(lo=0, nullable=True),
+    },
+    "customer_ledger": {
+        "customer_id": _uuid(required=True),
+        "type": _enum([t.value for t in LedgerEntryType], required=True),
+        "amount_minor": _int(lo=1, required=True),
+        "currency": _CURRENCY_F,
+        "ref_type": _enum(["sale", "manual"], nullable=True),
+        "ref_id": _uuid(nullable=True),
+    },
+    "supplier_ledger": {
+        "supplier_id": _uuid(required=True),
+        "type": _enum([t.value for t in SupplierEntryType], required=True),
+        "amount_minor": _int(lo=1, required=True),
+        "currency": _CURRENCY_F,
+        "ref_type": _MUST_BE_NULL,
+        "ref_id": _MUST_BE_NULL,
+    },
+}
+
+_UPDATE: dict[str, dict[str, _Field]] = {
+    "products": {
+        "name": _str(200, required=True),
+        "sell_price_minor": _int(lo=0),
+        "sell_currency": _CURRENCY_F,
+        "is_active": _BOOL,
+    },
+}
+
+
+def clean_fields(table: str, op: str, data: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate `data` against the allow-list for (table, op) and return it.
+
+    Raises ValidationError SYNC_FIELD_NOT_ALLOWED / SYNC_FIELD_REQUIRED /
+    SYNC_FIELD_INVALID / MONEY_CURRENCY_INVALID."""
+    spec = (_INSERT if op == "insert" else _UPDATE)[table]
+    for key in data:
+        if key not in spec:
+            raise ValidationError(
+                "SYNC_FIELD_NOT_ALLOWED", table=table, field=str(key)[:64],
+                reason="server_owned" if key in SERVER_OWNED else "unknown",
+            )
+    out: dict[str, Any] = {}
+    for name, f in spec.items():
+        if name in data:
+            out[name] = _check(table, name, f, data[name])
+        elif f.required and op == "insert":
+            raise ValidationError("SYNC_FIELD_REQUIRED", table=table, field=name)
+    return out
+
+
+def _check(table: str, name: str, f: _Field, value: Any) -> Any:
+    def invalid(reason: str) -> ValidationError:
+        return ValidationError("SYNC_FIELD_INVALID", table=table, field=name, reason=reason)
+
+    if value is None:
+        if f.nullable or f.kind == "null":
+            return None
+        raise invalid("null")
+    if f.kind == "null":
+        raise ValidationError(
+            "SYNC_FIELD_NOT_ALLOWED", table=table, field=name, reason="must_be_null"
+        )
+    if f.kind == "int":
+        if type(value) is not int:  # bool is an int subclass; floats are never money
+            raise invalid("type")
+        if not f.lo <= value <= f.hi:
+            raise invalid("range")
+        return value
+    if f.kind == "bool":
+        if type(value) is not bool:
+            raise invalid("type")
+        return value
+    if not isinstance(value, str):
+        raise invalid("type")
+    if "\x00" in value:
+        raise invalid("nul")
+    if f.kind == "uuid":
+        if _UUID.fullmatch(value) is None:
+            raise invalid("uuid")
+    elif f.kind == "currency":
+        if _CURRENCY.fullmatch(value) is None:
+            raise ValidationError("MONEY_CURRENCY_INVALID", currency=value[:8])
+    elif f.kind == "enum":
+        if value not in f.choices:
+            raise invalid("enum")
+    elif len(value) > f.max_len:
+        raise invalid("too_long")
+    elif f.required and not value.strip():
+        raise invalid("empty")
+    return value
+
+
+# ── Envelope ─────────────────────────────────────────────────────────────────
+
+
+def parse_recorded_at(value: str) -> datetime | None:
+    """The outbox `created_at` (informational, audit only): tz-aware ISO-8601."""
+    if len(value) > 40:
+        return None
+    try:
+        at = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return at if at.tzinfo is not None else None
+
+
+def check_envelope(op: OpInput, actor: User) -> None:
+    """Op-level shape rules. op_id is checked by the caller before any DB access
+    (an invalid op_id cannot be recorded, so its outcome is never cached)."""
+    if not is_uuid(op.row_id):
+        raise ValidationError("SYNC_OP_INVALID", field="row_id")
+    if op.table not in SYNC_TABLES:
+        raise ValidationError("UNKNOWN_TABLE", table=op.table[:32])
+    if op.op not in ("insert", "update"):
+        raise ValidationError("SYNC_OP_INVALID", field="op")
+    if (op.table, op.op) not in _HANDLERS:
+        raise ValidationError("SYNC_OP_UNSUPPORTED", table=op.table, op=op.op)
+    if op.op == "update":
+        if op.base_version is None:
+            raise ValidationError("SYNC_BASE_VERSION_REQUIRED", table=op.table)
+        if not 0 <= op.base_version <= INT32_MAX:  # 0 = never read: a plain conflict
+            raise ValidationError("SYNC_OP_INVALID", field="base_version")
+    if op.actor_id is not None and op.actor_id != actor.id:
+        # An op is only ever applied under the token of the user who recorded it.
+        raise PermissionDeniedError("SYNC_ACTOR_MISMATCH", actor_id=actor.id)
+    if op.created_at is not None and parse_recorded_at(op.created_at) is None:
+        raise ValidationError("SYNC_OP_INVALID", field="created_at")
+
+
+# ── Read port + plan types ───────────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class ProductRef:
+    id: str
+    deleted: bool
+    track_stock: bool
+    sell_price_minor: int
+    cost_minor: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class CustomerRef:
+    id: str
+    deleted: bool
+    currency: str
+    credit_limit_minor: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class SupplierRef:
+    id: str
+    deleted: bool
+    currency: str
+
+
+@dataclass(frozen=True, slots=True)
+class SaleRef:
+    id: str
+    branch_id: str
+    created_by: str | None
+    customer_id: str | None
+    currency: str
+    subtotal_minor: int
+    total_minor: int
+    paid_minor: int
+
+
+class SyncReader(Protocol):
+    """Lookups the policy needs (implemented in infrastructure, same session)."""
+
+    def product(self, product_id: str) -> ProductRef | None: ...
+
+    def unit_exists(self, unit_id: str) -> bool: ...
+
+    def customer(self, customer_id: str) -> CustomerRef | None: ...
+
+    def customer_balance(self, customer_id: str) -> int: ...
+
+    def supplier(self, supplier_id: str) -> SupplierRef | None: ...
+
+    def sale(self, sale_id: str) -> SaleRef | None: ...  # locks the header where supported
+
+    def sale_lines_total(self, sale_id: str) -> int: ...
+
+    def sale_line_qty(self, sale_id: str, product_id: str) -> int: ...
+
+    def sale_stock_out_qty(self, sale_id: str, product_id: str) -> int: ...
+
+    def sale_payments_total(self, sale_id: str) -> int: ...
+
+    def sale_charges_total(self, sale_id: str) -> int: ...
+
+
+@dataclass(frozen=True, slots=True)
+class RowSnapshot:
+    """The stored row an op targets: business columns + version + soft-delete flag."""
+
+    version: int
+    deleted: bool
+    values: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class AuditIntent:
+    action: str
+    entity_type: str
+    after: dict[str, Any]
+    before: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ApplyPlan:
+    values: dict[str, Any]  # columns to write: validated + server-derived
+    auth_branch_id: str  # branch the permission was checked in
+    row_branch_id: str | None  # branch the row belongs to (change_log scope); None = shop-wide
+    audit: AuditIntent
+
+
+@dataclass(frozen=True, slots=True)
+class _Ctx:
+    op: OpInput
+    actor: User
+    active_branch: str | None
+    existing: RowSnapshot | None
+    reader: SyncReader
+    now: datetime
+
+
+def _need(ctx: _Ctx, permission: Permission, branch_id: str) -> None:
+    require_permission(POLICY, ctx.actor, permission, branch_id)
+
+
+def _active(ctx: _Ctx) -> str:
+    if not ctx.active_branch:
+        raise ValidationError("BRANCH_REQUIRED")
+    return ctx.active_branch
+
+
+def _guard_insert(ctx: _Ctx) -> None:
+    if ctx.existing is None:
+        return
+    if ctx.op.table in MASTER_TABLES:
+        raise SyncConflict(f"{ctx.op.table.upper()}_ALREADY_EXISTS", row_id=ctx.op.row_id)
+    raise ValidationError("SYNC_ROW_EXISTS", table=ctx.op.table, row_id=ctx.op.row_id)
+
+
+def _guard_update(ctx: _Ctx, not_found: str) -> RowSnapshot:
+    current = ctx.existing
+    if current is None or current.deleted:
+        raise NotFoundError(not_found, row_id=ctx.op.row_id)
+    if current.version != ctx.op.base_version:
+        raise SyncConflict(
+            f"{ctx.op.table.upper()}_VERSION_CONFLICT",
+            base_version=ctx.op.base_version, current_version=current.version,
+        )
+    return current
+
+
+def _product(ctx: _Ctx, product_id: str, *, allow_deleted: bool = False) -> ProductRef:
+    p = ctx.reader.product(product_id)
+    if p is None or (p.deleted and not allow_deleted):
+        raise NotFoundError("PRODUCT_NOT_FOUND", product_id=product_id)
+    return p
+
+
+def _customer(ctx: _Ctx, customer_id: str) -> CustomerRef:
+    c = ctx.reader.customer(customer_id)
+    if c is None or c.deleted:
+        raise NotFoundError("CUSTOMER_NOT_FOUND", customer_id=customer_id)
+    return c
+
+
+def _own_sale(ctx: _Ctx, sale_id: str) -> SaleRef:
+    """A sale child (line, payment, sale movement, credit charge) must reference an
+    existing sale that the pushing actor created; SALE_CREATE in the sale's branch."""
+    sale = ctx.reader.sale(sale_id)
+    if sale is None:
+        raise NotFoundError("SALE_NOT_FOUND", sale_id=sale_id)
+    _need(ctx, Permission.SALE_CREATE, sale.branch_id)
+    if sale.created_by != ctx.actor.id:
+        raise ValidationError("SYNC_REF_MISMATCH", field="sale_id", reason="not_own_sale")
+    return sale
+
+
+def _pick(values: Mapping[str, Any], *keys: str) -> dict[str, Any]:
+    return {k: values[k] for k in keys if k in values}
+
+
+def _violates(rule: Callable[[], None]) -> bool:
+    try:
+        rule()
+    except ConflictError:
+        return True
+    return False
+
+
+# ── Handlers: one per (table, op) the app legitimately pushes ────────────────
+
+
+def _products_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    branch = _active(ctx)
+    _need(ctx, Permission.PRODUCT_MANAGE, branch)
+    _guard_insert(ctx)
+    if not ctx.reader.unit_exists(v["unit_id"]):
+        raise ValidationError("UNIT_NOT_FOUND", unit_id=v["unit_id"])
+    after = _pick(
+        v, "sku", "name", "unit_id", "sell_price_minor", "sell_currency", "track_stock", "is_active"
+    )
+    return ApplyPlan(v, branch, None, AuditIntent("product.created", "product", after))
+
+
+def _products_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    branch = _active(ctx)
+    _need(ctx, Permission.PRODUCT_MANAGE, branch)
+    current = _guard_update(ctx, "PRODUCT_NOT_FOUND")
+    if not v:
+        raise ValidationError("SYNC_OP_INVALID", field="data", reason="empty")
+    changed = {k: val for k, val in v.items() if current.values.get(k) != val}
+    price_changed = "sell_price_minor" in changed or "sell_currency" in changed
+    if price_changed:
+        _need(ctx, Permission.PRICE_CHANGE, branch)
+    if price_changed:
+        action = "product.price_changed"
+    elif changed.get("is_active") is False:
+        action = "product.deactivated"
+    else:
+        action = "product.updated"
+    before = {k: current.values.get(k) for k in changed}
+    return ApplyPlan(v, branch, None, AuditIntent(action, "product", changed, before))
+
+
+def _barcodes_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    branch = _active(ctx)
+    _need(ctx, Permission.PRODUCT_MANAGE, branch)
+    _guard_insert(ctx)
+    _product(ctx, v["product_id"])
+    after = _pick(v, "product_id", "code")
+    return ApplyPlan(v, branch, None, AuditIntent("barcode.added", "barcode", after))
+
+
+def _units_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    branch = _active(ctx)
+    if (v["name"], v["decimal_places"]) in CANONICAL_UNITS:
+        # Every fresh device seeds these five units on first use, whatever the role
+        # of its first user; any member of the branch may push that seed.
+        if not ctx.actor.is_active or not POLICY.permissions_for(ctx.actor, branch):
+            raise PermissionDeniedError(
+                "ACCESS_DENIED", permission="branch.member", branch_id=branch,
+                actor_id=ctx.actor.id,
+            )
+    else:
+        _need(ctx, Permission.PRODUCT_MANAGE, branch)
+    _guard_insert(ctx)
+    after = _pick(v, "name", "decimal_places")
+    return ApplyPlan(v, branch, None, AuditIntent("unit.created", "unit", after))
+
+
+def _customers_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    branch = _active(ctx)
+    _need(ctx, Permission.SALE_CREATE, branch)
+    _guard_insert(ctx)
+    after = _pick(v, "name", "credit_limit_minor", "currency")
+    return ApplyPlan(v, branch, None, AuditIntent("customer.created", "customer", after))
+
+
+def _suppliers_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    branch = _active(ctx)
+    _need(ctx, Permission.PRODUCT_MANAGE, branch)
+    _guard_insert(ctx)
+    after = _pick(v, "name", "currency")
+    return ApplyPlan(v, branch, None, AuditIntent("supplier.created", "supplier", after))
+
+
+_STOCK_ACTIONS = {
+    StockReason.ADJUSTMENT: "stock.adjusted",
+    StockReason.PURCHASE: "stock.received",
+    StockReason.SALE: "stock.sold",
+}
+
+
+def _stock_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    reason = StockReason(v["reason"])
+    if reason not in _STOCK_ACTIONS:
+        raise ValidationError("SYNC_OP_UNSUPPORTED", table="stock_movements", reason=reason.value)
+    branch: str = v["branch_id"]
+    needed = Permission.SALE_CREATE if reason is StockReason.SALE else Permission.STOCK_ADJUST
+    _need(ctx, needed, branch)
+    _guard_insert(ctx)
+    qty: int = v["qty_delta"]
+    if reason is StockReason.SALE:
+        # A sale movement must be backed by an unconsumed line of the pusher's own
+        # sale in the same branch; otherwise sale.create would be a stock write-off.
+        _product(ctx, v["product_id"], allow_deleted=True)
+        if qty >= 0:
+            raise ValidationError("STOCK_INVALID_QTY", qty=qty)
+        if v.get("ref_type") != "sale" or v.get("ref_id") is None:
+            raise ValidationError("SYNC_FIELD_REQUIRED", table="stock_movements", field="ref_id")
+        sale = _own_sale(ctx, v["ref_id"])
+        if sale.branch_id != branch:
+            raise ValidationError("SYNC_REF_MISMATCH", field="branch_id", reason="sale_branch")
+        sold = ctx.reader.sale_line_qty(sale.id, v["product_id"])
+        moved = ctx.reader.sale_stock_out_qty(sale.id, v["product_id"])
+        if moved - qty > sold:
+            raise ValidationError(
+                "SYNC_REF_MISMATCH", field="qty_delta", reason="exceeds_sale_lines"
+            )
+    else:
+        if v.get("ref_type") is not None or v.get("ref_id") is not None:
+            raise ValidationError(
+                "SYNC_FIELD_NOT_ALLOWED", table="stock_movements", field="ref_id",
+                reason=reason.value,
+            )
+        product = _product(ctx, v["product_id"])
+        if reason is StockReason.ADJUSTMENT:
+            adjust_stock(
+                id=ctx.op.row_id, product_id=product.id, branch_id=branch, qty_delta=qty,
+                at=ctx.now,
+            )
+            if not product.track_stock:
+                raise ValidationError("PRODUCT_NOT_STOCK_TRACKED", product_id=product.id)
+        elif qty <= 0:
+            raise ValidationError("STOCK_INVALID_QTY", qty=qty)
+    after = _pick(v, "product_id", "branch_id", "qty_delta", "reason", "ref_id")
+    return ApplyPlan(
+        v, branch, branch, AuditIntent(_STOCK_ACTIONS[reason], "stock_movement", after)
+    )
+
+
+def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    branch: str = v["branch_id"]
+    _need(ctx, Permission.SALE_CREATE, branch)
+    _guard_insert(ctx)
+    total: int = v["total_minor"]
+    if total != v["subtotal_minor"] - v.get("discount_minor", 0) + v.get("tax_minor", 0):
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="sales", field="total_minor", reason="arithmetic"
+        )
+    customer_id = v.get("customer_id")
+    if customer_id is None:
+        if v["paid_minor"] < total:
+            raise ConflictError("SALE_UNDERPAID", total=total, paid=v["paid_minor"])
+    else:
+        _customer(ctx, customer_id)
+    after = _pick(v, "number", "branch_id", "customer_id", "currency", "total_minor", "paid_minor")
+    return ApplyPlan(v, branch, branch, AuditIntent("sale.settled", "sale", after))
+
+
+def _sale_lines_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    sale = _own_sale(ctx, v["sale_id"])
+    _guard_insert(ctx)
+    product = _product(ctx, v["product_id"], allow_deleted=True)
+    expected = line_total_minor(v["unit_price_minor"], v["qty_minor"], v.get("decimal_places", 0))
+    if v["line_total_minor"] != expected:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="sale_lines", field="line_total_minor",
+            reason="arithmetic",
+        )
+    currency = v.get("currency", DEFAULT_CURRENCY)
+    if currency != sale.currency:
+        raise ConflictError("SALE_CURRENCY_MISMATCH", expected=sale.currency, got=currency)
+    if ctx.reader.sale_lines_total(sale.id) + v["line_total_minor"] > sale.subtotal_minor:
+        raise ValidationError(
+            "SYNC_REF_MISMATCH", field="line_total_minor", reason="exceeds_subtotal"
+        )
+    values = {**v, "unit_cost_minor": product.cost_minor or 0}  # cost snapshot is server-owned
+    after = {
+        **_pick(v, "sale_id", "product_id", "qty_minor", "unit_price_minor", "line_total_minor"),
+        "catalog_price_minor": product.sell_price_minor,
+    }
+    return ApplyPlan(
+        values, sale.branch_id, sale.branch_id, AuditIntent("sale.line_added", "sale_line", after)
+    )
+
+
+def _payments_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    sale = _own_sale(ctx, v["sale_id"])
+    _guard_insert(ctx)
+    amount: int = v["amount_minor"]
+    currency = v.get("currency", DEFAULT_CURRENCY)
+    if currency != sale.currency:
+        raise ConflictError("SALE_CURRENCY_MISMATCH", expected=sale.currency, got=currency)
+    tendered = v.get("tendered_minor")
+    if tendered is not None and tendered < amount:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="payments", field="tendered_minor", reason="below_amount"
+        )
+    if ctx.reader.sale_payments_total(sale.id) + amount > sale.paid_minor:
+        raise ValidationError("SYNC_REF_MISMATCH", field="amount_minor", reason="exceeds_paid")
+    after = _pick(v, "sale_id", "method", "amount_minor", "currency")
+    return ApplyPlan(
+        v, sale.branch_id, sale.branch_id, AuditIntent("payment.recorded", "payment", after)
+    )
+
+
+def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    entry = LedgerEntryType(v["type"])
+    if entry not in (LedgerEntryType.CHARGE, LedgerEntryType.PAYMENT):
+        # opening / adjustment (write-off): no app flow pushes them yet.
+        raise ValidationError("SYNC_OP_UNSUPPORTED", table="customer_ledger", type=entry.value)
+    amount: int = v["amount_minor"]
+    currency = v.get("currency", DEFAULT_CURRENCY)
+    if entry is LedgerEntryType.CHARGE:
+        if v.get("ref_type") != "sale" or v.get("ref_id") is None:
+            raise ValidationError("SYNC_FIELD_REQUIRED", table="customer_ledger", field="ref_id")
+        sale = _own_sale(ctx, v["ref_id"])
+        _guard_insert(ctx)
+        customer = _customer(ctx, v["customer_id"])
+        if sale.customer_id != customer.id:
+            raise ValidationError(
+                "SYNC_REF_MISMATCH", field="customer_id", reason="sale_customer"
+            )
+        if currency != sale.currency:
+            raise ConflictError("SALE_CURRENCY_MISMATCH", expected=sale.currency, got=currency)
+        if ctx.reader.sale_charges_total(sale.id) + amount > sale.total_minor - sale.paid_minor:
+            raise ValidationError(
+                "SYNC_REF_MISMATCH", field="amount_minor", reason="exceeds_unpaid"
+            )
+        balance = ctx.reader.customer_balance(customer.id)
+        over_limit = _violates(lambda: assert_within_credit_limit(
+            balance_minor=balance, charge_minor=amount,
+            credit_limit_minor=customer.credit_limit_minor,
+        ))
+        after = {
+            **_pick(v, "customer_id", "amount_minor", "currency", "ref_id"),
+            "over_credit_limit": over_limit,
+        }
+        return ApplyPlan(
+            v, sale.branch_id, sale.branch_id,
+            AuditIntent("debt.charge_posted", "customer_ledger", after),
+        )
+    if v.get("ref_type") not in (None, "manual") or v.get("ref_id") is not None:
+        raise ValidationError(
+            "SYNC_FIELD_NOT_ALLOWED", table="customer_ledger", field="ref_id", reason="payment"
+        )
+    branch = _active(ctx)
+    _need(ctx, Permission.SALE_CREATE, branch)
+    _guard_insert(ctx)
+    customer = _customer(ctx, v["customer_id"])
+    if currency != customer.currency:
+        raise ConflictError("DEBT_CURRENCY_MISMATCH", expected=customer.currency, got=currency)
+    # Append-only ledger: concurrent offline payments both apply (customers-debt.md),
+    # so an overpayment is flagged in the audit entry, not rejected.
+    balance = ctx.reader.customer_balance(customer.id)
+    overpaid = _violates(
+        lambda: assert_not_overpaid(balance_minor=balance, payment_minor=amount)
+    )
+    after = {**_pick(v, "customer_id", "amount_minor", "currency"), "overpaid": overpaid}
+    return ApplyPlan(
+        v, branch, None, AuditIntent("debt.payment_recorded", "customer_ledger", after)
+    )
+
+
+def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    if SupplierEntryType(v["type"]) is not SupplierEntryType.BILL:
+        raise ValidationError("SYNC_OP_UNSUPPORTED", table="supplier_ledger", type=v["type"])
+    branch = _active(ctx)
+    _need(ctx, Permission.STOCK_ADJUST, branch)
+    _guard_insert(ctx)
+    supplier = ctx.reader.supplier(v["supplier_id"])
+    if supplier is None or supplier.deleted:
+        raise NotFoundError("SUPPLIER_NOT_FOUND", supplier_id=v["supplier_id"])
+    currency = v.get("currency", DEFAULT_CURRENCY)
+    if currency != supplier.currency:
+        raise ConflictError("PURCHASE_CURRENCY_MISMATCH", expected=supplier.currency, got=currency)
+    after = _pick(v, "supplier_id", "amount_minor", "currency")
+    return ApplyPlan(
+        v, branch, None, AuditIntent("supplier.bill_posted", "supplier_ledger", after)
+    )
+
+
+_HANDLERS: dict[tuple[str, str], Callable[[_Ctx, dict[str, Any]], ApplyPlan]] = {
+    ("products", "insert"): _products_insert,
+    ("products", "update"): _products_update,
+    ("barcodes", "insert"): _barcodes_insert,
+    ("units", "insert"): _units_insert,
+    ("customers", "insert"): _customers_insert,
+    ("suppliers", "insert"): _suppliers_insert,
+    ("stock_movements", "insert"): _stock_insert,
+    ("sales", "insert"): _sales_insert,
+    ("sale_lines", "insert"): _sale_lines_insert,
+    ("payments", "insert"): _payments_insert,
+    ("customer_ledger", "insert"): _customer_ledger_insert,
+    ("supplier_ledger", "insert"): _supplier_ledger_insert,
+}
+
+
+def plan_op(
+    op: OpInput,
+    *,
+    actor: User,
+    active_branch: str | None,
+    existing: RowSnapshot | None,
+    reader: SyncReader,
+    now: datetime,
+) -> ApplyPlan:
+    """Validate + authorize one op (after check_envelope). Raises SyncConflict
+    (outcome `conflict`) or another AppError (outcome `rejected`)."""
+    values = clean_fields(op.table, op.op, op.data)
+    ctx = _Ctx(
+        op=op, actor=actor, active_branch=active_branch, existing=existing, reader=reader, now=now
+    )
+    return _HANDLERS[(op.table, op.op)](ctx, values)
+
+
+# ── Outcome caching, audit role, pull scope ──────────────────────────────────
+
+_TRANSIENT = frozenset({"ACCESS_DENIED", "SYNC_ACTOR_MISMATCH", "BRANCH_REQUIRED", "ROW_INVALID"})
+
+
+def is_cacheable(code: str) -> bool:
+    """Whether a rejected/conflict outcome is recorded against its op_id forever.
+    Outcomes that depend on server state that can change (permissions, which user
+    pushes, a parent not present yet, an unexpected error) are re-evaluated on
+    replay instead; nothing was applied, so exactly-once still holds."""
+    return code not in _TRANSIENT and not code.endswith("_NOT_FOUND")
+
+
+def role_label(actor: User, branch_id: str) -> str | None:
+    names = sorted({a.role_name for a in actor.assignments if a.branch_id == branch_id})
+    return ",".join(names)[:32] or None
+
+
+def clamp_pull_limit(limit: int) -> int:
+    return max(1, min(limit, PULL_LIMIT_MAX))
+
+
+_ANY = frozenset(Permission)
+_DEBT_READERS = frozenset(
+    {Permission.SALE_CREATE, Permission.REPORT_VIEW, Permission.DEBT_WRITE_OFF}
+)
+_SALE_READERS = frozenset({Permission.SALE_CREATE, Permission.REPORT_VIEW})
+_READ: dict[str, frozenset[Permission]] = {
+    "products": _ANY,
+    "barcodes": _ANY,
+    "units": _ANY,
+    "categories": _ANY,
+    "customers": _DEBT_READERS,
+    "customer_ledger": _DEBT_READERS,
+    "suppliers": frozenset(
+        {Permission.STOCK_ADJUST, Permission.PRODUCT_MANAGE, Permission.REPORT_VIEW}
+    ),
+    "supplier_ledger": frozenset({Permission.REPORT_VIEW, Permission.DEBT_WRITE_OFF}),
+    "stock_movements": _ANY,
+    "sales": _SALE_READERS,
+    "sale_lines": _SALE_READERS,
+    "payments": _SALE_READERS,
+}
+_BRANCH_SCOPED_READ = frozenset({"stock_movements", "sales", "sale_lines", "payments"})
+_COST_READERS = frozenset({Permission.PRODUCT_MANAGE, Permission.REPORT_VIEW})
+_COST_FIELDS: dict[str, tuple[str, ...]] = {
+    "products": ("cost_minor", "cost_currency"),
+    "sale_lines": ("unit_cost_minor",),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class PullScope:
+    """What one actor may pull: tables their permissions can read (branch rows only
+    for branches they hold a role in), allow-listed fields only, costs redacted
+    without product.manage/report.view."""
+
+    any_branch: frozenset[Permission]
+    by_branch: Mapping[str, frozenset[Permission]]
+
+    @classmethod
+    def for_actor(cls, actor: User) -> PullScope:
+        if not actor.is_active:
+            return cls(frozenset(), {})
+        by_branch = {
+            a.branch_id: POLICY.permissions_for(actor, a.branch_id) for a in actor.assignments
+        }
+        union: frozenset[Permission] = frozenset().union(*by_branch.values())
+        return cls(union, by_branch)
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.any_branch
+
+    def view(
+        self, table: str, branch_id: str | None, data: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
+        """The pull payload for one change_log row, or None when not visible."""
+        readers = _READ.get(table)
+        if readers is None:
+            return None
+        perms = self.any_branch
+        if table in _BRANCH_SCOPED_READ:
+            legacy = data.get("branch_id")  # rows logged before change_log.branch_id existed
+            branch = branch_id or (legacy if isinstance(legacy, str) else None)
+            if branch is not None:
+                perms = self.by_branch.get(branch, frozenset())
+        if not perms & readers:
+            return None
+        # A hidden cost field is omitted, not nulled: the device keeps its local
+        # value instead of overwriting it (one device can hold several users' rows).
+        hidden = () if perms & _COST_READERS else _COST_FIELDS.get(table, ())
+        return {k: data[k] for k in READ_FIELDS[table] if k in data and k not in hidden}

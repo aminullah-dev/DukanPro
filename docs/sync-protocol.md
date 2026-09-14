@@ -1,6 +1,6 @@
 # Sync protocol (offline-first)
 
-Status: **design, Phase 0.** Implementation begins Phase 6; the client outbox table and interfaces are scaffolded in Phase 0/1 so every write is sync-ready from the start.
+Status: **implemented** (Phase 6); push and pull **hardened** after the readiness review (theme 1). What a push may write is decided in one place, `server/dukan/application/sync_policy.py`; this document describes it.
 
 ## Principles
 
@@ -24,22 +24,131 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | `base_version` | version the client read (for mutable aggregates) |
 | `local_seq` | monotonic per-device sequence (ordering) |
 | `device_id` | installation id |
-| `actor_id` | user id |
+| `actor_id` | user id; `system` for automatic device writes no user performed (the unit seed) |
 | `created_at` | UTC |
 | `status` | `pending` / `sent` / `acked` / `conflict` / `rejected` |
 
 ## Push
 
-1. Client sends unacked operations **in `local_seq` order**.
-2. Server, per operation, in a transaction: **dedupe by `op_id`** → if seen, return the stored result; else validate domain invariants, apply, record `op_id`, assign a global `server_seq`.
-3. Server returns per-op `{op_id, result: applied|conflict|rejected, version?, code?}`.
-4. Client marks `acked`, or handles `conflict`/`rejected`.
+`POST /sync/push` with a bearer token and an optional `X-Branch-Id` header (the active branch for shop-wide rows; defaults to the user's default branch).
+
+```json
+{"device_id": "≤ 128 chars",
+ "ops": [{"op_id": "<uuid>", "table": "sales", "row_id": "<uuid>", "op": "insert",
+          "data": {"number": "INV-20260912-0001", "…": "…"}, "base_version": null,
+          "actor_id": "<uuid, omitted for system seeds>", "created_at": "2026-09-12T08:00:00.000Z"}]}
+```
+
+1. The client sends, in `local_seq` order, the pending ops the **signed-in user** recorded plus system seeds. Another user's ops wait on the device for that user's own sync.
+2. The server handles each op in its own transaction, in request order:
+   1. `op_id` must be a canonical lowercase UUID (otherwise `rejected` `SYNC_OP_INVALID`, not recorded).
+   2. **Replay:** an op_id already recorded returns its stored outcome, code and `server_seq`; nothing applies twice.
+   3. **Envelope:** `row_id` is a canonical UUID; the table is known; `op` is `insert` or `update` and supported for that table; updates carry `base_version`; `actor_id`, when sent, is the token's user; `created_at`, when sent, is tz-aware ISO-8601.
+   4. **Fields:** `data` is checked against the table's allow-list (next section).
+   5. **Authorization** of the authenticated user in the row's branch.
+   6. **Parents and invariants.**
+   7. **Write:** an insert, or a compare-and-set update.
+   8. **change_log:** the row's post-image and its `branch_id`.
+   9. **Audit:** one entry, origin `sync` (see [domain/read-models-sync-audit.md](domain/read-models-sync-audit.md)).
+   10. **Record** the op_id with its outcome, code, `server_seq`, actor and device (see "Outcome caching").
+3. The response is HTTP 200 with one result per op: `{op_id, outcome: applied|conflict|rejected, server_seq?, code?}`. One bad op never fails the batch.
+4. A request-level failure fails the whole request; nothing is marked on the device, and it re-sends everything next time (replays make that safe): `401` (token), `422 REQUEST_INVALID` (malformed body, e.g. `device_id` over 128 chars), `500 SYNC_UNAVAILABLE` (the database failed mid-batch; ops before it stay applied and replay).
+5. The client acks `applied` ops and marks `conflict` ops. A `rejected` op is marked rejected and counted on the sync card, unless the server did not record the rejection (see "Outcome caching"): then it stays pending and is re-sent.
+
+## Push validation and authorization
+
+**Fields.** Every key in `data` must be on the table's allow-list. Anything else is `SYNC_FIELD_NOT_ALLOWED`, including the server-owned `id`, `version`, `created_*`, `updated_*`, `deleted_at`, `occurred_at` and cost columns. Values are strict:
+- integers are JSON integers within PostgreSQL INTEGER range (never booleans, floats or strings);
+- ids are canonical lowercase UUIDs; currencies are ISO-4217 codes;
+- strings fit their column, are not blank when required, and contain no NUL.
+
+`occurred_at` is the server's apply time; the device's time is kept in the audit entry.
+
+**Authorization.** The permission is checked for the authenticated user (never a user named in the payload) in the branch the row belongs to: `branch_id` for sales and stock movements, the parent sale's branch for its children, the active branch for shop-wide rows.
+
+| Table, op | Permission (branch) | Rules |
+|---|---|---|
+| products insert | product.manage (active) | the unit exists; `category_id` and `cost_*` must be null |
+| products update | product.manage (active), plus price.change when the price or currency changes | `base_version` required; only `name`, `sell_price_minor`, `sell_currency`, `is_active` |
+| barcodes insert | product.manage (active) | the product exists |
+| units insert | any role in the active branch for the device seed (piece/0, kg/3, litre/3, dozen/0, meter/2); product.manage otherwise | |
+| customers insert | sale.create (active) | |
+| suppliers insert | product.manage (active) | |
+| stock_movements insert, `adjustment` | stock.adjust (row) | qty ≠ 0; the product tracks stock |
+| stock_movements insert, `purchase` | stock.adjust (row) | qty > 0 |
+| stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product |
+| sales insert | sale.create (row) | total = subtotal − discount + tax; paid ≥ total unless on credit; the customer exists; `shift_id` null |
+| sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up); lines ≤ subtotal; the sale's currency; `unit_cost_minor` is set by the server from the product's cost |
+| payments insert | sale.create (sale's) | the pusher's own sale; payments ≤ paid; tendered ≥ amount |
+| customer_ledger insert, `charge` | sale.create (sale's) | `ref_type` `sale` and `ref_id` of the pusher's own sale for that customer; charges ≤ total − paid; over the credit limit is **flagged** in the audit, not refused |
+| customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused |
+| supplier_ledger insert, `bill` | stock.adjust (active) | the supplier exists; the supplier's currency |
+
+Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories, updates of anything but products, stock transfers, counts and returns, customer opening balances and adjustments, supplier payments. Offline ledger entries that break a limit online would enforce still apply, because two tills can both act while offline; the audit flag is what the owner reviews.
+
+## Push codes
+
+`conflict`: `<TABLE>_VERSION_CONFLICT` (stale `base_version`), `<TABLE>_ALREADY_EXISTS` (insert on an existing master row).
+
+`rejected`:
+- Envelope: `SYNC_OP_INVALID`, `UNKNOWN_TABLE`, `SYNC_OP_UNSUPPORTED`, `SYNC_BASE_VERSION_REQUIRED`, `SYNC_ACTOR_MISMATCH`.
+- Fields: `SYNC_FIELD_NOT_ALLOWED`, `SYNC_FIELD_REQUIRED`, `SYNC_FIELD_INVALID`, `MONEY_CURRENCY_INVALID` (the context names the field and the reason).
+- Access: `ACCESS_DENIED`, `BRANCH_REQUIRED`.
+- References: `PRODUCT_NOT_FOUND`, `UNIT_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `SUPPLIER_NOT_FOUND`, `SALE_NOT_FOUND`, `SYNC_REF_MISMATCH`, `SYNC_ROW_EXISTS` (a ledger row id reused).
+- Domain: `STOCK_INVALID_QTY`, `PRODUCT_NOT_STOCK_TRACKED`, `SALE_UNDERPAID`, `SALE_CURRENCY_MISMATCH`, `DEBT_CURRENCY_MISMATCH`, `PURCHASE_CURRENCY_MISMATCH`.
+- `ROW_INVALID`: an unexpected server error on that op.
+
+## Outcome caching
+
+A recorded outcome is returned on every replay of its op_id. Outcomes that depend on server state that can change are **not** recorded, so a replay re-evaluates them: `ACCESS_DENIED`, `SYNC_ACTOR_MISMATCH`, `BRANCH_REQUIRED`, `ROW_INVALID` and every `*_NOT_FOUND`. Nothing was applied, so exactly-once still holds.
+
+The client mirrors this: such an op stays pending and is re-sent on the next sync, for example when a parent still queued by another user arrives, a role is granted, or the right user signs in. An op whose parent was rejected for good keeps coming back as `*_NOT_FOUND` and stays pending.
+
+## Master data concurrency
+
+An update is a compare-and-set: `UPDATE … WHERE id = :row_id AND version = :base_version AND deleted_at IS NULL`, then `version + 1`. Zero rows updated is a `conflict`, so two concurrent pushes can never both win. The pulled post-image carries the new `version` and the client stores it, so its next edit sends a current `base_version`.
+
+## Attribution
+
+The server applies an op only under the token of the user who recorded it: when `actor_id` is sent it must equal the token's user (`SYNC_ACTOR_MISMATCH` otherwise). Rows are stamped `created_by`/`updated_by` with that user.
+
+`created_at` (the device's outbox time) and `device_id` are informational. They go to the audit entry and `processed_ops`, never into authorization. The app does not yet have a stable per-installation device id.
 
 ## Pull
 
-1. Client requests changes since its last `server_watermark` (a monotonic server sequence).
-2. Server returns changed records + **tombstones** (soft deletes) + a new watermark.
-3. Client applies them, reconciling against any still-pending local optimistic state.
+`GET /sync/pull?since=<watermark>&limit=<1..1000, default 500>` returns `{changes: [{seq, table, row_id, op, data}], watermark}`.
+- `since < 0` or a limit out of range is `422 REQUEST_INVALID`.
+- A user with no active role gets `403 ACCESS_DENIED`.
+
+Each change is the row's **post-image**: its allow-listed business columns, plus `version` on master rows. It is filtered to what the pulling user may read:
+
+| Table | Readable with | Where |
+|---|---|---|
+| products, barcodes, units, categories | any permission | shop-wide |
+| customers, customer_ledger | sale.create, report.view or debt.write_off | shop-wide |
+| suppliers | stock.adjust, product.manage or report.view | shop-wide |
+| supplier_ledger | report.view or debt.write_off | shop-wide |
+| stock_movements | any permission | branches where the user holds a role |
+| sales, sale_lines, payments | sale.create or report.view | branches where the user holds a role with one of them |
+
+Cost fields (`products.cost_minor`, `products.cost_currency`, `sale_lines.unit_cost_minor`) are **omitted** unless the user has product.manage or report.view. They are omitted, not nulled, because the client writes only the keys that are present. One user's pull therefore never wipes a value another user of the same device can see.
+
+The watermark is the last row scanned, visible or not, so paging is monotonic. Because the scope is per user, the client keeps **one cursor per user** on the device and pages until the watermark stops advancing. A user's first cursor starts from the device-wide cursor that earlier, unscoped pulls left behind.
+
+## Known limitations
+
+- No tombstones yet: soft deletes do not reach devices.
+- No document atomicity: a sale's rows apply one op at a time, so the server can briefly hold a header whose lines are still queued.
+- Business numbers are not leased yet (decision B below): devices number sales locally.
+
+## Rollout of the hardened push
+
+1. Upgrade the server and the apps together.
+   - An old app records sale stock movements without a `ref_id`.
+   - On upgrade, the new app's local schema v7 links its still-pending movements to their sale, so these devices need not be drained first.
+   - A movement an old app pushes to the new server is rejected (`SYNC_FIELD_REQUIRED`) for good, so a device that stays on the old app should sync before the server is upgraded.
+2. Migration `0008` is additive (nullable columns) and reversible.
+3. After the upgrade, watch the rejected count on devices, and audit entries flagged `over_credit_limit` or `overpaid`.
 
 ## Conflict policy — by aggregate class
 
@@ -77,3 +186,6 @@ Legal invoice numbers must be gap-free per product-year. Two candidate schemes �
 - Property/contract tests for idempotency (replay = no-op), ordering, and tombstone application.
 - A **conflict test matrix** per aggregate class, mirrored in Dart and Python.
 - Partition simulations: two devices offline → diverge → sync → assert derived balances equal the sum of all ledger ops.
+- Where they live:
+  - Server: `server/tests/unit/test_sync_policy.py`, `server/tests/integration/test_sync.py`, `server/tests/integration/test_sync_hardening.py`.
+  - Client: `packages/dukan_data/test/sync_engine_test.dart` (a fake server that mirrors these rules), `app/test/sync_controller_test.dart`, `app/test/sync_api_test.dart`.

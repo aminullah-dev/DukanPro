@@ -273,6 +273,17 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String syncRejected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تغییر از طرف سرور رد شد',
+      one: '۱ تغییر از طرف سرور رد شد',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String lastSyncedAt(String time) {
     return 'آخرین همگام‌سازی $time';
   }
@@ -704,6 +715,17 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
       locale: localeName,
       other: '$count مورد نیاز به بازبینی دارند',
       one: '۱ مورد نیاز به بازبینی دارد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String syncRejected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تغییر از طرف سرور رد شد',
+      one: '۱ تغییر از طرف سرور رد شد',
     );
     return '$_temp0';
   }

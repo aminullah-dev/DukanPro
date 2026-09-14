@@ -86,6 +86,11 @@ class SyncStatusCard extends ConsumerWidget {
                       l.syncConflicts(status.conflicts),
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
                     ),
+                  if (status.rejected > 0)
+                    Text(
+                      l.syncRejected(status.rejected),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                    ),
                 ],
               ),
             ),

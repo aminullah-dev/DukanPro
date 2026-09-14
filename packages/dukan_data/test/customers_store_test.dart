@@ -70,4 +70,20 @@ void main() {
     expect(await purchasing.supplierBalance(s.id), 400000);
     expect((await catalog.products.findById(p.id))?.cost?.amountMinor, 40000);
   });
+
+  test('a zero-cost receipt adds stock but bills the supplier nothing', () async {
+    final p = Product(id: newId(), sku: 'P4', name: 'Salt', unitId: 'piece', sellPrice: Money(1000, 'AFN'));
+    await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    final s = Supplier(id: newId(), name: 'Donor');
+    await purchasing.createSupplier(s, actorId: 'u1', deviceId: 'app');
+    await purchasing.receiveGoods(
+      supplierId: s.id,
+      lines: [ReceiptLine(productId: p.id, qtyMinor: 5, unitCostMinor: 0)],
+      branchId: 'B1', actorId: 'u1', deviceId: 'app',
+    );
+    expect(await catalog.onHand(p.id, 'B1'), 5);
+    expect(await purchasing.supplierBalance(s.id), 0);
+    final ops = await DriftSyncOutbox(db).pending();
+    expect(ops.where((o) => o.aggregateType == 'supplier_ledger'), isEmpty); // the server rejects a zero bill
+  });
 }

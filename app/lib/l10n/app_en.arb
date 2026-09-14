@@ -82,6 +82,8 @@
   "syncFailed": "Couldn't sync. Check your connection and try again.",
   "syncConflicts": "{count, plural, =1{1 item needs review} other{{count} items need review}}",
   "@syncConflicts": { "placeholders": { "count": { "type": "int" } } },
+  "syncRejected": "{count, plural, =1{1 change was rejected by the server} other{{count} changes were rejected by the server}}",
+  "@syncRejected": { "placeholders": { "count": { "type": "int" } } },
   "lastSyncedAt": "Last synced {time}",
   "@lastSyncedAt": { "placeholders": { "time": { "type": "String" } } },
   "employees": "Employees",
