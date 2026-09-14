@@ -55,6 +55,7 @@ class AuthController extends Notifier<AuthState> {
     required String password,
     required String displayName,
     required String shopName,
+    required String setupCode,
   }) async {
     try {
       final res = await _api.bootstrap(
@@ -63,6 +64,7 @@ class AuthController extends Notifier<AuthState> {
         displayName: displayName,
         shopName: shopName,
         deviceId: ref.read(deviceIdProvider),
+        setupToken: setupCode,
       );
       await _persist(res, password);
       final profile = await _profiles.current();

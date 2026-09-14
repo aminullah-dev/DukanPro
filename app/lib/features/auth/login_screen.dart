@@ -17,6 +17,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _password = TextEditingController();
   final _displayName = TextEditingController();
   final _shopName = TextEditingController();
+  final _setupCode = TextEditingController();
   bool _setup = false;
   bool _busy = false;
 
@@ -26,6 +27,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _password.dispose();
     _displayName.dispose();
     _shopName.dispose();
+    _setupCode.dispose();
     super.dispose();
   }
 
@@ -39,6 +41,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         password: _password.text,
         displayName: _displayName.text.trim().isEmpty ? username : _displayName.text.trim(),
         shopName: _shopName.text.trim().isEmpty ? 'My Shop' : _shopName.text.trim(),
+        setupCode: _setupCode.text.trim(),
       );
     } else {
       await controller.loginOnline(username: username, password: _password.text);
@@ -56,6 +59,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         'NETWORK' => l.errNetwork,
         'INVALID_CREDENTIALS' => l.loginFailed,
         'BOOTSTRAP_ALREADY_DONE' => l.errBootstrapDone,
+        'SETUP_TOKEN_INVALID' => l.errSetupCode,
         _ => _setup ? l.setupFailed : l.loginFailed,
       };
 
@@ -97,6 +101,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextField(
                   controller: _shopName,
                   decoration: InputDecoration(labelText: l.shopName, border: const OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _setupCode,
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                    labelText: l.setupCode,
+                    helperText: l.setupCodeHelp,
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
               ],
               if (error != null) ...[

@@ -46,6 +46,7 @@ final class LocalSales {
   }) async {
     final currency = lines.isEmpty ? 'AFN' : lines.first.currency;
     final totals = computeTotals(lines, discountMinor: discountMinor);
+    assertDiscountValid(discountMinor: discountMinor, subtotalMinor: totals.subtotalMinor);
     final tendered = tenderedMinor ?? cashMinor;
     final onCredit = customerId != null;
     assertSettleable(

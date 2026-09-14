@@ -569,6 +569,24 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 change was rejected by the server} other{{count} changes were rejected by the server}}'**
   String syncRejected(int count);
 
+  /// No description provided for @setupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup code'**
+  String get setupCode;
+
+  /// No description provided for @setupCodeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown in the server console when the server starts'**
+  String get setupCodeHelp;
+
+  /// No description provided for @errSetupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong setup code. Check the server console.'**
+  String get errSetupCode;
+
   /// No description provided for @lastSyncedAt.
   ///
   /// In en, this message translates to:

@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from dukan.application.access import require_permission
+from dukan.application.access import require_any_permission, require_permission
 from dukan.application.purchasing import (
     GoodsReceiptView,
     PurchasingService,
@@ -25,6 +25,7 @@ from dukan.infrastructure.db.models import (
     SupplierLedgerModel,
     SupplierModel,
 )
+from dukan.infrastructure.scope import require_active_branch
 from dukan.shared.errors import NotFoundError, ValidationError
 from dukan.shared.ids import new_id
 
@@ -61,6 +62,7 @@ class SqlPurchasingService(PurchasingService):
         self, *, actor: User, branch_id: str, name: str, phone: str | None
     ) -> SupplierView:
         require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
+        require_active_branch(self._s, branch_id)
         s = SupplierModel(
             id=new_id(), name=name, phone=phone, created_by=actor.id, updated_by=actor.id
         )
@@ -68,7 +70,12 @@ class SqlPurchasingService(PurchasingService):
         self._s.commit()
         return self._view(s)
 
-    def list_suppliers(self) -> list[SupplierView]:
+    def list_suppliers(self, *, actor: User, branch_id: str) -> list[SupplierView]:
+        require_any_permission(
+            _POLICY, actor,
+            (Permission.STOCK_ADJUST, Permission.PRODUCT_MANAGE, Permission.REPORT_VIEW),
+            branch_id,
+        )
         stmt = (
             select(SupplierModel)
             .where(SupplierModel.deleted_at.is_(None))
@@ -85,8 +92,19 @@ class SqlPurchasingService(PurchasingService):
         self, *, actor: User, branch_id: str, supplier_id: str | None, lines: list[ReceiptLineInput]
     ) -> GoodsReceiptView:
         require_permission(_POLICY, actor, Permission.STOCK_ADJUST, branch_id)
+        require_active_branch(self._s, branch_id)
         if not lines:
             raise ValidationError("GRN_EMPTY")
+        if supplier_id is not None or any(l.unit_cost_minor > 0 for l in lines):
+            # A supplier bill is a debt and a cost sets every later margin: both need
+            # purchase.cost. Without it a receipt only moves stock.
+            require_permission(_POLICY, actor, Permission.PURCHASE_COST, branch_id)
+        if supplier_id is not None and self._s.scalar(
+            select(SupplierModel).where(
+                SupplierModel.id == supplier_id, SupplierModel.deleted_at.is_(None)
+            )
+        ) is None:
+            raise NotFoundError("SUPPLIER_NOT_FOUND", supplier_id=supplier_id)
         total = sum(l.unit_cost_minor * l.qty_minor for l in lines)
         receipt = GoodsReceiptModel(
             id=new_id(), number=self._next_number(), supplier_id=supplier_id, branch_id=branch_id,
@@ -114,9 +132,9 @@ class SqlPurchasingService(PurchasingService):
                     ref_id=receipt.id, created_by=actor.id,
                 )
             )
-            # Update last cost on the product.
-            product.cost_minor = l.unit_cost_minor
-            product.cost_currency = product.sell_currency
+            if l.unit_cost_minor > 0:  # a quantity-only receipt leaves the last cost alone
+                product.cost_minor = l.unit_cost_minor
+                product.cost_currency = product.sell_currency
         if supplier_id is not None:
             self._s.add(
                 SupplierLedgerModel(

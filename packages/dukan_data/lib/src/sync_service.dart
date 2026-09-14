@@ -25,7 +25,9 @@ Value<T> _opt<T>(Map<String, Object?> d, String key, T Function(Object?) read) =
 bool _retryable(String? code) =>
     code != null && (code.endsWith('_NOT_FOUND') || _retryableCodes.contains(code));
 
-const _retryableCodes = {'ACCESS_DENIED', 'SYNC_ACTOR_MISMATCH', 'BRANCH_REQUIRED', 'ROW_INVALID'};
+const _retryableCodes = {
+  'ACCESS_DENIED', 'SYNC_ACTOR_MISMATCH', 'BRANCH_REQUIRED', 'BRANCH_INACTIVE', 'ROW_INVALID',
+};
 
 /// Drains the outbox to the server and applies server changes back — the
 /// offline-first sync loop. See docs/sync-protocol.md.

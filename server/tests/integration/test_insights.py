@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 def _seed(client: TestClient) -> dict:
     token = client.post(
         "/auth/bootstrap",
-        json={"username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
     ).json()["tokens"]["access_token"]
     h = {"Authorization": f"Bearer {token}"}
     units = {u["name"]: u["id"] for u in client.get("/units", headers=h).json()}

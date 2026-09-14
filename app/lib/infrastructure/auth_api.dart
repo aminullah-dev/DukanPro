@@ -77,6 +77,7 @@ abstract interface class AuthApi {
     required String displayName,
     required String shopName,
     required String deviceId,
+    required String setupToken,
   });
   Future<ApiAuthResult> login({
     required String username,
@@ -117,6 +118,7 @@ class DioAuthApi implements AuthApi {
     required String displayName,
     required String shopName,
     required String deviceId,
+    required String setupToken,
   }) =>
       _wrap(
         () => _dio.post('/auth/bootstrap', data: {
@@ -125,6 +127,7 @@ class DioAuthApi implements AuthApi {
           'display_name': displayName,
           'shop_name': shopName,
           'device_id': deviceId,
+          'setup_token': setupToken,
         }),
         ApiAuthResult.fromJson,
       );

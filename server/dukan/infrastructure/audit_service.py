@@ -13,6 +13,7 @@ from dukan.application.access import require_permission
 from dukan.application.audit import AuditEntryView, AuditService
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.infrastructure.db.models import AuditEntryModel
+from dukan.infrastructure.scope import require_everywhere
 
 _POLICY = PermissionPolicy()
 
@@ -37,6 +38,12 @@ class SqlAuditService(AuditService):
             q = q.where(AuditEntryModel.actor_id == actor_id)
         return q.order_by(AuditEntryModel.occurred_at.desc()).limit(max(1, min(limit, 5000)))
 
+    def _require_reader(self, actor: User, branch_id: str) -> None:
+        # Entries carry no branch, so the trail is shop-wide: only an actor with
+        # audit.view in every branch (an owner of the whole shop) reads it.
+        require_permission(_POLICY, actor, Permission.AUDIT_VIEW, branch_id)
+        require_everywhere(self._s, actor, Permission.AUDIT_VIEW)
+
     def _view(self, m: AuditEntryModel) -> AuditEntryView:
         return AuditEntryView(
             id=m.id,
@@ -58,7 +65,7 @@ class SqlAuditService(AuditService):
         actor_id: str | None = None,
         limit: int = 100,
     ) -> list[AuditEntryView]:
-        require_permission(_POLICY, actor, Permission.AUDIT_VIEW, branch_id)
+        self._require_reader(actor, branch_id)
         rows = self._s.scalars(self._filtered(action, entity_type, actor_id, limit)).all()
         return [self._view(m) for m in rows]
 
@@ -72,7 +79,7 @@ class SqlAuditService(AuditService):
         actor_id: str | None = None,
         limit: int = 1000,
     ) -> str:
-        require_permission(_POLICY, actor, Permission.AUDIT_VIEW, branch_id)
+        self._require_reader(actor, branch_id)
         rows = self._s.scalars(self._filtered(action, entity_type, actor_id, limit)).all()
         buf = io.StringIO()
         writer = csv.writer(buf)

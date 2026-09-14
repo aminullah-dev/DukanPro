@@ -31,7 +31,9 @@ def issue_access(*, secret: str, user_id: str, session_id: str, ttl_minutes: int
 
 def decode_access(*, secret: str, token: str) -> dict:
     try:
-        return jwt.decode(token, secret, algorithms=[_ALGO])
+        return jwt.decode(
+            token, secret, algorithms=[_ALGO], options={"require": ["exp", "iat", "sub", "sid"]}
+        )
     except jwt.ExpiredSignatureError as e:
         raise AuthError("TOKEN_EXPIRED") from e
     except jwt.PyJWTError as e:

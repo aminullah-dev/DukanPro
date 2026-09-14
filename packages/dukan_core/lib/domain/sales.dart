@@ -84,3 +84,12 @@ void assertSettleable({
     throw ConflictError('SALE_UNDERPAID', {'total': totalMinor, 'paid': paidMinor});
   }
 }
+
+/// A discount lies between 0 and the subtotal: a negative one is a hidden
+/// surcharge, a larger one a negative total. Raises [ValidationError]
+/// `SALE_DISCOUNT_INVALID`.
+void assertDiscountValid({required int discountMinor, required int subtotalMinor}) {
+  if (discountMinor < 0 || discountMinor > subtotalMinor) {
+    throw ValidationError('SALE_DISCOUNT_INVALID', {'discount': discountMinor, 'subtotal': subtotalMinor});
+  }
+}

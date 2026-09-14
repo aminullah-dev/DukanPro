@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from dukan.application.access import require_permission
+from dukan.application.access import require_any_permission, require_permission
 from dukan.application.catalog import CatalogService, ProductView
 from dukan.domain.catalog import assert_unique_barcode, assert_unique_sku
 from dukan.domain.identity import Permission, PermissionPolicy, User
@@ -19,6 +19,7 @@ from dukan.infrastructure.db.models import (
     StockMovementModel,
     UnitModel,
 )
+from dukan.infrastructure.scope import require_active_branch
 from dukan.shared.errors import NotFoundError, ValidationError
 from dukan.shared.ids import new_id
 from dukan.shared.money import Money
@@ -105,6 +106,7 @@ class SqlCatalogService(CatalogService):
         barcodes: list[str],
     ) -> ProductView:
         require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
+        require_active_branch(self._s, branch_id)
         Money(sell_price_minor, currency).validated()
         if self._s.scalar(
             select(UnitModel).where(UnitModel.id == unit_id, UnitModel.deleted_at.is_(None))
@@ -148,6 +150,7 @@ class SqlCatalogService(CatalogService):
         is_active: bool | None,
     ) -> ProductView:
         require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
+        require_active_branch(self._s, branch_id)
         product = self._get(product_id)
         if name is not None:
             product.name = name
@@ -170,6 +173,7 @@ class SqlCatalogService(CatalogService):
         self, *, actor: User, branch_id: str, product_id: str, code: str
     ) -> ProductView:
         require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
+        require_active_branch(self._s, branch_id)
         product = self._get(product_id)
         taken = self._s.scalar(
             select(BarcodeModel).where(
@@ -184,7 +188,14 @@ class SqlCatalogService(CatalogService):
         self._s.commit()
         return self._view(product, branch_id)
 
-    def list_products(self, *, branch_id: str, search: str | None) -> list[ProductView]:
+    def _require_member(self, actor: User, branch_id: str) -> None:
+        # On-hand is per branch: only someone who works there reads it.
+        require_any_permission(_POLICY, actor, tuple(Permission), branch_id)
+
+    def list_products(
+        self, *, actor: User, branch_id: str, search: str | None
+    ) -> list[ProductView]:
+        self._require_member(actor, branch_id)
         stmt = select(ProductModel).where(ProductModel.deleted_at.is_(None))
         if search:
             like = f"%{search}%"
@@ -192,13 +203,15 @@ class SqlCatalogService(CatalogService):
         stmt = stmt.order_by(ProductModel.name)
         return [self._view(p, branch_id) for p in self._s.scalars(stmt)]
 
-    def get_product(self, *, branch_id: str, product_id: str) -> ProductView:
+    def get_product(self, *, actor: User, branch_id: str, product_id: str) -> ProductView:
+        self._require_member(actor, branch_id)
         return self._view(self._get(product_id), branch_id)
 
     def adjust_stock(
         self, *, actor: User, branch_id: str, product_id: str, qty_delta: int
     ) -> ProductView:
         require_permission(_POLICY, actor, Permission.STOCK_ADJUST, branch_id)
+        require_active_branch(self._s, branch_id)
         product = self._get(product_id)
         if not product.track_stock:
             raise ValidationError("PRODUCT_NOT_STOCK_TRACKED", product_id=product_id)

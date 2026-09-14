@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from dukan.shared.errors import ConflictError
+from dukan.shared.errors import ConflictError, ValidationError
 
 
 class LedgerEntryType(StrEnum):
@@ -61,3 +61,10 @@ def assert_within_credit_limit(
 def assert_not_overpaid(*, balance_minor: int, payment_minor: int) -> None:
     if payment_minor > balance_minor:
         raise ConflictError("DEBT_OVERPAYMENT", balance=balance_minor, payment=payment_minor)
+
+
+def assert_credit_limit_valid(*, credit_limit_minor: int | None) -> None:
+    """A credit limit is None (unlimited) or a non-negative amount. Raises
+    ValidationError CUSTOMER_CREDIT_LIMIT_INVALID."""
+    if credit_limit_minor is not None and credit_limit_minor < 0:
+        raise ValidationError("CUSTOMER_CREDIT_LIMIT_INVALID", limit=credit_limit_minor)

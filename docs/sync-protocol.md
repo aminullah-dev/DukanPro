@@ -64,7 +64,7 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 
 `occurred_at` is the server's apply time; the device's time is kept in the audit entry.
 
-**Authorization.** The permission is checked for the authenticated user (never a user named in the payload) in the branch the row belongs to: `branch_id` for sales and stock movements, the parent sale's branch for its children, the active branch for shop-wide rows.
+**Authorization.** The permission is checked for the authenticated user (never a user named in the payload) in the branch the row belongs to: `branch_id` for sales and stock movements, the parent sale's branch for its children, the active branch for shop-wide rows. That branch must be active (`BRANCH_INACTIVE`, not recorded: the op applies once the branch reopens).
 
 | Table, op | Permission (branch) | Rules |
 |---|---|---|
@@ -72,17 +72,17 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | products update | product.manage (active), plus price.change when the price or currency changes | `base_version` required; only `name`, `sell_price_minor`, `sell_currency`, `is_active` |
 | barcodes insert | product.manage (active) | the product exists |
 | units insert | any role in the active branch for the device seed (piece/0, kg/3, litre/3, dozen/0, meter/2); product.manage otherwise | |
-| customers insert | sale.create (active) | |
+| customers insert | sale.create (active) | a credit limit other than 0 (null is unlimited) without customer.credit is stored as 0, and the audit keeps the requested limit |
 | suppliers insert | product.manage (active) | |
 | stock_movements insert, `adjustment` | stock.adjust (row) | qty ≠ 0; the product tracks stock |
 | stock_movements insert, `purchase` | stock.adjust (row) | qty > 0 |
 | stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product |
-| sales insert | sale.create (row) | total = subtotal − discount + tax; paid ≥ total unless on credit; the customer exists; `shift_id` null |
+| sales insert | sale.create (row), plus sale.discount for a discount above 0 | 0 ≤ discount ≤ subtotal; total = subtotal − discount + tax; paid ≥ total unless on credit; the customer exists; `shift_id` null |
 | sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up); lines ≤ subtotal; the sale's currency; a pushed `unit_cost_minor` is ignored and set by the server from the product's cost |
 | payments insert | sale.create (sale's) | the pusher's own sale, whose lines add up to its subtotal; payments ≤ paid and ≤ total; tendered ≥ amount |
 | customer_ledger insert, `charge` | sale.create (sale's) | `ref_type` `sale` and `ref_id` of the pusher's own sale for that customer, whose lines add up to its subtotal; charges ≤ total − paid; over the credit limit is **flagged** in the audit, not refused |
 | customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused |
-| supplier_ledger insert, `bill` | stock.adjust (active) | the supplier exists; the supplier's currency |
+| supplier_ledger insert, `bill` | purchase.cost (active) | the supplier exists; the supplier's currency |
 
 Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories, updates of anything but products, stock transfers, counts and returns, customer opening balances and adjustments, supplier payments. Offline ledger entries that break a limit online would enforce still apply, because two tills can both act while offline; the audit flag is what the owner reviews.
 
@@ -93,14 +93,14 @@ Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories,
 `rejected`:
 - Envelope: `SYNC_OP_INVALID`, `UNKNOWN_TABLE`, `SYNC_OP_UNSUPPORTED`, `SYNC_BASE_VERSION_REQUIRED`, `SYNC_ACTOR_MISMATCH`, `SYNC_OP_ID_TAKEN` (another user's applied op already holds this op_id).
 - Fields: `SYNC_FIELD_NOT_ALLOWED`, `SYNC_FIELD_REQUIRED`, `SYNC_FIELD_INVALID`, `MONEY_CURRENCY_INVALID` (the context names the field and the reason).
-- Access: `ACCESS_DENIED`, `BRANCH_REQUIRED`.
+- Access: `ACCESS_DENIED`, `BRANCH_REQUIRED`, `BRANCH_INACTIVE`.
 - References: `PRODUCT_NOT_FOUND`, `UNIT_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `SUPPLIER_NOT_FOUND`, `SALE_NOT_FOUND`, `SALE_LINES_NOT_FOUND` (money against a sale whose lines have not all arrived), `SYNC_REF_MISMATCH`, `SYNC_ROW_EXISTS` (a ledger row id reused).
-- Domain: `STOCK_INVALID_QTY`, `PRODUCT_NOT_STOCK_TRACKED`, `SALE_UNDERPAID`, `SALE_CURRENCY_MISMATCH`, `DEBT_CURRENCY_MISMATCH`, `PURCHASE_CURRENCY_MISMATCH`.
+- Domain: `STOCK_INVALID_QTY`, `PRODUCT_NOT_STOCK_TRACKED`, `SALE_UNDERPAID`, `SALE_DISCOUNT_INVALID`, `SALE_CURRENCY_MISMATCH`, `DEBT_CURRENCY_MISMATCH`, `PURCHASE_CURRENCY_MISMATCH`.
 - `ROW_INVALID`: an unexpected server error on that op.
 
 ## Outcome caching
 
-A recorded outcome is returned on every replay of its op_id. Outcomes that depend on server state that can change are **not** recorded, so a replay re-evaluates them: `ACCESS_DENIED`, `SYNC_ACTOR_MISMATCH`, `BRANCH_REQUIRED`, `ROW_INVALID` and every `*_NOT_FOUND`. Nothing was applied, so exactly-once still holds.
+A recorded outcome is returned on every replay of its op_id. Outcomes that depend on server state that can change are **not** recorded, so a replay re-evaluates them: `ACCESS_DENIED`, `SYNC_ACTOR_MISMATCH`, `BRANCH_REQUIRED`, `BRANCH_INACTIVE`, `ROW_INVALID` and every `*_NOT_FOUND`. Nothing was applied, so exactly-once still holds.
 
 The client mirrors this: such an op stays pending and is re-sent on the next sync, for example when a parent still queued by another user arrives, a role is granted, or the right user signs in. An op whose parent was rejected for good keeps coming back as `*_NOT_FOUND` and stays pending.
 

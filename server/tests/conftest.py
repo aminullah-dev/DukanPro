@@ -9,6 +9,7 @@ import os
 # a module-level app). Tests use their own per-test DB via the `client` fixture.
 os.environ.setdefault("DUKAN_SECRET_KEY", "test-secret-key-at-least-32-bytes-long-00")
 os.environ.setdefault("DUKAN_DATABASE_URL", "sqlite:///./.pytest_import.db")
+os.environ.setdefault("DUKAN_BOOTSTRAP_TOKEN", "test-setup-token")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -23,6 +24,7 @@ def client(tmp_path) -> TestClient:
     settings = Settings(
         secret_key="test-secret-key-at-least-32-bytes-long-00",
         database_url=f"sqlite:///{tmp_path / 't.db'}",
+        bootstrap_token="test-setup-token",
     )
     app = create_app(settings)
     Base.metadata.create_all(app.state.engine)

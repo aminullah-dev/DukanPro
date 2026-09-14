@@ -282,6 +282,16 @@ class AppLocalizationsPs extends AppLocalizations {
   }
 
   @override
+  String get setupCode => 'د تنظیم کوډ';
+
+  @override
+  String get setupCodeHelp =>
+      'کله چې سرور پیلېږي، د سرور په کنسول کې ښودل کېږي';
+
+  @override
+  String get errSetupCode => 'د تنظیم کوډ سم نه دی. د سرور کنسول وګورئ.';
+
+  @override
   String lastSyncedAt(String time) {
     return 'وروستۍ همغږي $time';
   }

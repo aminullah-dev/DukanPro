@@ -10,8 +10,10 @@ from dukan.domain.identity import (
     PermissionPolicy,
     User,
     UserStatus,
-    assert_not_last_owner,
+    assert_branch_keeps_owner,
+    assert_keeps_an_assignment,
     assert_password_strong,
+    assert_role_known,
     assert_role_mutable,
     assert_username_available,
 )
@@ -48,12 +50,34 @@ def test_disabled_user_has_no_permissions() -> None:
     assert POLICY.can(u, Permission.SALE_CREATE, "B1") is False
 
 
-def test_last_owner_protected() -> None:
-    owner = _user([BranchAssignment("B1", "owner")])
+def test_every_branch_keeps_an_owner() -> None:
     with pytest.raises(ConflictError) as e:
-        assert_not_last_owner(target=owner, active_owner_count=1)
+        assert_branch_keeps_owner(branch_id="B1", owners_after=0)
     assert e.value.code == "USER_LAST_OWNER"
-    assert_not_last_owner(target=owner, active_owner_count=2)  # no raise
+    assert_branch_keeps_owner(branch_id="B1", owners_after=1)  # no raise
+
+
+def test_a_user_keeps_an_assignment() -> None:
+    with pytest.raises(ConflictError) as e:
+        assert_keeps_an_assignment(user_id="u", remaining=0)
+    assert e.value.code == "USER_LAST_ASSIGNMENT"
+    assert_keeps_an_assignment(user_id="u", remaining=1)  # no raise
+
+
+def test_only_builtin_roles_are_assignable() -> None:
+    with pytest.raises(ValidationError) as e:
+        assert_role_known(role_name="admin")
+    assert e.value.code == "ROLE_UNKNOWN"
+    assert_role_known(role_name="stock_keeper")  # no raise
+
+
+def test_money_permissions_belong_to_owner_and_manager() -> None:
+    money = (Permission.SALE_VOID, Permission.SALE_DISCOUNT, Permission.CUSTOMER_CREDIT,
+             Permission.PURCHASE_COST)
+    for role, allowed in (("owner", True), ("manager", True), ("cashier", False),
+                          ("stock_keeper", False), ("accountant", False)):
+        u = _user([BranchAssignment("B1", role)])
+        assert all(POLICY.can(u, p, "B1") is allowed for p in money), role
 
 
 def test_duplicate_username_rejected() -> None:

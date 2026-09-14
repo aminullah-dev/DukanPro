@@ -20,6 +20,7 @@ from typing import Any, Protocol
 
 from dukan.application.access import require_permission
 from dukan.application.sync import OpInput
+from dukan.domain.branches import assert_branch_active
 from dukan.domain.customers import (
     LedgerEntryType,
     assert_not_overpaid,
@@ -28,7 +29,7 @@ from dukan.domain.customers import (
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.domain.inventory import StockReason, adjust_stock
 from dukan.domain.purchasing import SupplierEntryType
-from dukan.domain.sales import PaymentMethod, line_total_minor
+from dukan.domain.sales import PaymentMethod, assert_discount_valid, line_total_minor
 from dukan.shared.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
 from dukan.shared.limits import INT32_MAX, INT32_MIN
 
@@ -402,6 +403,8 @@ class SyncReader(Protocol):
 
     def sale_charges_total(self, sale_id: str) -> int: ...
 
+    def branch_active(self, branch_id: str) -> bool: ...
+
 
 @dataclass(frozen=True, slots=True)
 class RowSnapshot:
@@ -581,7 +584,14 @@ def _customers_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     branch = _active(ctx)
     _need(ctx, Permission.SALE_CREATE, branch)
     _guard_insert(ctx)
+    limit = v.get("credit_limit_minor")  # absent or null: unlimited credit
     after = _pick(v, "name", "credit_limit_minor", "currency")
+    if limit != 0 and not POLICY.can(ctx.actor, Permission.CUSTOMER_CREDIT, branch):
+        # Granting credit is a manager's decision. The offline row still applies
+        # (its sales and payments depend on it) but with no credit; the audit keeps
+        # what was asked for.
+        v = {**v, "credit_limit_minor": 0}
+        after = {**after, "credit_limit_minor": 0, "credit_limit_requested": limit}
     return ApplyPlan(v, branch, None, AuditIntent("customer.created", "customer", after))
 
 
@@ -652,8 +662,12 @@ def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     branch: str = v["branch_id"]
     _need(ctx, Permission.SALE_CREATE, branch)
     _guard_insert(ctx)
+    discount: int = v.get("discount_minor", 0)
+    assert_discount_valid(discount_minor=discount, subtotal_minor=v["subtotal_minor"])
+    if discount > 0:
+        _need(ctx, Permission.SALE_DISCOUNT, branch)
     total: int = v["total_minor"]
-    if total != v["subtotal_minor"] - v.get("discount_minor", 0) + v.get("tax_minor", 0):
+    if total != v["subtotal_minor"] - discount + v.get("tax_minor", 0):
         raise ValidationError(
             "SYNC_FIELD_INVALID", table="sales", field="total_minor", reason="arithmetic"
         )
@@ -663,7 +677,10 @@ def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
             raise ConflictError("SALE_UNDERPAID", total=total, paid=v["paid_minor"])
     else:
         _customer(ctx, customer_id)
-    after = _pick(v, "number", "branch_id", "customer_id", "currency", "total_minor", "paid_minor")
+    after = _pick(
+        v, "number", "branch_id", "customer_id", "currency", "discount_minor", "total_minor",
+        "paid_minor",
+    )
     return ApplyPlan(v, branch, branch, AuditIntent("sale.settled", "sale", after))
 
 
@@ -779,7 +796,7 @@ def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     if SupplierEntryType(v["type"]) is not SupplierEntryType.BILL:
         raise ValidationError("SYNC_OP_UNSUPPORTED", table="supplier_ledger", type=v["type"])
     branch = _active(ctx)
-    _need(ctx, Permission.STOCK_ADJUST, branch)
+    _need(ctx, Permission.PURCHASE_COST, branch)  # a bill is a debt: not a stock move
     _guard_insert(ctx)
     supplier = ctx.reader.supplier(v["supplier_id"])
     if supplier is None or supplier.deleted:
@@ -824,12 +841,19 @@ def plan_op(
     ctx = _Ctx(
         op=op, actor=actor, active_branch=active_branch, existing=existing, reader=reader, now=now
     )
-    return _HANDLERS[(op.table, op.op)](ctx, values)
+    plan = _HANDLERS[(op.table, op.op)](ctx, values)
+    # Writes happen only in an active branch; its history stays readable.
+    assert_branch_active(
+        branch_id=plan.auth_branch_id, is_active=reader.branch_active(plan.auth_branch_id)
+    )
+    return plan
 
 
 # ── Outcome caching, audit role, pull scope ──────────────────────────────────
 
-_TRANSIENT = frozenset({"ACCESS_DENIED", "SYNC_ACTOR_MISMATCH", "BRANCH_REQUIRED", "ROW_INVALID"})
+_TRANSIENT = frozenset({
+    "ACCESS_DENIED", "SYNC_ACTOR_MISMATCH", "BRANCH_REQUIRED", "BRANCH_INACTIVE", "ROW_INVALID",
+})
 
 
 def is_cacheable(code: str) -> bool:

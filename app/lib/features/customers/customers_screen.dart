@@ -14,7 +14,10 @@ class CustomersScreen extends ConsumerWidget {
   Future<void> _add(BuildContext context, WidgetRef ref) async {
     final actor = ref.read(sessionActorProvider);
     if (actor == null) return;
-    final created = await showDialog<Customer>(context: context, builder: (_) => const _AddCustomerDialog());
+    final created = await showDialog<Customer>(
+      context: context,
+      builder: (_) => _AddCustomerDialog(canGrantCredit: actor.can(Permission.customerCredit)),
+    );
     if (created == null) return;
     await ref.read(localCustomersProvider).createCustomer(created, actorId: actor.user.id, deviceId: 'app');
     ref.invalidate(customersProvider);
@@ -88,7 +91,11 @@ class _BalanceChip extends ConsumerWidget {
 }
 
 class _AddCustomerDialog extends StatefulWidget {
-  const _AddCustomerDialog();
+  const _AddCustomerDialog({required this.canGrantCredit});
+
+  /// Credit is a manager's decision: without customer.credit the customer gets
+  /// none (limit 0) and the field is hidden.
+  final bool canGrantCredit;
   @override
   State<_AddCustomerDialog> createState() => _AddCustomerDialogState();
 }
@@ -114,7 +121,8 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: _name, decoration: InputDecoration(labelText: l.customerName)),
         TextField(controller: _phone, decoration: InputDecoration(labelText: l.phone)),
-        TextField(
+        if (widget.canGrantCredit)
+          TextField(
           controller: _limit,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(labelText: l.creditLimit, suffixText: 'AFN'),
@@ -136,7 +144,7 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
               Customer(
                 id: newId(), name: name,
                 phone: phone.isEmpty ? null : phone,
-                creditLimitMinor: limit == null ? null : (limit * 100).round(),
+                creditLimitMinor: !widget.canGrantCredit ? 0 : (limit == null ? null : (limit * 100).round()),
               ),
             );
           },

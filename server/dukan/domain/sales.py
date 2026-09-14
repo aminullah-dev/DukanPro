@@ -81,3 +81,13 @@ def assert_settleable(
             raise ConflictError("SALE_CURRENCY_MISMATCH", expected=currency, got=l.currency)
     if not allow_credit and paid_minor < total_minor:
         raise ConflictError("SALE_UNDERPAID", total=total_minor, paid=paid_minor)
+
+
+def assert_discount_valid(*, discount_minor: int, subtotal_minor: int) -> None:
+    """A discount lies between 0 and the subtotal: a negative one is a hidden
+    surcharge, a larger one a negative total. Raises ValidationError
+    SALE_DISCOUNT_INVALID."""
+    if not 0 <= discount_minor <= subtotal_minor:
+        raise ValidationError(
+            "SALE_DISCOUNT_INVALID", discount=discount_minor, subtotal=subtotal_minor
+        )

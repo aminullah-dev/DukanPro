@@ -41,6 +41,7 @@ from dukan.domain.identity import User
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     BarcodeModel,
+    BranchModel,
     CategoryModel,
     ChangeLogModel,
     CustomerLedgerModel,
@@ -192,6 +193,10 @@ class _SqlSyncReader:
             CustomerLedgerModel.type == "charge", CustomerLedgerModel.ref_type == "sale",
             CustomerLedgerModel.ref_id == sale_id, CustomerLedgerModel.deleted_at.is_(None),
         )
+
+    def branch_active(self, branch_id: str) -> bool:
+        b = self._s.get(BranchModel, branch_id)
+        return b is not None and b.deleted_at is None and b.is_active
 
 
 class SqlSyncService(SyncService):

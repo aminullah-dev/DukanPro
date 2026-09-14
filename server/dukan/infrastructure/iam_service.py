@@ -1,8 +1,12 @@
 """Concrete IamService bound to a SQLAlchemy session. Employee & branch
 administration: orchestrates a transaction, delegates rules to the domain, and
-writes an audit entry in the same transaction as each change. Server-
-authoritative and permission-gated; disabling a user or resetting a password
-revokes that user's sessions (identity-access invariant #4)."""
+writes an audit entry in the same transaction as each change.
+
+Every action is authorized in the TARGET's scope: the branch a role is granted
+in, or every branch a user works in when acting on that user. Every branch keeps
+an active owner and every user keeps an assignment. Disabling a user or
+resetting a password revokes that user's sessions (identity-access invariant #4).
+"""
 
 from __future__ import annotations
 
@@ -11,18 +15,20 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from dukan.application.access import require_permission
+from dukan.application.access import require_any_permission, require_permission
 from dukan.application.dto import BranchRole
 from dukan.application.iam import BranchView, EmployeeView, IamService
-from dukan.domain.branches import assert_not_last_active_branch
+from dukan.domain.branches import assert_branch_active, assert_not_last_active_branch
 from dukan.domain.identity import (
     BranchAssignment,
     Permission,
     PermissionPolicy,
     User,
     UserStatus,
-    assert_not_last_owner,
+    assert_branch_keeps_owner,
+    assert_keeps_an_assignment,
     assert_password_strong,
+    assert_role_known,
     assert_username_available,
 )
 from dukan.infrastructure.db.models import (
@@ -32,11 +38,13 @@ from dukan.infrastructure.db.models import (
     SessionModel,
     UserModel,
 )
+from dukan.infrastructure.scope import require_everywhere
 from dukan.infrastructure.security import passwords
 from dukan.shared.errors import NotFoundError, PermissionDeniedError
 from dukan.shared.ids import new_id
 
 _POLICY = PermissionPolicy()
+_OWNER = "owner"
 
 
 class SqlIamService(IamService):
@@ -44,22 +52,14 @@ class SqlIamService(IamService):
         self._s = session
 
     # ---- helpers ---------------------------------------------------------
-    def _require_any(self, actor: User, branch_id: str, perms: tuple[Permission, ...]) -> None:
-        if any(_POLICY.can(actor, p, branch_id) for p in perms):
-            return
-        raise PermissionDeniedError(
-            "ACCESS_DENIED",
-            permission="|".join(p.value for p in perms),
-            branch_id=branch_id,
-            actor_id=actor.id,
-        )
-
     def _assignments(self, user_id: str) -> tuple[BranchAssignment, ...]:
         rows = self._s.scalars(
-            select(BranchAssignmentModel).where(
+            select(BranchAssignmentModel)
+            .where(
                 BranchAssignmentModel.user_id == user_id,
                 BranchAssignmentModel.deleted_at.is_(None),
             )
+            .order_by(BranchAssignmentModel.created_at, BranchAssignmentModel.id)
         ).all()
         return tuple(BranchAssignment(branch_id=r.branch_id, role_name=r.role_name) for r in rows)
 
@@ -126,16 +126,75 @@ class SqlIamService(IamService):
             raise NotFoundError("BRANCH_NOT_FOUND", branch_id=branch_id)
         return m
 
-    def _active_owner_count(self) -> int:
-        rows = self._s.scalars(
-            select(UserModel.id).where(
-                UserModel.status == "active", UserModel.deleted_at.is_(None)
-            )
-        ).all()
-        return sum(1 for uid in rows if self._is_owner(uid))
+    @staticmethod
+    def _is_owner_in(user: User, branch_id: str) -> bool:
+        return user.is_active and any(
+            a.branch_id == branch_id and a.role_name == _OWNER for a in user.assignments
+        )
 
-    def _is_owner(self, user_id: str) -> bool:
-        return any(a.role_name == "owner" for a in self._assignments(user_id))
+    def _require_can_grant(self, actor: User, branch_id: str, role_name: str) -> None:
+        """Granting a role needs user.manage in that branch; granting owner needs
+        owner rights there."""
+        assert_role_known(role_name=role_name)
+        require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
+        if role_name == _OWNER and not self._is_owner_in(actor, branch_id):
+            raise PermissionDeniedError(
+                "ACCESS_DENIED", permission=_OWNER, branch_id=branch_id, actor_id=actor.id
+            )
+
+    def _require_user_admin(self, actor: User, target: User, fallback_branch: str) -> None:
+        """Acting on a user (status, password) needs user.manage in every branch
+        they work in; acting on an owner needs owner rights in all of them."""
+        branches = sorted({a.branch_id for a in target.assignments}) or [fallback_branch]
+        for branch_id in branches:
+            require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
+        if target.is_owner and not all(self._is_owner_in(actor, b) for b in branches):
+            raise PermissionDeniedError(
+                "ACCESS_DENIED", permission=_OWNER, user_id=target.id, actor_id=actor.id
+            )
+
+    def _active_owner_rows(self) -> list[tuple[str, str]]:
+        """(user_id, branch_id) of every live owner assignment of an active user.
+        The rows are locked, so two concurrent demotions cannot both pass."""
+        return [
+            (uid, bid)
+            for uid, bid in self._s.execute(
+                select(BranchAssignmentModel.user_id, BranchAssignmentModel.branch_id)
+                .join(UserModel, UserModel.id == BranchAssignmentModel.user_id)
+                .where(
+                    BranchAssignmentModel.role_name == _OWNER,
+                    BranchAssignmentModel.deleted_at.is_(None),
+                    UserModel.status == UserStatus.ACTIVE.value,
+                    UserModel.deleted_at.is_(None),
+                )
+                .with_for_update(of=BranchAssignmentModel)
+            ).tuples()
+        ]
+
+    def _assert_owner_remains(self, branch_id: str, *, losing: str) -> None:
+        """The branch must keep an active owner once `losing` stops being one."""
+        owners_after = sum(
+            1 for uid, bid in self._active_owner_rows() if bid == branch_id and uid != losing
+        )
+        assert_branch_keeps_owner(branch_id=branch_id, owners_after=owners_after)
+
+    def _shop_owners(self) -> set[str]:
+        """Active users who own every branch of the shop."""
+        branch_ids = set(
+            self._s.scalars(select(BranchModel.id).where(BranchModel.deleted_at.is_(None)))
+        )
+        owned: dict[str, set[str]] = {}
+        for uid, bid in self._active_owner_rows():
+            owned.setdefault(uid, set()).add(bid)
+        return {uid for uid, bids in owned.items() if branch_ids <= bids}
+
+    @staticmethod
+    def _branches_where(actor: User, *perms: Permission) -> set[str]:
+        return {
+            a.branch_id
+            for a in actor.assignments
+            if any(_POLICY.can(actor, p, a.branch_id) for p in perms)
+        }
 
     def _revoke_sessions(self, user_id: str) -> None:
         self._s.execute(
@@ -167,10 +226,20 @@ class SqlIamService(IamService):
 
     # ---- employees -------------------------------------------------------
     def list_employees(self, *, actor: User, branch_id: str) -> list[EmployeeView]:
+        """Users who work in a branch the actor manages users in."""
         require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
+        managed = self._branches_where(actor, Permission.USER_MANAGE)
         rows = self._s.scalars(
             select(UserModel)
-            .where(UserModel.deleted_at.is_(None))
+            .where(
+                UserModel.deleted_at.is_(None),
+                UserModel.id.in_(
+                    select(BranchAssignmentModel.user_id).where(
+                        BranchAssignmentModel.branch_id.in_(managed),
+                        BranchAssignmentModel.deleted_at.is_(None),
+                    )
+                ),
+            )
             .order_by(UserModel.display_name)
         ).all()
         return [self._employee_view(m) for m in rows]
@@ -185,7 +254,9 @@ class SqlIamService(IamService):
         display_name: str,
         role_name: str,
     ) -> EmployeeView:
-        require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
+        self._require_can_grant(actor, branch_id, role_name)
+        branch = self._require_branch(branch_id)
+        assert_branch_active(branch_id=branch_id, is_active=branch.is_active)
         assert_password_strong(password=password)
         taken = (
             self._s.scalar(
@@ -232,9 +303,11 @@ class SqlIamService(IamService):
     ) -> EmployeeView:
         require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
         m = self._require_user(user_id)
+        target = self._domain_user(m)
+        self._require_user_admin(actor, target, branch_id)
         if not active:
-            target = self._domain_user(m)
-            assert_not_last_owner(target=target, active_owner_count=self._active_owner_count())
+            for owned in sorted({a.branch_id for a in target.assignments if a.role_name == _OWNER}):
+                self._assert_owner_remains(owned, losing=target.id)
         m.status = "active" if active else "disabled"
         m.updated_by = actor.id
         m.version += 1
@@ -254,8 +327,10 @@ class SqlIamService(IamService):
         self, *, actor: User, branch_id: str, user_id: str, target_branch_id: str, role_name: str
     ) -> EmployeeView:
         require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
+        self._require_can_grant(actor, target_branch_id, role_name)
         m = self._require_user(user_id)
-        self._require_branch(target_branch_id)
+        target_branch = self._require_branch(target_branch_id)
+        assert_branch_active(branch_id=target_branch_id, is_active=target_branch.is_active)
         existing = self._s.scalar(
             select(BranchAssignmentModel).where(
                 BranchAssignmentModel.user_id == user_id,
@@ -264,6 +339,8 @@ class SqlIamService(IamService):
             )
         )
         if existing is not None:
+            if existing.role_name == _OWNER and role_name != _OWNER:
+                self._assert_owner_remains(target_branch_id, losing=user_id)
             existing.role_name = role_name
             existing.updated_by = actor.id
             existing.version += 1
@@ -292,6 +369,7 @@ class SqlIamService(IamService):
         self, *, actor: User, branch_id: str, user_id: str, target_branch_id: str
     ) -> EmployeeView:
         require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
+        require_permission(_POLICY, actor, Permission.USER_MANAGE, target_branch_id)
         m = self._require_user(user_id)
         row = self._s.scalar(
             select(BranchAssignmentModel).where(
@@ -302,20 +380,24 @@ class SqlIamService(IamService):
         )
         if row is None:
             raise NotFoundError("ASSIGNMENT_NOT_FOUND", user_id=user_id, branch_id=target_branch_id)
-        if row.role_name == "owner":
-            # Dropping the owner role must not leave the shop ownerless.
-            assert_not_last_owner(
-                target=self._domain_user(m), active_owner_count=self._active_owner_count()
-            )
+        if row.role_name == _OWNER:
+            self._assert_owner_remains(target_branch_id, losing=user_id)
+        remaining = [a for a in self._assignments(user_id) if a.branch_id != target_branch_id]
+        assert_keeps_an_assignment(user_id=user_id, remaining=len(remaining))
         row.deleted_at = datetime.now(UTC)
         row.updated_by = actor.id
+        if m.default_branch_id == target_branch_id:
+            # Requests without X-Branch-Id act in the default branch: keep it live.
+            m.default_branch_id = remaining[0].branch_id
+            m.updated_by = actor.id
+            m.version += 1
         self._s.flush()
         self._audit(
             "role.revoked",
             actor_id=actor.id,
             entity_type="user",
             entity_id=user_id,
-            after={"branch_id": target_branch_id},
+            after={"branch_id": target_branch_id, "default_branch_id": m.default_branch_id},
         )
         self._s.commit()
         return self._employee_view(m)
@@ -324,8 +406,9 @@ class SqlIamService(IamService):
         self, *, actor: User, branch_id: str, user_id: str, new_password: str
     ) -> None:
         require_permission(_POLICY, actor, Permission.USER_MANAGE, branch_id)
-        assert_password_strong(password=new_password)
         m = self._require_user(user_id)
+        self._require_user_admin(actor, self._domain_user(m), branch_id)
+        assert_password_strong(password=new_password)
         m.password_hash = passwords.hash_password(new_password)
         m.updated_by = actor.id
         m.version += 1
@@ -338,9 +421,14 @@ class SqlIamService(IamService):
 
     # ---- branches --------------------------------------------------------
     def list_branches(self, *, actor: User, branch_id: str) -> list[BranchView]:
-        self._require_any(actor, branch_id, (Permission.BRANCH_MANAGE, Permission.USER_MANAGE))
+        """Branches the actor manages (branches or their staff)."""
+        perms = (Permission.BRANCH_MANAGE, Permission.USER_MANAGE)
+        require_any_permission(_POLICY, actor, perms, branch_id)
+        visible = self._branches_where(actor, *perms)
         rows = self._s.scalars(
-            select(BranchModel).where(BranchModel.deleted_at.is_(None)).order_by(BranchModel.name)
+            select(BranchModel)
+            .where(BranchModel.deleted_at.is_(None), BranchModel.id.in_(visible))
+            .order_by(BranchModel.name)
         ).all()
         return [self._branch_view(m) for m in rows]
 
@@ -353,7 +441,10 @@ class SqlIamService(IamService):
         timezone: str = "Asia/Kabul",
         currency_default: str = "AFN",
     ) -> BranchView:
+        # Opening a branch is a shop-wide act: branch.manage in every branch.
         require_permission(_POLICY, actor, Permission.BRANCH_MANAGE, branch_id)
+        require_everywhere(self._s, actor, Permission.BRANCH_MANAGE)
+        owners = self._shop_owners() | {actor.id}
         m = BranchModel(
             id=new_id(),
             name=name,
@@ -365,6 +456,24 @@ class SqlIamService(IamService):
         )
         self._s.add(m)
         self._s.flush()
+        # The shop's owners own the new branch too, so it can be administered.
+        for owner_id in sorted(owners):
+            self._s.add(
+                BranchAssignmentModel(
+                    id=new_id(),
+                    user_id=owner_id,
+                    branch_id=m.id,
+                    role_name=_OWNER,
+                    created_by=actor.id,
+                )
+            )
+            self._audit(
+                "role.assigned",
+                actor_id=actor.id,
+                entity_type="user",
+                entity_id=owner_id,
+                after={"branch_id": m.id, "role": _OWNER},
+            )
         self._audit(
             "branch.created",
             actor_id=actor.id,
@@ -379,6 +488,7 @@ class SqlIamService(IamService):
         self, *, actor: User, branch_id: str, target_branch_id: str, name: str
     ) -> BranchView:
         require_permission(_POLICY, actor, Permission.BRANCH_MANAGE, branch_id)
+        require_permission(_POLICY, actor, Permission.BRANCH_MANAGE, target_branch_id)
         m = self._require_branch(target_branch_id)
         m.name = name
         m.updated_by = actor.id
@@ -398,6 +508,7 @@ class SqlIamService(IamService):
         self, *, actor: User, branch_id: str, target_branch_id: str, active: bool
     ) -> BranchView:
         require_permission(_POLICY, actor, Permission.BRANCH_MANAGE, branch_id)
+        require_permission(_POLICY, actor, Permission.BRANCH_MANAGE, target_branch_id)
         m = self._require_branch(target_branch_id)
         if not active:
             count = len(

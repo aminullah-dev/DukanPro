@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from dukan.application.access import require_permission
+from dukan.application.access import require_any_permission, require_permission
 from dukan.application.sales import (
     PaymentInput,
     SaleLineInput,
@@ -23,7 +23,7 @@ from dukan.domain.customers import (
     ledger_balance,
 )
 from dukan.domain.identity import Permission, PermissionPolicy, User
-from dukan.domain.sales import SaleLine, assert_settleable, compute_totals
+from dukan.domain.sales import SaleLine, assert_discount_valid, assert_settleable, compute_totals
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     CustomerLedgerModel,
@@ -36,6 +36,7 @@ from dukan.infrastructure.db.models import (
     StockMovementModel,
     UnitModel,
 )
+from dukan.infrastructure.scope import require_active_branch
 from dukan.shared.errors import ConflictError, NotFoundError, ValidationError
 from dukan.shared.ids import new_id
 
@@ -46,11 +47,14 @@ class SqlSalesService(SalesService):
     def __init__(self, session: Session) -> None:
         self._s = session
 
-    def _audit(self, action: str, actor_id: str, entity_id: str, after: dict | None = None) -> None:
+    def _audit(
+        self, action: str, actor_id: str, entity_id: str, after: dict | None = None,
+        before: dict | None = None,
+    ) -> None:
         self._s.add(
             AuditEntryModel(
                 id=new_id(), action=action, actor_id=actor_id, entity_type="sale",
-                entity_id=entity_id, after=after, origin="api",
+                entity_id=entity_id, before=before, after=after, origin="api",
             )
         )
 
@@ -109,6 +113,7 @@ class SqlSalesService(SalesService):
         customer_id: str | None,
     ) -> SaleView:
         require_permission(_POLICY, actor, Permission.SALE_CREATE, branch_id)
+        require_active_branch(self._s, branch_id)
         if not lines:
             raise ValidationError("SALE_EMPTY")
 
@@ -135,6 +140,10 @@ class SqlSalesService(SalesService):
             )
 
         totals = compute_totals(domain_lines, discount_minor)
+        assert_discount_valid(discount_minor=discount_minor, subtotal_minor=totals.subtotal_minor)
+        if discount_minor > 0:
+            # A discount is money off the sale: a manager's permission, and audited.
+            require_permission(_POLICY, actor, Permission.SALE_DISCOUNT, branch_id)
         paid = sum(p.amount_minor for p in payments)
         assert_settleable(
             lines=domain_lines, total_minor=totals.total_minor, paid_minor=paid,
@@ -200,6 +209,11 @@ class SqlSalesService(SalesService):
                 "debt.charge_posted", actor.id, sale.id,
                 {"customer_id": customer_id, "amount": remainder},
             )
+        if discount_minor > 0:
+            self._audit(
+                "discount.applied", actor.id, sale.id,
+                {"amount": discount_minor, "subtotal": totals.subtotal_minor},
+            )
         self._audit(
             "sale.settled", actor.id, sale.id,
             {"number": sale.number, "total": totals.total_minor},
@@ -207,13 +221,22 @@ class SqlSalesService(SalesService):
         self._s.commit()
         return self._view(sale)
 
-    def void_sale(self, *, actor: User, branch_id: str, sale_id: str) -> SaleView:
-        require_permission(_POLICY, actor, Permission.SALE_CREATE, branch_id)
+    def void_sale(self, *, actor: User, sale_id: str, reason: str) -> SaleView:
         sale = self._s.get(SaleModel, sale_id)
         if sale is None:
             raise NotFoundError("SALE_NOT_FOUND", sale_id=sale_id)
+        # A void hands money back and restores stock: a manager's call, made in the
+        # sale's own branch and recorded with its reason.
+        require_permission(_POLICY, actor, Permission.SALE_VOID, sale.branch_id)
+        require_active_branch(self._s, sale.branch_id)
+        if not reason.strip():
+            raise ValidationError("SALE_VOID_REASON_REQUIRED")
         if sale.status != "settled":
             raise ConflictError("SALE_NOT_VOIDABLE", status=sale.status)
+        shift = self._s.get(ShiftModel, sale.shift_id) if sale.shift_id else None
+        if shift is not None and shift.status != "open":
+            # Its cash was counted when the shift closed; the void would vanish from it.
+            raise ConflictError("SALE_SHIFT_CLOSED", shift_id=shift.id)
         sale.status = "voided"
         lines = self._s.scalars(select(SaleLineModel).where(SaleLineModel.sale_id == sale.id)).all()
         for l in lines:
@@ -224,18 +247,26 @@ class SqlSalesService(SalesService):
                     created_by=actor.id,
                 )
             )
-        self._audit("sale.voided", actor.id, sale.id, {"number": sale.number})
+        self._audit(
+            "sale.voided", actor.id, sale.id,
+            {"number": sale.number, "status": "voided", "reason": reason.strip()},
+            before={"status": "settled"},
+        )
         self._s.commit()
         return self._view(sale)
 
-    def get_sale(self, *, sale_id: str) -> SaleView:
+    def get_sale(self, *, actor: User, sale_id: str) -> SaleView:
         sale = self._s.get(SaleModel, sale_id)
         if sale is None:
             raise NotFoundError("SALE_NOT_FOUND", sale_id=sale_id)
+        require_any_permission(
+            _POLICY, actor, (Permission.SALE_CREATE, Permission.REPORT_VIEW), sale.branch_id
+        )
         return self._view(sale)
 
     def open_shift(self, *, actor: User, branch_id: str, opening_float_minor: int) -> ShiftView:
         require_permission(_POLICY, actor, Permission.SALE_CREATE, branch_id)
+        require_active_branch(self._s, branch_id)
         shift = ShiftModel(
             id=new_id(), branch_id=branch_id, user_id=actor.id,
             opening_float_minor=opening_float_minor, status="open", created_by=actor.id,
@@ -251,7 +282,12 @@ class SqlSalesService(SalesService):
         shift = self._s.get(ShiftModel, shift_id)
         if shift is None:
             raise NotFoundError("SHIFT_NOT_FOUND", shift_id=shift_id)
-        require_permission(_POLICY, actor, Permission.SALE_CREATE, shift.branch_id)
+        # Closing your own shift is a cashier's job; closing someone else's sets
+        # their variance, which is a manager's.
+        needed = Permission.SALE_CREATE if shift.user_id == actor.id else Permission.REPORT_VIEW
+        require_permission(_POLICY, actor, needed, shift.branch_id)
+        if shift.status != "open":
+            raise ConflictError("SHIFT_ALREADY_CLOSED", shift_id=shift.id)
         cash_sales = self._s.scalar(
             select(func.coalesce(func.sum(PaymentModel.amount_minor), 0))
             .select_from(PaymentModel)

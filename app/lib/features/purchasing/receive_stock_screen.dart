@@ -44,7 +44,10 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
       setState(() => _error = 'QTY');
       return;
     }
-    final cost = double.tryParse(_cost.text) ?? 0;
+    // A cost or a supplier bill needs purchase.cost; without it a receipt only
+    // moves stock.
+    final canCost = actor.can(Permission.purchaseCost);
+    final cost = canCost ? (double.tryParse(_cost.text) ?? 0) : 0.0;
     // A receipt adds stock at a cost: the server rejects a zero or negative
     // quantity and a negative cost, so the device must not record one.
     if (qtyMinor <= 0 || !cost.isFinite || cost < 0) {
@@ -58,7 +61,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
     });
     try {
       await ref.read(localPurchasingProvider).receiveGoods(
-            supplierId: _supplierId,
+            supplierId: canCost ? _supplierId : null,
             lines: [ReceiptLine(productId: product.id, qtyMinor: qtyMinor, unitCostMinor: costMinor)],
             branchId: actor.branchId, actorId: actor.user.id, deviceId: 'app',
           );
@@ -76,6 +79,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
     final l = AppLocalizations.of(context);
     final productsAsync = ref.watch(productsProvider);
     final suppliersAsync = ref.watch(suppliersProvider);
+    final canCost = ref.watch(sessionActorProvider)?.can(Permission.purchaseCost) ?? false;
     return Scaffold(
       appBar: AppBar(title: Text(l.receiveStock)),
       body: productsAsync.when(
@@ -97,13 +101,16 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
               decoration: InputDecoration(labelText: l.quantityDelta, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _cost,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(labelText: l.unitCost, suffixText: 'AFN', border: const OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            suppliersAsync.maybeWhen(
+            if (canCost) ...[
+              TextField(
+                controller: _cost,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: l.unitCost, suffixText: 'AFN', border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (canCost)
+              suppliersAsync.maybeWhen(
               data: (suppliers) => DropdownButtonFormField<String>(
                 initialValue: _supplierId,
                 decoration: InputDecoration(labelText: l.supplier, border: const OutlineInputBorder()),

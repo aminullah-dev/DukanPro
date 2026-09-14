@@ -4,9 +4,13 @@ the domain, and writes an audit entry in the same transaction as each change."""
 
 from __future__ import annotations
 
+import hmac
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from dukan.application.auth import AuthService
@@ -37,9 +41,10 @@ def _as_utc(dt: datetime) -> datetime:
 
 
 class SqlAuthService(AuthService):
-    def __init__(self, session: Session, settings: Settings) -> None:
+    def __init__(self, session: Session, settings: Settings, *, setup_token: str) -> None:
         self._s = session
         self._cfg = settings
+        self._setup_token = setup_token
 
     # ---- helpers ----------------------------------------------------------
     def _assignments(self, user_id: str) -> tuple[BranchAssignment, ...]:
@@ -106,8 +111,18 @@ class SqlAuthService(AuthService):
 
     # ---- AuthService ------------------------------------------------------
     def bootstrap_owner(
-        self, *, username: str, password: str, display_name: str, shop_name: str, device_id: str
+        self,
+        *,
+        username: str,
+        password: str,
+        display_name: str,
+        shop_name: str,
+        device_id: str,
+        setup_token: str,
     ) -> AuthResult:
+        # Only whoever holds the server's setup code may claim a fresh server.
+        if not hmac.compare_digest(setup_token.encode(), self._setup_token.encode()):
+            raise AuthError("SETUP_TOKEN_INVALID")
         if self._s.scalar(select(UserModel).limit(1)) is not None:
             raise ConflictError("BOOTSTRAP_ALREADY_DONE")
         assert_password_strong(password=password)
@@ -129,11 +144,17 @@ class SqlAuthService(AuthService):
                 id=new_id(), user_id=owner.id, branch_id=branch.id, role_name="owner"
             )
         )
-        self._s.flush()
-        user = self._domain_user(owner)
-        toks = self._issue_session(user, device_id)
-        self._audit("owner.bootstrapped", actor_id=owner.id, entity_type="user", entity_id=owner.id)
-        self._s.commit()
+        try:
+            self._s.flush()
+            user = self._domain_user(owner)
+            toks = self._issue_session(user, device_id)
+            self._audit(
+                "owner.bootstrapped", actor_id=owner.id, entity_type="user", entity_id=owner.id
+            )
+            self._s.commit()
+        except IntegrityError as e:  # a concurrent bootstrap won the race
+            self._s.rollback()
+            raise ConflictError("BOOTSTRAP_ALREADY_DONE") from e
         return AuthResult(user=self.profile(user), tokens=toks)
 
     def authenticate(self, *, username: str, password: str, device_id: str) -> AuthResult:
@@ -162,21 +183,53 @@ class SqlAuthService(AuthService):
         return AuthResult(user=self.profile(user), tokens=toks)
 
     def refresh(self, *, refresh_token: str) -> AuthTokens:
-        sess = self._s.scalar(
-            select(SessionModel).where(
-                SessionModel.refresh_hash == tokens.hash_refresh(refresh_token)
-            )
-        )
+        presented = tokens.hash_refresh(refresh_token)
         now = datetime.now(UTC)
-        if sess is None or sess.revoked_at is not None or _as_utc(sess.expires_at) <= now:
+        sess = self._s.scalar(select(SessionModel).where(SessionModel.refresh_hash == presented))
+        if sess is None:
+            reused = self._s.scalar(
+                select(SessionModel).where(SessionModel.prev_refresh_hash == presented)
+            )
+            if reused is not None and reused.revoked_at is None:
+                # A refresh token that was already rotated came back, so it was
+                # copied: revoke the session so neither holder keeps it.
+                reused.revoked_at = now
+                self._audit(
+                    "session.reuse_detected", actor_id=reused.user_id,
+                    entity_type="session", entity_id=reused.id,
+                )
+                self._s.commit()
+            raise AuthError("REFRESH_INVALID")
+        if sess.revoked_at is not None or _as_utc(sess.expires_at) <= now:
             raise AuthError("REFRESH_INVALID")
         m = self._s.get(UserModel, sess.user_id)
         if m is None or m.status != "active":
             raise AuthError("USER_DISABLED")
-        sess.revoked_at = now  # rotate: invalidate the presented refresh token
-        toks = self._issue_session(self._domain_user(m), sess.device_id)
+        raw = tokens.new_refresh_token()
+        # Rotate in place and atomically: a concurrent refresh with the same token
+        # finds the hash already changed. The session's absolute expiry stays.
+        rotated = cast(
+            "CursorResult[Any]",
+            self._s.execute(
+                update(SessionModel)
+                .where(
+                    SessionModel.id == sess.id,
+                    SessionModel.refresh_hash == presented,
+                    SessionModel.revoked_at.is_(None),
+                )
+                .values(refresh_hash=tokens.hash_refresh(raw), prev_refresh_hash=presented)
+                .execution_options(synchronize_session=False)
+            ),
+        )
+        if rotated.rowcount != 1:
+            self._s.rollback()
+            raise AuthError("REFRESH_INVALID")
+        access = tokens.issue_access(
+            secret=self._cfg.secret_key, user_id=m.id, session_id=sess.id,
+            ttl_minutes=self._cfg.access_ttl_minutes,
+        )
         self._s.commit()
-        return toks
+        return AuthTokens(access_token=access, refresh_token=raw)
 
     def logout(self, *, refresh_token: str) -> None:
         sess = self._s.scalar(
@@ -191,10 +244,18 @@ class SqlAuthService(AuthService):
 
     def authenticated_user(self, *, access_token: str) -> User:
         claims = tokens.decode_access(secret=self._cfg.secret_key, token=access_token)
-        sess = self._s.get(SessionModel, claims.get("sid", ""))
-        if sess is None or sess.revoked_at is not None:
+        sess = self._s.get(SessionModel, str(claims["sid"]))
+        if (
+            sess is None
+            or sess.revoked_at is not None
+            or sess.deleted_at is not None
+            or _as_utc(sess.expires_at) <= datetime.now(UTC)
+        ):
             raise AuthError("SESSION_REVOKED")
-        m = self._s.get(UserModel, claims.get("sub", ""))
+        if sess.user_id != claims["sub"]:
+            # The session belongs to someone else: we never issued this token.
+            raise AuthError("TOKEN_INVALID")
+        m = self._s.get(UserModel, sess.user_id)
         if m is None or m.status != "active":
             raise AuthError("USER_DISABLED")
         return self._domain_user(m)

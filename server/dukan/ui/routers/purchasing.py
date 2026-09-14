@@ -37,8 +37,9 @@ class ReceiveGoodsRequest(BaseModel):
 
 
 @router.get("/suppliers")
-def list_suppliers(actor: Actor, svc: Purchasing) -> list[dict]:
-    return [supplier_view_dict(v) for v in svc.list_suppliers()]
+def list_suppliers(actor: Actor, svc: Purchasing, x_branch_id: BranchHeader = None) -> list[dict]:
+    views = svc.list_suppliers(actor=actor, branch_id=active_branch(actor, x_branch_id))
+    return [supplier_view_dict(v) for v in views]
 
 
 @router.post("/suppliers")

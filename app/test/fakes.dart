@@ -61,6 +61,7 @@ class FakeAuthApi implements AuthApi {
     required String displayName,
     required String shopName,
     required String deviceId,
+    required String setupToken,
   }) async =>
       _result(username);
 

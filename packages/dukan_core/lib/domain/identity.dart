@@ -14,7 +14,11 @@ enum Permission {
   reportView('report.view'),
   branchManage('branch.manage'),
   debtWriteOff('debt.write_off'),
-  auditView('audit.view');
+  auditView('audit.view'),
+  saleVoid('sale.void'),
+  saleDiscount('sale.discount'),
+  customerCredit('customer.credit'),
+  purchaseCost('purchase.cost');
 
   const Permission(this.code);
   final String code;
@@ -57,6 +61,10 @@ final Map<BuiltinRole, Set<Permission>> kBuiltinRolePermissions = {
     Permission.productManage,
     Permission.reportView,
     Permission.debtWriteOff,
+    Permission.saleVoid,
+    Permission.saleDiscount,
+    Permission.customerCredit,
+    Permission.purchaseCost,
   },
   BuiltinRole.cashier: {Permission.saleCreate},
   BuiltinRole.stockKeeper: {Permission.stockAdjust},
@@ -116,12 +124,28 @@ final class PermissionPolicy {
   }
 }
 
-/// Domain invariant: a shop must always retain at least one active owner.
-/// Raises [ConflictError] `USER_LAST_OWNER`. `activeOwnerCount` is the count of
-/// active owners *including* [target] before the change.
-void assertNotLastOwner({required User target, required int activeOwnerCount}) {
-  if (target.isOwner && activeOwnerCount <= 1) {
-    throw ConflictError('USER_LAST_OWNER', {'userId': target.id});
+/// Domain invariant: every branch keeps at least one active owner, so someone
+/// can always administer it. [ownersAfter] counts the branch's active owners
+/// once the change applies. Raises [ConflictError] `USER_LAST_OWNER`.
+void assertBranchKeepsOwner({required String branchId, required int ownersAfter}) {
+  if (ownersAfter < 1) {
+    throw ConflictError('USER_LAST_OWNER', {'branch_id': branchId});
+  }
+}
+
+/// Domain invariant: a user keeps at least one branch assignment.
+/// Raises [ConflictError] `USER_LAST_ASSIGNMENT`.
+void assertKeepsAnAssignment({required String userId, required int remaining}) {
+  if (remaining < 1) {
+    throw ConflictError('USER_LAST_ASSIGNMENT', {'user_id': userId});
+  }
+}
+
+/// Only built-in roles can be assigned until custom roles exist.
+/// Raises [ValidationError] `ROLE_UNKNOWN`.
+void assertRoleKnown({required String roleName}) {
+  if (BuiltinRole.fromName(roleName) == null) {
+    throw ValidationError('ROLE_UNKNOWN', {'role': roleName});
   }
 }
 

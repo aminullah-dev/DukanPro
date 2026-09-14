@@ -46,6 +46,9 @@ class SessionModel(RecordMixin, Base):
     user_id: Mapped[str] = mapped_column(String(36), index=True)
     device_id: Mapped[str] = mapped_column(String(128))
     refresh_hash: Mapped[str] = mapped_column(String(128), index=True)
+    # The hash the last refresh rotated out: presented again, it means the refresh
+    # token was copied, and the session is revoked.
+    prev_refresh_hash: Mapped[str | None] = mapped_column(String(128), index=True, default=None)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 

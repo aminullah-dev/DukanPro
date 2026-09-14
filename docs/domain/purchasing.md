@@ -18,6 +18,8 @@
 4. Cost valuation method (last cost vs weighted average) is **configuration**, applied consistently; historical movements keep the cost they were received at (never retro-repriced).
 5. Supplier balance is **derived** from the append-only supplier ledger.
 6. Currencies: a PO/receipt/bill carries its own currency; supplier balance is per-currency; no implicit conversion.
+7. Receiving stock needs `stock.adjust`; a receipt that **bills a supplier or carries a cost** also needs `purchase.cost` (owner, manager). Without it a receipt only moves stock and leaves the product's last cost alone.
+8. A receipt's supplier must exist (`SUPPLIER_NOT_FOUND`).
 
 ## Error codes
 
@@ -27,6 +29,7 @@
 | `PO_ILLEGAL_TRANSITION` | invalid status change |
 | `PURCHASE_CURRENCY_MISMATCH` | payment currency has no matching bills |
 | `GRN_EMPTY` | receiving with no lines |
+| `SUPPLIER_NOT_FOUND` | receiving against an unknown supplier |
 
 ## Test table
 
@@ -37,6 +40,7 @@
 | partial then full | ordered 10 | receive 6 then 4 | status partially_received → received |
 | supplier balance | bill 4000, payment 1500 | read balance | `2500` owed to supplier |
 | weighted avg cost | on_hand 10 @ 40, receive 10 @ 50 | valuation | avg 45 (if config=weighted_avg) |
+| stock keeper bills | stock_keeper | receive with a supplier or a cost | `ACCESS_DENIED`; quantity only is allowed |
 
 ## Audit
 

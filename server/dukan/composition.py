@@ -8,6 +8,8 @@ uvicorn entrypoint: `dukan.composition:app`.
 
 from __future__ import annotations
 
+import logging
+import secrets
 from collections.abc import Awaitable, Callable, Iterator
 
 from fastapi import FastAPI, Request, Response
@@ -74,6 +76,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+    # Only whoever can read this server's console (or set DUKAN_BOOTSTRAP_TOKEN)
+    # can claim a fresh server as its owner.
+    setup_token = settings.bootstrap_token or secrets.token_urlsafe(12)
+    if settings.bootstrap_token is None:
+        logging.getLogger("dukan").warning(
+            "First-run setup code: %s (enter it in the app to create the owner account;"
+            " set DUKAN_BOOTSTRAP_TOKEN to choose it yourself)",
+            setup_token,
+        )
 
     app.include_router(health.router)
     app.include_router(auth.router)
@@ -91,7 +102,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def provide_auth_service() -> Iterator[AuthService]:
         session = session_factory()
         try:
-            yield SqlAuthService(session, settings)
+            yield SqlAuthService(session, settings, setup_token=setup_token)
         finally:
             session.close()
 

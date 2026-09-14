@@ -22,6 +22,7 @@ class BootstrapRequest(BaseModel):
     display_name: Str128
     shop_name: Str128 = "My Shop"
     device_id: Str128 = "unknown"
+    setup_token: Secret  # the server's first-run setup code
 
 
 class LoginRequest(BaseModel):
@@ -49,6 +50,7 @@ def bootstrap(
             display_name=body.display_name,
             shop_name=body.shop_name,
             device_id=body.device_id,
+            setup_token=body.setup_token,
         )
     )
 

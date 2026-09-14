@@ -5,6 +5,7 @@ attribution, scoped + bounded pull, REST input bounds."""
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -13,7 +14,12 @@ from sqlalchemy import select, update
 
 import dukan.infrastructure.sync_service as sync_service_module
 from dukan.application.sync_policy import READ_FIELDS
-from dukan.infrastructure.db.models import AuditEntryModel, ProcessedOpModel, ProductModel
+from dukan.infrastructure.db.models import (
+    AuditEntryModel,
+    BranchAssignmentModel,
+    ProcessedOpModel,
+    ProductModel,
+)
 
 PW = "pw12345678"
 SEED_UNITS = [("piece", 0), ("kg", 3), ("litre", 3), ("dozen", 0), ("meter", 2)]
@@ -95,7 +101,7 @@ def outcomes(results: list[dict]) -> list[tuple[str, str | None]]:
 class Shop:
     def __init__(self, client: TestClient) -> None:
         self.c = client
-        boot = client.post("/auth/bootstrap", json={
+        boot = client.post("/auth/bootstrap", json={"setup_token": "test-setup-token", 
             "username": "owner", "password": PW, "display_name": "Owner", "shop_name": "Dukan",
         }).json()
         self.owner_id: str = boot["user"]["id"]
@@ -227,10 +233,17 @@ def test_stock_keeper_flows_and_limits(client: TestClient) -> None:
         keeper, *seed_ops(),
         op("stock_movements", {**mv, "qty_delta": 5, "reason": "adjustment"}),
         op("stock_movements", {**mv, "qty_delta": 10, "reason": "purchase"}),
-        op("supplier_ledger", {"supplier_id": sid, "type": "bill", "amount_minor": 3000,
-                               "currency": "AFN"}),
     )
     assert set(outcomes(ok)) == {("applied", None)}
+    # A bill is a debt to the supplier: purchase.cost, which a stock keeper lacks.
+    bill = {"supplier_id": sid, "type": "bill", "amount_minor": 3000, "currency": "AFN"}
+    assert outcomes(shop.push(keeper, op("supplier_ledger", bill))) == [
+        ("rejected", "ACCESS_DENIED")
+    ]
+    ghost = {**bill, "supplier_id": _uuid()}
+    assert outcomes(shop.push(shop.owner, op("supplier_ledger", ghost))) == [
+        ("rejected", "SUPPLIER_NOT_FOUND")
+    ]
     bad = shop.push(
         keeper,
         op("stock_movements", {**mv, "qty_delta": 0, "reason": "adjustment"}),
@@ -246,7 +259,7 @@ def test_stock_keeper_flows_and_limits(client: TestClient) -> None:
     assert outcomes(bad) == [
         ("rejected", "STOCK_INVALID_QTY"), ("rejected", "STOCK_INVALID_QTY"),
         ("rejected", "PRODUCT_NOT_STOCK_TRACKED"), ("rejected", "SYNC_OP_UNSUPPORTED"),
-        ("rejected", "SUPPLIER_NOT_FOUND"), ("rejected", "ACCESS_DENIED"),
+        ("rejected", "ACCESS_DENIED"), ("rejected", "ACCESS_DENIED"),
         ("rejected", "ACCESS_DENIED"), ("rejected", "ACCESS_DENIED"),
     ]
     assert client.get(f"/products/{pid}", headers=shop.owner).json()["on_hand"] == 15
@@ -264,8 +277,16 @@ def test_accountant_and_role_less_users_are_denied(client: TestClient) -> None:
     )
     assert outcomes(res) == [("rejected", "ACCESS_DENIED"), ("applied", None)]
     cashier, cashier_id = shop.employee("c1", "cashier")
+    # The API keeps every user assigned; a role-less user only exists in older data.
     r = client.delete(f"/users/{cashier_id}/roles/{shop.branch}", headers=shop.owner)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 409 and r.json()["error"]["code"] == "USER_LAST_ASSIGNMENT"
+    with client.app.state.session_factory() as s:
+        s.execute(
+            update(BranchAssignmentModel)
+            .where(BranchAssignmentModel.user_id == cashier_id)
+            .values(deleted_at=datetime.now(UTC))
+        )
+        s.commit()
     pid = shop.product()
     _, ops = sale_ops(shop.branch, pid)
     assert outcomes(shop.push(cashier, ops[0], *seed_ops()[:1])) == [
@@ -528,7 +549,7 @@ def test_pull_is_scoped_by_permission_and_branch_and_redacts_cost(client: TestCl
     _, sale = sale_ops(shop.branch, pid)
     assert set(outcomes(shop.push(cashier, *sale))) == {("applied", None)}
     bill = op("supplier_ledger", {"supplier_id": sid, "type": "bill", "amount_minor": 7000})
-    assert outcomes(shop.push(keeper, bill)) == [("applied", None)]
+    assert outcomes(shop.push(shop.owner, bill)) == [("applied", None)]
     b2 = shop.second_branch()
     c2, _ = shop.employee("c2", "cashier", branch_id=b2)
 

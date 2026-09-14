@@ -20,6 +20,9 @@
 6. A settled sale is **immutable**; corrections are a **void** (reverses stock + payments + ledger) or a **refund** (new negative sale referencing the original). No in-place edits.
 7. Change is computed for cash tender; over-tender yields `change`, never a negative payment.
 8. Payments are append-only; you cannot delete a payment, only void the sale or record a refund.
+9. A **void** needs `sale.void` (owner, manager) in the **sale's** branch and a reason, recorded in the audit entry. A sale whose shift is already closed cannot be voided (`SALE_SHIFT_CLOSED`): its cash was counted.
+10. A discount lies between 0 and the subtotal (`SALE_DISCOUNT_INVALID`); any discount needs `sale.discount` and writes `discount.applied`.
+11. A shift closes once (`SHIFT_ALREADY_CLOSED`), by its own cashier or by someone with `report.view` in its branch. Reading a sale needs `sale.create` or `report.view` in the sale's branch.
 
 ## Error codes
 
@@ -31,6 +34,9 @@
 | `SALE_OVER_CREDIT_LIMIT` | credit remainder exceeds customer limit → (see `customers-debt.md`) |
 | `SALE_CURRENCY_MISMATCH` | payment currency ≠ sale currency (no implicit conversion) |
 | `SHIFT_NOT_OPEN` | ringing a sale with no open shift (when shifts required) |
+| `SALE_DISCOUNT_INVALID` | discount below 0 or above the subtotal |
+| `SALE_NOT_VOIDABLE` / `SALE_VOID_REASON_REQUIRED` / `SALE_SHIFT_CLOSED` | voiding a sale that is not settled / without a reason / after its shift closed |
+| `SHIFT_ALREADY_CLOSED` | closing a closed shift |
 
 ## Test table
 
@@ -45,6 +51,9 @@
 | void reverses | settled sale with stock + payment | void | stock movements reversed, payments reversed, audited |
 | settle decrements once | stock-tracked sale | settle, then replay settle op | stock −qty exactly once |
 | currency mismatch | sale AFN | pay USD | `SALE_CURRENCY_MISMATCH` |
+| cashier voids | settled cash sale | cashier voids it | `ACCESS_DENIED` |
+| cross-branch void | manager of B2 | void a B1 sale | `ACCESS_DENIED` |
+| discount too big | subtotal 50 | discount 60 | `SALE_DISCOUNT_INVALID` |
 
 ## Audit
 

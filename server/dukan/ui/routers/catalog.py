@@ -56,7 +56,8 @@ def list_products(
     actor: Actor, svc: Catalog, search: str | None = None, x_branch_id: BranchHeader = None
 ) -> list[dict]:
     branch = active_branch(actor, x_branch_id)
-    return [product_view_dict(v) for v in svc.list_products(branch_id=branch, search=search)]
+    views = svc.list_products(actor=actor, branch_id=branch, search=search)
+    return [product_view_dict(v) for v in views]
 
 
 @router.post("/products")
@@ -84,7 +85,9 @@ def get_product(
     product_id: str, actor: Actor, svc: Catalog, x_branch_id: BranchHeader = None
 ) -> dict:
     return product_view_dict(
-        svc.get_product(branch_id=active_branch(actor, x_branch_id), product_id=product_id)
+        svc.get_product(
+            actor=actor, branch_id=active_branch(actor, x_branch_id), product_id=product_id
+        )
     )
 
 

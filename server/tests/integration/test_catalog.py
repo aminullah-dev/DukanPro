@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 def _owner_token(client: TestClient) -> str:
     r = client.post(
         "/auth/bootstrap",
-        json={"username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
     )
     assert r.status_code == 200, r.text
     return r.json()["tokens"]["access_token"]

@@ -81,3 +81,11 @@ void assertNotOverpaid({required int balanceMinor, required int paymentMinor}) {
     throw ConflictError('DEBT_OVERPAYMENT', {'balance': balanceMinor, 'payment': paymentMinor});
   }
 }
+
+/// A credit limit is null (unlimited) or a non-negative amount. Raises
+/// [ValidationError] `CUSTOMER_CREDIT_LIMIT_INVALID`.
+void assertCreditLimitValid({required int? creditLimitMinor}) {
+  if (creditLimitMinor != null && creditLimitMinor < 0) {
+    throw ValidationError('CUSTOMER_CREDIT_LIMIT_INVALID', {'limit': creditLimitMinor});
+  }
+}

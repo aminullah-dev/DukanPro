@@ -29,3 +29,10 @@ def assert_not_last_active_branch(*, active_branch_count: int) -> None:
     """
     if active_branch_count <= 1:
         raise ConflictError("BRANCH_LAST_ACTIVE")
+
+
+def assert_branch_active(*, branch_id: str, is_active: bool) -> None:
+    """Writes happen only in an active branch; a deactivated branch keeps its
+    history readable. Raises ConflictError BRANCH_INACTIVE."""
+    if not is_active:
+        raise ConflictError("BRANCH_INACTIVE", branch_id=branch_id)

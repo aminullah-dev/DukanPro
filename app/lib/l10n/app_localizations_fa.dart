@@ -284,6 +284,16 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get setupCode => 'کد راه‌اندازی';
+
+  @override
+  String get setupCodeHelp =>
+      'هنگام روشن شدن سرور، در کنسول سرور نشان داده می‌شود';
+
+  @override
+  String get errSetupCode => 'کد راه‌اندازی درست نیست. کنسول سرور را ببینید.';
+
+  @override
   String lastSyncedAt(String time) {
     return 'آخرین همگام‌سازی $time';
   }
@@ -729,6 +739,16 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
     );
     return '$_temp0';
   }
+
+  @override
+  String get setupCode => 'کد راه‌اندازی';
+
+  @override
+  String get setupCodeHelp =>
+      'هنگام روشن شدن سرور، در کنسول سرور نشان داده می‌شود';
+
+  @override
+  String get errSetupCode => 'کد راه‌اندازی درست نیست. کنسول سرور را ببینید.';
 
   @override
   String lastSyncedAt(String time) {

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from dukan.application.sales import PaymentInput, SaleLineInput, SalesService
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_current_actor, get_sales_service
-from dukan.ui.fields import Id, Int32, Str8
+from dukan.ui.fields import Id, Int32, Str8, Str200
 from dukan.ui.serializers import sale_view_dict, shift_view_dict
 
 router = APIRouter(tags=["sales"])
@@ -47,6 +47,10 @@ class CloseShiftRequest(BaseModel):
     counted_cash_minor: Int32
 
 
+class VoidSaleRequest(BaseModel):
+    reason: Str200
+
+
 @router.post("/sales")
 def settle_sale(
     body: SettleSaleRequest, actor: Actor, svc: Sales, x_branch_id: BranchHeader = None
@@ -73,14 +77,12 @@ def settle_sale(
 
 @router.get("/sales/{sale_id}")
 def get_sale(sale_id: str, actor: Actor, svc: Sales) -> dict:
-    return sale_view_dict(svc.get_sale(sale_id=sale_id))
+    return sale_view_dict(svc.get_sale(actor=actor, sale_id=sale_id))
 
 
 @router.post("/sales/{sale_id}/void")
-def void_sale(sale_id: str, actor: Actor, svc: Sales, x_branch_id: BranchHeader = None) -> dict:
-    return sale_view_dict(
-        svc.void_sale(actor=actor, branch_id=active_branch(actor, x_branch_id), sale_id=sale_id)
-    )
+def void_sale(sale_id: str, body: VoidSaleRequest, actor: Actor, svc: Sales) -> dict:
+    return sale_view_dict(svc.void_sale(actor=actor, sale_id=sale_id, reason=body.reason))
 
 
 @router.post("/shifts")

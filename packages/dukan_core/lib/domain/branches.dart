@@ -31,3 +31,11 @@ void assertNotLastActiveBranch({required int activeBranchCount}) {
     throw ConflictError('BRANCH_LAST_ACTIVE', const {});
   }
 }
+
+/// Writes happen only in an active branch; a deactivated branch keeps its
+/// history readable. Raises [ConflictError] `BRANCH_INACTIVE`.
+void assertBranchActive({required String branchId, required bool isActive}) {
+  if (!isActive) {
+    throw ConflictError('BRANCH_INACTIVE', {'branch_id': branchId});
+  }
+}

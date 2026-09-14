@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 def _owner(client: TestClient) -> dict:
     token = client.post(
         "/auth/bootstrap",
-        json={"username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
     ).json()["tokens"]["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -57,7 +57,7 @@ def test_audit_requires_audit_view(client: TestClient) -> None:
 def test_weak_password_is_rejected(client: TestClient) -> None:
     r = client.post(
         "/auth/bootstrap",
-        json={"username": "owner", "password": "short", "display_name": "Owner"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "short", "display_name": "Owner"},
     )
     assert r.status_code == 422
     assert r.json()["error"]["code"] == "WEAK_PASSWORD"

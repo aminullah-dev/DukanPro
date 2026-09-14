@@ -283,6 +283,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get setupCode => 'Setup code';
+
+  @override
+  String get setupCodeHelp =>
+      'Shown in the server console when the server starts';
+
+  @override
+  String get errSetupCode => 'Wrong setup code. Check the server console.';
+
+  @override
   String lastSyncedAt(String time) {
     return 'Last synced $time';
   }
