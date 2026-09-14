@@ -35,6 +35,7 @@ class UpdateProductRequest(BaseModel):
     name: Str200 | None = None
     sell_price_minor: Money | None = None
     is_active: bool | None = None
+    track_stock: bool | None = None
     version: Int32 | None = None  # the version edited; a newer one is a conflict
 
 
@@ -109,6 +110,7 @@ def update_product(
             sell_price_minor=body.sell_price_minor,
             is_active=body.is_active,
             version=body.version,
+            track_stock=body.track_stock,
         )
     )
 
@@ -127,6 +129,18 @@ def add_barcode(
             branch_id=active_branch(actor, x_branch_id),
             product_id=product_id,
             code=body.code,
+        )
+    )
+
+
+@router.delete("/products/{product_id}/barcodes/{code}")
+def remove_barcode(
+    product_id: str, code: str, actor: Actor, svc: Catalog, x_branch_id: BranchHeader = None
+) -> dict:
+    return product_view_dict(
+        svc.remove_barcode(
+            actor=actor, branch_id=active_branch(actor, x_branch_id), product_id=product_id,
+            code=code,
         )
     )
 

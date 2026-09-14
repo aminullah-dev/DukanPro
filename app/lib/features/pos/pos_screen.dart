@@ -605,6 +605,7 @@ class _ZReportDialogState extends State<_ZReportDialog> {
           row(l.openingFloat, s.openingFloatMinor),
           row(l.cashSales, s.cashSalesMinor),
           row(l.debtCollected, s.cashCollectedMinor),
+          if (s.cashPaidOutMinor > 0) row(l.paidToSuppliers, -s.cashPaidOutMinor),
           row(l.cardSales, s.cardSalesMinor),
           row(l.transferSales, s.transferSalesMinor),
           const Divider(),

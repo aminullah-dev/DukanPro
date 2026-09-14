@@ -114,6 +114,7 @@ final class LocalSales {
           'unit_cost_minor': l.unitCostMinor, 'line_total_minor': l.lineTotal, 'currency': l.currency,
         }, actorId: actorId, deviceId: deviceId);
 
+        if (!l.trackStock) continue; // an untracked product (a service) moves no stock
         final movementId = newId();
         await _db.into(_db.stockMovements).insert(StockMovementsCompanion.insert(
               id: movementId, productId: l.productId, branchId: branchId,

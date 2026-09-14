@@ -451,6 +451,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errShiftAlreadyOpen => 'You already have an open shift here.';
 
   @override
+  String get suppliers => 'Suppliers';
+
+  @override
+  String get paySupplier => 'Pay supplier';
+
+  @override
+  String get addSupplier => 'Add supplier';
+
+  @override
+  String get supplierName => 'Supplier name';
+
+  @override
+  String get noSuppliers => 'No suppliers yet';
+
+  @override
+  String get paidToSuppliers => 'Paid to suppliers in cash';
+
+  @override
+  String get productActive => 'Active: offered for sale';
+
+  @override
+  String get barcodes => 'Barcodes';
+
+  @override
+  String get addBarcode => 'Add barcode';
+
+  @override
+  String get removeBarcode => 'Remove barcode';
+
+  @override
+  String get errBarcodeTaken =>
+      'This barcode is already on another product. Remove it there first.';
+
+  @override
+  String get errSupplierOverpayment =>
+      'That is more than the shop owes this supplier.';
+
+  @override
+  String get errNotStockTracked => 'This product\'s stock is not tracked.';
+
+  @override
   String get errSessionEnded =>
       'Your access has changed or ended. Sign in again.';
 

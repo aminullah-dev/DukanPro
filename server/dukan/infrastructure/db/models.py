@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Index, Integer, String
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from dukan.infrastructure.db.base import Base, RecordMixin, utcnow
@@ -105,6 +105,13 @@ class ProductModel(RecordMixin, Base):
 
 class BarcodeModel(RecordMixin, Base):
     __tablename__ = "barcodes"
+    # A scan resolves to one item: a code is unique among live barcodes.
+    __table_args__ = (
+        Index(
+            "ux_barcodes_code_live", "code", unique=True,
+            sqlite_where=text("deleted_at IS NULL"), postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
     product_id: Mapped[str] = mapped_column(String(36), index=True)
     code: Mapped[str] = mapped_column(String(64), index=True)
     symbology: Mapped[str] = mapped_column(String(16), default="ean13")
@@ -221,6 +228,9 @@ class SupplierModel(RecordMixin, Base):
 class SupplierLedgerModel(RecordMixin, Base):
     __tablename__ = "supplier_ledger"
     supplier_id: Mapped[str] = mapped_column(String(36), index=True)
+    # A payment: how it was paid, and the shift whose drawer it came out of.
+    shift_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    method: Mapped[str | None] = mapped_column(String(8), default=None)
     type: Mapped[str] = mapped_column(String(12))
     amount_minor: Mapped[int] = mapped_column(BigInteger, )
     currency: Mapped[str] = mapped_column(String(3), default="AFN")

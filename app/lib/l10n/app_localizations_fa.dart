@@ -450,6 +450,47 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errShiftAlreadyOpen => 'شما همین حالا یک شیفت باز در اینجا دارید.';
 
   @override
+  String get suppliers => 'تأمین‌کنندگان';
+
+  @override
+  String get paySupplier => 'پرداخت به تأمین‌کننده';
+
+  @override
+  String get addSupplier => 'افزودن تأمین‌کننده';
+
+  @override
+  String get supplierName => 'نام تأمین‌کننده';
+
+  @override
+  String get noSuppliers => 'هنوز تأمین‌کننده‌ای نیست';
+
+  @override
+  String get paidToSuppliers => 'پرداخت نقدی به تأمین‌کنندگان';
+
+  @override
+  String get productActive => 'فعال (قابل فروش)';
+
+  @override
+  String get barcodes => 'بارکدها';
+
+  @override
+  String get addBarcode => 'افزودن بارکد';
+
+  @override
+  String get removeBarcode => 'حذف بارکد';
+
+  @override
+  String get errBarcodeTaken =>
+      'این بارکد روی کالای دیگری ثبت است. اول آن را از آنجا حذف کنید.';
+
+  @override
+  String get errSupplierOverpayment =>
+      'این مبلغ از بدهی دکان به این تأمین‌کننده بیشتر است.';
+
+  @override
+  String get errNotStockTracked => 'موجودی این کالا دنبال نمی‌شود.';
+
+  @override
   String get errSessionEnded =>
       'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
 
@@ -1124,6 +1165,47 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get errShiftAlreadyOpen => 'شما همین حالا یک شیفت باز در اینجا دارید.';
+
+  @override
+  String get suppliers => 'تهیه‌کنندگان';
+
+  @override
+  String get paySupplier => 'پرداخت به تهیه‌کننده';
+
+  @override
+  String get addSupplier => 'افزودن تهیه‌کننده';
+
+  @override
+  String get supplierName => 'نام تهیه‌کننده';
+
+  @override
+  String get noSuppliers => 'هنوز تهیه‌کننده‌ای نیست';
+
+  @override
+  String get paidToSuppliers => 'پرداخت نقدی به تهیه‌کنندگان';
+
+  @override
+  String get productActive => 'فعال (قابل فروش)';
+
+  @override
+  String get barcodes => 'بارکدها';
+
+  @override
+  String get addBarcode => 'افزودن بارکد';
+
+  @override
+  String get removeBarcode => 'حذف بارکد';
+
+  @override
+  String get errBarcodeTaken =>
+      'این بارکد روی جنس دیگری ثبت است. اول آن را از آنجا حذف کنید.';
+
+  @override
+  String get errSupplierOverpayment =>
+      'این مبلغ از قرض دکان به این تهیه‌کننده بیشتر است.';
+
+  @override
+  String get errNotStockTracked => 'موجودی این جنس دنبال نمی‌شود.';
 
   @override
   String get errSessionEnded =>

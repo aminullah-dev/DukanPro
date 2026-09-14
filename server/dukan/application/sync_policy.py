@@ -21,6 +21,7 @@ from typing import Any, Protocol
 from dukan.application.access import require_any_permission, require_permission
 from dukan.application.sync import OpInput
 from dukan.domain.branches import assert_branch_active
+from dukan.domain.catalog import assert_unique_barcode
 from dukan.domain.customers import (
     LedgerEntryType,
     assert_not_overpaid,
@@ -28,7 +29,7 @@ from dukan.domain.customers import (
 )
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.domain.inventory import StockReason, adjust_stock
-from dukan.domain.purchasing import SupplierEntryType
+from dukan.domain.purchasing import SupplierEntryType, assert_supplier_payment_valid
 from dukan.domain.sales import (
     PaymentMethod,
     assert_discount_valid,
@@ -72,7 +73,7 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
         "sku", "name", "unit_id", "category_id", "sell_price_minor", "sell_currency",
         "cost_minor", "cost_currency", "track_stock", "is_active", "version",
     ),
-    "barcodes": ("product_id", "code", "symbology", "version"),
+    "barcodes": ("product_id", "code", "symbology", "version", "deleted_at"),  # removals too
     "units": ("name", "decimal_places", "version"),
     "categories": ("name", "parent_id", "version"),
     "customers": ("name", "phone", "credit_limit_minor", "currency", "is_active", "version"),
@@ -98,6 +99,7 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
     ),
     "supplier_ledger": (
         "supplier_id", "type", "amount_minor", "currency", "ref_type", "ref_id", "occurred_at",
+        "shift_id", "method",
     ),
     "shifts": (
         "branch_id", "user_id", "opened_at", "opening_float_minor", "closed_at",
@@ -251,6 +253,11 @@ _INSERT: dict[str, dict[str, _Field]] = {
         "currency": _CURRENCY_F,
         "ref_type": _MUST_BE_NULL,
         "ref_id": _MUST_BE_NULL,
+        # A payment's: the drawer it came out of, and how it was paid.
+        "shift_id": _uuid(nullable=True),
+        "method": _enum(
+            [m.value for m in PaymentMethod if m is not PaymentMethod.CREDIT], nullable=True
+        ),
     },
     "shifts": {
         "branch_id": _uuid(required=True),
@@ -267,6 +274,7 @@ _UPDATE: dict[str, dict[str, _Field]] = {
         "sell_currency": _CURRENCY_F,
         "is_active": _BOOL,
         "cost_minor": _int(lo=0, hi=MONEY_MAX),  # a goods receipt's cost, purchase.cost
+        "track_stock": _BOOL,
     },
     "customers": {
         "name": _str(128),
@@ -278,6 +286,7 @@ _UPDATE: dict[str, dict[str, _Field]] = {
         "status": _enum(["closed"]),
         "counted_cash_minor": _int(lo=0, hi=MONEY_MAX),
     },
+    "barcodes": {"deleted": _BOOL},  # a removal: the only edit a barcode takes
 }
 
 
@@ -460,6 +469,12 @@ class SyncReader(Protocol):
 
     def shift_expected_cash(self, shift_id: str) -> int: ...  # float + its drawer cash
 
+    def barcode_taken(self, code: str) -> bool: ...  # by a live barcode
+
+    def sku_taken(self, sku: str) -> bool: ...  # by a live product
+
+    def supplier_balance(self, supplier_id: str) -> int: ...
+
     def customer(self, customer_id: str) -> CustomerRef | None: ...
 
     def customer_balance(self, customer_id: str) -> int: ...
@@ -616,6 +631,10 @@ def _products_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     after = _pick(
         v, "sku", "name", "unit_id", "sell_price_minor", "sell_currency", "track_stock", "is_active"
     )
+    if ctx.reader.sku_taken(v["sku"]):
+        # Two tills offline gave one code to two products: both are real, so the
+        # second is kept (its sales depend on it) and flagged to rename.
+        after = {**after, "sku_taken": True}
     return ApplyPlan(v, branch, None, AuditIntent("product.created", "product", after))
 
 
@@ -653,8 +672,24 @@ def _barcodes_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     _need(ctx, Permission.PRODUCT_MANAGE, branch)
     _guard_insert(ctx)
     _product(ctx, v["product_id"])
+    # A scan resolves to one item: a code another till gave first stays with it.
+    assert_unique_barcode(code=v["code"], taken=ctx.reader.barcode_taken(v["code"]))
     after = _pick(v, "product_id", "code")
     return ApplyPlan(v, branch, None, AuditIntent("barcode.added", "barcode", after))
+
+
+def _barcodes_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    """Taking a barcode off its product (so the code can go on another one): the
+    row is soft-deleted, and devices drop it on their next pull."""
+    branch = _active(ctx)
+    _need(ctx, Permission.PRODUCT_MANAGE, branch)
+    current = _guard_update(ctx, "BARCODE_NOT_FOUND")
+    if v.get("deleted") is not True:
+        raise ValidationError("SYNC_OP_INVALID", field="data", reason="barcode_edit")
+    after = {"product_id": current.values.get("product_id"), "code": current.values.get("code")}
+    return ApplyPlan(
+        {"deleted_at": ctx.now}, branch, None, AuditIntent("barcode.removed", "barcode", after)
+    )
 
 
 def _units_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
@@ -733,7 +768,8 @@ def _stock_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     if reason is StockReason.SALE:
         # A sale movement must be backed by an unconsumed line of the pusher's own
         # sale in the same branch; otherwise sale.create would be a stock write-off.
-        _product(ctx, v["product_id"], allow_deleted=True)
+        if not _product(ctx, v["product_id"], allow_deleted=True).track_stock:
+            raise ValidationError("PRODUCT_NOT_STOCK_TRACKED", product_id=v["product_id"])
         if qty >= 0:
             raise ValidationError("STOCK_INVALID_QTY", qty=qty)
         if v.get("ref_type") != "sale" or v.get("ref_id") is None:
@@ -762,10 +798,11 @@ def _stock_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
                 id=ctx.op.row_id, product_id=product.id, branch_id=branch, qty_delta=qty,
                 at=ctx.now,
             )
-            if not product.track_stock:
-                raise ValidationError("PRODUCT_NOT_STOCK_TRACKED", product_id=product.id)
         elif qty <= 0:
             raise ValidationError("STOCK_INVALID_QTY", qty=qty)
+        if not product.track_stock:
+            # An untracked product (a service) has no stock to move, on any path.
+            raise ValidationError("PRODUCT_NOT_STOCK_TRACKED", product_id=product.id)
     after = _pick(v, "product_id", "branch_id", "qty_delta", "reason", "ref_id")
     return ApplyPlan(
         v, branch, branch, AuditIntent(_STOCK_ACTIONS[reason], "stock_movement", after)
@@ -992,10 +1029,12 @@ def _write_off(ctx: _Ctx, v: dict[str, Any], amount: int, currency: str) -> Appl
 
 
 def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
-    if SupplierEntryType(v["type"]) is not SupplierEntryType.BILL:
+    entry = SupplierEntryType(v["type"])
+    if entry is not SupplierEntryType.BILL and entry is not SupplierEntryType.PAYMENT:
         raise ValidationError("SYNC_OP_UNSUPPORTED", table="supplier_ledger", type=v["type"])
     branch = _active(ctx)
-    _need(ctx, Permission.PURCHASE_COST, branch)  # a bill is a debt: not a stock move
+    # A bill is a debt and a payment is money out: purchase.cost, not a stock move.
+    _need(ctx, Permission.PURCHASE_COST, branch)
     _guard_insert(ctx)
     supplier = ctx.reader.supplier(v["supplier_id"])
     if supplier is None or supplier.deleted:
@@ -1003,9 +1042,29 @@ def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     currency = v.get("currency", DEFAULT_CURRENCY)
     if currency != supplier.currency:
         raise ConflictError("PURCHASE_CURRENCY_MISMATCH", expected=supplier.currency, got=currency)
-    after = _pick(v, "supplier_id", "amount_minor", "currency")
+    if entry is SupplierEntryType.BILL:
+        if v.get("shift_id") is not None or v.get("method") is not None:
+            raise ValidationError(
+                "SYNC_FIELD_NOT_ALLOWED", table="supplier_ledger", field="shift_id", reason="bill"
+            )
+        after = _pick(v, "supplier_id", "amount_minor", "currency")
+        return ApplyPlan(
+            v, branch, None, AuditIntent("supplier.bill_posted", "supplier_ledger", after)
+        )
+    if v.get("shift_id") is not None:
+        _own_shift(ctx, v["shift_id"], branch)  # the drawer the cash came out of
+    # Like a customer's payment: two tills' offline payments both apply, and one
+    # past the balance is flagged, not refused.
+    balance = ctx.reader.supplier_balance(supplier.id)
+    overpaid = _violates(lambda: assert_supplier_payment_valid(
+        amount_minor=v["amount_minor"], balance_minor=balance
+    ))
+    after = {
+        **_pick(v, "supplier_id", "amount_minor", "currency", "method", "shift_id"),
+        "overpaid": overpaid,
+    }
     return ApplyPlan(
-        v, branch, None, AuditIntent("supplier.bill_posted", "supplier_ledger", after)
+        v, branch, None, AuditIntent("supplier.payment_recorded", "supplier_ledger", after)
     )
 
 
@@ -1063,6 +1122,7 @@ _HANDLERS: dict[tuple[str, str], Callable[[_Ctx, dict[str, Any]], ApplyPlan]] = 
     ("products", "insert"): _products_insert,
     ("products", "update"): _products_update,
     ("barcodes", "insert"): _barcodes_insert,
+    ("barcodes", "update"): _barcodes_update,
     ("units", "insert"): _units_insert,
     ("customers", "insert"): _customers_insert,
     ("customers", "update"): _customers_update,

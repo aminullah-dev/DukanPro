@@ -16,6 +16,7 @@ final class ShiftSummary {
     required this.transferSalesMinor,
     required this.cashCollectedMinor,
     required this.otherCollectedMinor,
+    this.cashPaidOutMinor = 0,
   });
   final int openingFloatMinor;
   final int cashSalesMinor;
@@ -24,7 +25,10 @@ final class ShiftSummary {
   final int cashCollectedMinor;
   final int otherCollectedMinor;
 
-  int get expectedCashMinor => openingFloatMinor + cashSalesMinor + cashCollectedMinor;
+  /// Cash paid out of the drawer to suppliers.
+  final int cashPaidOutMinor;
+
+  int get expectedCashMinor => openingFloatMinor + cashSalesMinor + cashCollectedMinor - cashPaidOutMinor;
 }
 
 /// A till's shifts: opened with a float, closed with the counted cash (the
@@ -80,6 +84,10 @@ final class LocalShifts {
     final collected = await (_db.select(_db.customerLedger)
           ..where((t) => t.shiftId.equals(shift.id) & t.type.equals('payment') & t.deletedAt.isNull()))
         .get();
+    final paidOut = await (_db.select(_db.supplierLedger)
+          ..where((t) =>
+              t.shiftId.equals(shift.id) & t.type.equals('payment') & t.method.equals('cash') & t.deletedAt.isNull()))
+        .get();
     return ShiftSummary(
       openingFloatMinor: shift.openingFloatMinor,
       cashSalesMinor: taken(PaymentMethod.cash),
@@ -87,6 +95,7 @@ final class LocalShifts {
       transferSalesMinor: taken(PaymentMethod.transfer),
       cashCollectedMinor: total(collected.where((e) => e.method == 'cash').map((e) => e.amountMinor)),
       otherCollectedMinor: total(collected.where((e) => e.method != 'cash').map((e) => e.amountMinor)),
+      cashPaidOutMinor: total(paidOut.map((e) => e.amountMinor)),
     );
   }
 

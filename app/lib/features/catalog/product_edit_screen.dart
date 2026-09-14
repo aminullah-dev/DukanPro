@@ -1,8 +1,10 @@
 import 'package:dukan_core/dukan_core.dart';
+import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import '../auth/providers.dart';
@@ -44,6 +46,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
   late final TextEditingController _barcode;
   String? _unitId;
   bool _track = true;
+  bool _active = true;
   bool _busy = false;
   String? _error; // a message ready to show
 
@@ -60,6 +63,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
     _barcode = TextEditingController();
     _unitId = p?.unitId;
     _track = p?.trackStock ?? true;
+    _active = p?.isActive ?? true;
   }
 
   @override
@@ -108,13 +112,13 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
         final product = Product(
           id: p.id, sku: p.sku, name: _name.text.trim(), unitId: p.unitId,
           sellPrice: Money(priceMinor, 'AFN'), categoryId: p.categoryId, cost: p.cost,
-          trackStock: _track, isActive: p.isActive, version: p.version,
+          trackStock: _track, isActive: _active, version: p.version,
         );
         await catalog.updateProduct(product, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
       }
       if (mounted) Navigator.of(context).pop();
     } on AppError catch (e) {
-      if (mounted) setState(() => _error = numberErrorText(l, e) ?? l.errGeneric);
+      if (mounted) setState(() => _error = moneyErrorText(l, e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -176,6 +180,16 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                   value: _track,
                   onChanged: (v) => setState(() => _track = v),
                 ),
+                if (!_isNew) ...[
+                  // An inactive product is not sold, and keeps its barcodes.
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l.productActive),
+                    value: _active,
+                    onChanged: (v) => setState(() => _active = v),
+                  ),
+                  _Barcodes(productId: widget.product!.id),
+                ],
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -196,6 +210,91 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// A product's barcodes: a code is on one product only, so moving one means
+/// taking it off here first.
+class _Barcodes extends ConsumerStatefulWidget {
+  const _Barcodes({required this.productId});
+  final String productId;
+  @override
+  ConsumerState<_Barcodes> createState() => _BarcodesState();
+}
+
+class _BarcodesState extends ConsumerState<_Barcodes> {
+  final _code = TextEditingController();
+  List<Barcode> _codes = const [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final codes = await ref.read(localCatalogProvider).products.barcodesFor(widget.productId);
+    if (mounted) setState(() => _codes = codes);
+  }
+
+  Future<void> _change(Future<void> Function(LocalCatalog catalog, String actorId, String deviceId) write) async {
+    final actor = ref.read(sessionActorProvider);
+    if (actor == null) return;
+    try {
+      await write(ref.read(localCatalogProvider), actor.user.id, ref.read(deviceIdProvider));
+      if (mounted) setState(() => _error = null);
+      _code.clear();
+    } on AppError catch (e) {
+      if (mounted) setState(() => _error = moneyErrorText(AppLocalizations.of(context), e));
+    }
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Text(l.barcodes, style: Theme.of(context).textTheme.titleSmall),
+        for (final b in _codes)
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(b.code),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: l.removeBarcode,
+              onPressed: () => _change((c, actor, device) => c.removeBarcode(b.id, actorId: actor, deviceId: device)),
+            ),
+          ),
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: _code,
+              decoration: InputDecoration(labelText: l.barcodeLabel, errorText: _error, isDense: true),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: l.addBarcode,
+            onPressed: () {
+              final code = _code.text.trim();
+              if (code.isEmpty || code.length > 64) return;
+              _change((c, actor, device) => c.addBarcode(widget.productId, code, actorId: actor, deviceId: device));
+            },
+          ),
+        ]),
+      ],
     );
   }
 }

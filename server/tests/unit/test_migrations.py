@@ -194,3 +194,28 @@ def test_the_migrations_render_as_a_sql_script(url: str, monkeypatch: pytest.Mon
         # 0010 alters each table in one statement, so it is rewritten once.
         assert sql.count("ALTER TABLE sales ALTER COLUMN") == 1
 
+
+def test_0014_keeps_one_live_barcode_per_code(empty_database_url: str) -> None:
+    engine = sa.create_engine(empty_database_url)
+    _migrate(engine, "0013")
+    meta = sa.MetaData()
+    products = sa.Table("products", meta, autoload_with=engine)
+    barcodes = sa.Table("barcodes", meta, autoload_with=engine)
+    first, second = str(uuid.uuid4()), str(uuid.uuid4())
+    with engine.begin() as conn:
+        for product in (first, second):
+            conn.execute(products.insert().values(**_row(products, id=product)))
+            conn.execute(barcodes.insert().values(**_row(barcodes, product_id=product, code="999")))
+    _migrate(engine, "0014")
+    feed_table = sa.Table("change_log", sa.MetaData(), autoload_with=engine)
+    with engine.connect() as conn:
+        live = conn.execute(
+            sa.select(barcodes.c.product_id).where(barcodes.c.deleted_at.is_(None))
+        ).scalars().all()
+        dropped = conn.execute(
+            sa.select(feed_table.c.data).where(feed_table.c.table_name == "barcodes")
+        ).scalars().all()
+    engine.dispose()
+    assert len(live) == 1
+    assert len(dropped) == 1 and dropped[0]["deleted_at"] is not None and dropped[0]["code"] == "999"
+

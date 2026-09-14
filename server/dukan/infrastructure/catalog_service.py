@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from dukan.application.access import require_any_permission, require_permission
@@ -151,7 +152,7 @@ class SqlCatalogService(CatalogService):
                 id=new_id(), product_id=product.id, code=code, created_by=actor.id
             )
             self._s.add(barcode)
-            record_change(self._s, "barcodes", barcode, op="insert", branch_id=None)
+            self._log_barcode(barcode)
         self._audit("product.created", actor.id, product.id, {"sku": sku, "name": name})
         self._s.commit()
         return self._view(product, branch_id)
@@ -166,6 +167,7 @@ class SqlCatalogService(CatalogService):
         sell_price_minor: int | None,
         is_active: bool | None,
         version: int | None = None,
+        track_stock: bool | None = None,
     ) -> ProductView:
         require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
         require_active_branch(self._s, branch_id)
@@ -179,6 +181,8 @@ class SqlCatalogService(CatalogService):
             product.name = name
         if is_active is not None:
             product.is_active = is_active
+        if track_stock is not None:
+            product.track_stock = track_stock
         if sell_price_minor is not None:
             assert_price_valid(sell_price_minor=sell_price_minor)
         if sell_price_minor is not None and sell_price_minor != product.sell_price_minor:
@@ -210,8 +214,39 @@ class SqlCatalogService(CatalogService):
         assert_unique_barcode(code=code, taken=taken)
         barcode = BarcodeModel(id=new_id(), product_id=product.id, code=code, created_by=actor.id)
         self._s.add(barcode)
-        record_change(self._s, "barcodes", barcode, op="insert", branch_id=None)
+        self._log_barcode(barcode)
         self._audit("barcode.added", actor.id, product.id, {"code": code})
+        self._s.commit()
+        return self._view(product, branch_id)
+
+    def _log_barcode(self, barcode: BarcodeModel) -> None:
+        """Writes a new barcode to the feed. A unique index backs the check before
+        it: a code another request took meanwhile is the same conflict."""
+        try:
+            record_change(self._s, "barcodes", barcode, op="insert", branch_id=None)
+        except IntegrityError:
+            self._s.rollback()
+            raise ConflictError("BARCODE_DUPLICATE", barcode=barcode.code) from None
+
+    def remove_barcode(
+        self, *, actor: User, branch_id: str, product_id: str, code: str
+    ) -> ProductView:
+        """Takes a barcode off its product, so the code can go on another one."""
+        require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
+        require_active_branch(self._s, branch_id)
+        product = self._get(product_id)
+        barcode = self._s.scalar(
+            select(BarcodeModel).where(
+                BarcodeModel.product_id == product.id, BarcodeModel.code == code,
+                BarcodeModel.deleted_at.is_(None),
+            )
+        )
+        if barcode is None:
+            raise NotFoundError("BARCODE_NOT_FOUND", barcode=code)
+        barcode.deleted_at = datetime.now(UTC)
+        barcode.version += 1
+        record_change(self._s, "barcodes", barcode, op="update", branch_id=None)
+        self._audit("barcode.removed", actor.id, product.id, {"code": code})
         self._s.commit()
         return self._view(product, branch_id)
 

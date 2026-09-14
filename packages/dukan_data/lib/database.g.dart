@@ -9074,6 +9074,17 @@ class $SupplierLedgerTable extends SupplierLedger
   late final GeneratedColumn<String> supplierId = GeneratedColumn<String>(
       'supplier_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _methodMeta = const VerificationMeta('method');
+  @override
+  late final GeneratedColumn<String> method = GeneratedColumn<String>(
+      'method', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _shiftIdMeta =
+      const VerificationMeta('shiftId');
+  @override
+  late final GeneratedColumn<String> shiftId = GeneratedColumn<String>(
+      'shift_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
@@ -9111,6 +9122,8 @@ class $SupplierLedgerTable extends SupplierLedger
         updatedBy,
         version,
         supplierId,
+        method,
+        shiftId,
         type,
         amountMinor,
         currency,
@@ -9163,6 +9176,14 @@ class $SupplierLedgerTable extends SupplierLedger
     } else if (isInserting) {
       context.missing(_supplierIdMeta);
     }
+    if (data.containsKey('method')) {
+      context.handle(_methodMeta,
+          method.isAcceptableOrUnknown(data['method']!, _methodMeta));
+    }
+    if (data.containsKey('shift_id')) {
+      context.handle(_shiftIdMeta,
+          shiftId.isAcceptableOrUnknown(data['shift_id']!, _shiftIdMeta));
+    }
     if (data.containsKey('type')) {
       context.handle(
           _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
@@ -9212,6 +9233,10 @@ class $SupplierLedgerTable extends SupplierLedger
           .read(DriftSqlType.int, data['${effectivePrefix}version'])!,
       supplierId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}supplier_id'])!,
+      method: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}method']),
+      shiftId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}shift_id']),
       type: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
       amountMinor: attachedDatabase.typeMapping
@@ -9239,6 +9264,10 @@ class SupplierLedgerRow extends DataClass
   final String? updatedBy;
   final int version;
   final String supplierId;
+
+  /// A payment: how it was paid, and the shift whose drawer it came out of.
+  final String? method;
+  final String? shiftId;
   final String type;
   final int amountMinor;
   final String currency;
@@ -9252,6 +9281,8 @@ class SupplierLedgerRow extends DataClass
       this.updatedBy,
       required this.version,
       required this.supplierId,
+      this.method,
+      this.shiftId,
       required this.type,
       required this.amountMinor,
       required this.currency,
@@ -9273,6 +9304,12 @@ class SupplierLedgerRow extends DataClass
     }
     map['version'] = Variable<int>(version);
     map['supplier_id'] = Variable<String>(supplierId);
+    if (!nullToAbsent || method != null) {
+      map['method'] = Variable<String>(method);
+    }
+    if (!nullToAbsent || shiftId != null) {
+      map['shift_id'] = Variable<String>(shiftId);
+    }
     map['type'] = Variable<String>(type);
     map['amount_minor'] = Variable<int>(amountMinor);
     map['currency'] = Variable<String>(currency);
@@ -9296,6 +9333,11 @@ class SupplierLedgerRow extends DataClass
           : Value(updatedBy),
       version: Value(version),
       supplierId: Value(supplierId),
+      method:
+          method == null && nullToAbsent ? const Value.absent() : Value(method),
+      shiftId: shiftId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shiftId),
       type: Value(type),
       amountMinor: Value(amountMinor),
       currency: Value(currency),
@@ -9315,6 +9357,8 @@ class SupplierLedgerRow extends DataClass
       updatedBy: serializer.fromJson<String?>(json['updatedBy']),
       version: serializer.fromJson<int>(json['version']),
       supplierId: serializer.fromJson<String>(json['supplierId']),
+      method: serializer.fromJson<String?>(json['method']),
+      shiftId: serializer.fromJson<String?>(json['shiftId']),
       type: serializer.fromJson<String>(json['type']),
       amountMinor: serializer.fromJson<int>(json['amountMinor']),
       currency: serializer.fromJson<String>(json['currency']),
@@ -9333,6 +9377,8 @@ class SupplierLedgerRow extends DataClass
       'updatedBy': serializer.toJson<String?>(updatedBy),
       'version': serializer.toJson<int>(version),
       'supplierId': serializer.toJson<String>(supplierId),
+      'method': serializer.toJson<String?>(method),
+      'shiftId': serializer.toJson<String?>(shiftId),
       'type': serializer.toJson<String>(type),
       'amountMinor': serializer.toJson<int>(amountMinor),
       'currency': serializer.toJson<String>(currency),
@@ -9349,6 +9395,8 @@ class SupplierLedgerRow extends DataClass
           Value<String?> updatedBy = const Value.absent(),
           int? version,
           String? supplierId,
+          Value<String?> method = const Value.absent(),
+          Value<String?> shiftId = const Value.absent(),
           String? type,
           int? amountMinor,
           String? currency,
@@ -9362,6 +9410,8 @@ class SupplierLedgerRow extends DataClass
         updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
         version: version ?? this.version,
         supplierId: supplierId ?? this.supplierId,
+        method: method.present ? method.value : this.method,
+        shiftId: shiftId.present ? shiftId.value : this.shiftId,
         type: type ?? this.type,
         amountMinor: amountMinor ?? this.amountMinor,
         currency: currency ?? this.currency,
@@ -9378,6 +9428,8 @@ class SupplierLedgerRow extends DataClass
       version: data.version.present ? data.version.value : this.version,
       supplierId:
           data.supplierId.present ? data.supplierId.value : this.supplierId,
+      method: data.method.present ? data.method.value : this.method,
+      shiftId: data.shiftId.present ? data.shiftId.value : this.shiftId,
       type: data.type.present ? data.type.value : this.type,
       amountMinor:
           data.amountMinor.present ? data.amountMinor.value : this.amountMinor,
@@ -9398,6 +9450,8 @@ class SupplierLedgerRow extends DataClass
           ..write('updatedBy: $updatedBy, ')
           ..write('version: $version, ')
           ..write('supplierId: $supplierId, ')
+          ..write('method: $method, ')
+          ..write('shiftId: $shiftId, ')
           ..write('type: $type, ')
           ..write('amountMinor: $amountMinor, ')
           ..write('currency: $currency, ')
@@ -9416,6 +9470,8 @@ class SupplierLedgerRow extends DataClass
       updatedBy,
       version,
       supplierId,
+      method,
+      shiftId,
       type,
       amountMinor,
       currency,
@@ -9432,6 +9488,8 @@ class SupplierLedgerRow extends DataClass
           other.updatedBy == this.updatedBy &&
           other.version == this.version &&
           other.supplierId == this.supplierId &&
+          other.method == this.method &&
+          other.shiftId == this.shiftId &&
           other.type == this.type &&
           other.amountMinor == this.amountMinor &&
           other.currency == this.currency &&
@@ -9447,6 +9505,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
   final Value<String?> updatedBy;
   final Value<int> version;
   final Value<String> supplierId;
+  final Value<String?> method;
+  final Value<String?> shiftId;
   final Value<String> type;
   final Value<int> amountMinor;
   final Value<String> currency;
@@ -9461,6 +9521,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
     this.updatedBy = const Value.absent(),
     this.version = const Value.absent(),
     this.supplierId = const Value.absent(),
+    this.method = const Value.absent(),
+    this.shiftId = const Value.absent(),
     this.type = const Value.absent(),
     this.amountMinor = const Value.absent(),
     this.currency = const Value.absent(),
@@ -9476,6 +9538,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
     this.updatedBy = const Value.absent(),
     this.version = const Value.absent(),
     required String supplierId,
+    this.method = const Value.absent(),
+    this.shiftId = const Value.absent(),
     required String type,
     required int amountMinor,
     this.currency = const Value.absent(),
@@ -9494,6 +9558,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
     Expression<String>? updatedBy,
     Expression<int>? version,
     Expression<String>? supplierId,
+    Expression<String>? method,
+    Expression<String>? shiftId,
     Expression<String>? type,
     Expression<int>? amountMinor,
     Expression<String>? currency,
@@ -9509,6 +9575,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
       if (updatedBy != null) 'updated_by': updatedBy,
       if (version != null) 'version': version,
       if (supplierId != null) 'supplier_id': supplierId,
+      if (method != null) 'method': method,
+      if (shiftId != null) 'shift_id': shiftId,
       if (type != null) 'type': type,
       if (amountMinor != null) 'amount_minor': amountMinor,
       if (currency != null) 'currency': currency,
@@ -9526,6 +9594,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
       Value<String?>? updatedBy,
       Value<int>? version,
       Value<String>? supplierId,
+      Value<String?>? method,
+      Value<String?>? shiftId,
       Value<String>? type,
       Value<int>? amountMinor,
       Value<String>? currency,
@@ -9540,6 +9610,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
       updatedBy: updatedBy ?? this.updatedBy,
       version: version ?? this.version,
       supplierId: supplierId ?? this.supplierId,
+      method: method ?? this.method,
+      shiftId: shiftId ?? this.shiftId,
       type: type ?? this.type,
       amountMinor: amountMinor ?? this.amountMinor,
       currency: currency ?? this.currency,
@@ -9575,6 +9647,12 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
     if (supplierId.present) {
       map['supplier_id'] = Variable<String>(supplierId.value);
     }
+    if (method.present) {
+      map['method'] = Variable<String>(method.value);
+    }
+    if (shiftId.present) {
+      map['shift_id'] = Variable<String>(shiftId.value);
+    }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
     }
@@ -9604,6 +9682,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
           ..write('updatedBy: $updatedBy, ')
           ..write('version: $version, ')
           ..write('supplierId: $supplierId, ')
+          ..write('method: $method, ')
+          ..write('shiftId: $shiftId, ')
           ..write('type: $type, ')
           ..write('amountMinor: $amountMinor, ')
           ..write('currency: $currency, ')
@@ -14183,6 +14263,8 @@ typedef $$SupplierLedgerTableCreateCompanionBuilder = SupplierLedgerCompanion
   Value<String?> updatedBy,
   Value<int> version,
   required String supplierId,
+  Value<String?> method,
+  Value<String?> shiftId,
   required String type,
   required int amountMinor,
   Value<String> currency,
@@ -14199,6 +14281,8 @@ typedef $$SupplierLedgerTableUpdateCompanionBuilder = SupplierLedgerCompanion
   Value<String?> updatedBy,
   Value<int> version,
   Value<String> supplierId,
+  Value<String?> method,
+  Value<String?> shiftId,
   Value<String> type,
   Value<int> amountMinor,
   Value<String> currency,
@@ -14238,6 +14322,12 @@ class $$SupplierLedgerTableFilterComposer
 
   ColumnFilters<String> get supplierId => $composableBuilder(
       column: $table.supplierId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get method => $composableBuilder(
+      column: $table.method, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get shiftId => $composableBuilder(
+      column: $table.shiftId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnFilters(column));
@@ -14285,6 +14375,12 @@ class $$SupplierLedgerTableOrderingComposer
   ColumnOrderings<String> get supplierId => $composableBuilder(
       column: $table.supplierId, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get method => $composableBuilder(
+      column: $table.method, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get shiftId => $composableBuilder(
+      column: $table.shiftId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnOrderings(column));
 
@@ -14330,6 +14426,12 @@ class $$SupplierLedgerTableAnnotationComposer
 
   GeneratedColumn<String> get supplierId => $composableBuilder(
       column: $table.supplierId, builder: (column) => column);
+
+  GeneratedColumn<String> get method =>
+      $composableBuilder(column: $table.method, builder: (column) => column);
+
+  GeneratedColumn<String> get shiftId =>
+      $composableBuilder(column: $table.shiftId, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
@@ -14379,6 +14481,8 @@ class $$SupplierLedgerTableTableManager extends RootTableManager<
             Value<String?> updatedBy = const Value.absent(),
             Value<int> version = const Value.absent(),
             Value<String> supplierId = const Value.absent(),
+            Value<String?> method = const Value.absent(),
+            Value<String?> shiftId = const Value.absent(),
             Value<String> type = const Value.absent(),
             Value<int> amountMinor = const Value.absent(),
             Value<String> currency = const Value.absent(),
@@ -14394,6 +14498,8 @@ class $$SupplierLedgerTableTableManager extends RootTableManager<
             updatedBy: updatedBy,
             version: version,
             supplierId: supplierId,
+            method: method,
+            shiftId: shiftId,
             type: type,
             amountMinor: amountMinor,
             currency: currency,
@@ -14409,6 +14515,8 @@ class $$SupplierLedgerTableTableManager extends RootTableManager<
             Value<String?> updatedBy = const Value.absent(),
             Value<int> version = const Value.absent(),
             required String supplierId,
+            Value<String?> method = const Value.absent(),
+            Value<String?> shiftId = const Value.absent(),
             required String type,
             required int amountMinor,
             Value<String> currency = const Value.absent(),
@@ -14424,6 +14532,8 @@ class $$SupplierLedgerTableTableManager extends RootTableManager<
             updatedBy: updatedBy,
             version: version,
             supplierId: supplierId,
+            method: method,
+            shiftId: shiftId,
             type: type,
             amountMinor: amountMinor,
             currency: currency,

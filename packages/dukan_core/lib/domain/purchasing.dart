@@ -99,3 +99,13 @@ int receiptTotal(Iterable<ReceiptLine> lines) {
   }
   return total;
 }
+
+/// A payment to a supplier is a positive amount, no more than the shop owes
+/// them. Raises [ValidationError] `SUPPLIER_PAYMENT_INVALID` or [ConflictError]
+/// `SUPPLIER_OVERPAYMENT`.
+void assertSupplierPaymentValid({required int amountMinor, required int balanceMinor}) {
+  if (amountMinor <= 0) throw ValidationError('SUPPLIER_PAYMENT_INVALID', {'amount': amountMinor});
+  if (amountMinor > balanceMinor) {
+    throw ConflictError('SUPPLIER_OVERPAYMENT', {'amount': amountMinor, 'balance': balanceMinor});
+  }
+}

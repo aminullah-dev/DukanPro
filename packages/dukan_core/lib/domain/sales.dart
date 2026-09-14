@@ -56,6 +56,7 @@ final class SaleLine {
     required this.unitPriceMinor,
     required this.unitCostMinor,
     required this.currency,
+    this.trackStock = true,
   });
 
   final String productId;
@@ -65,6 +66,9 @@ final class SaleLine {
   final int unitPriceMinor; // snapshot at sale time
   final int unitCostMinor; // snapshot at sale time (for profit reports)
   final String currency;
+
+  /// An untracked product (a service) moves no stock.
+  final bool trackStock;
 
   int get lineTotal => lineTotalMinor(unitPriceMinor, qtyMinor, decimalPlaces);
 }

@@ -17,6 +17,7 @@ import 'features/iam/employees_screen.dart';
 import 'features/insights/notifications_bell.dart';
 import 'features/pos/pos_screen.dart';
 import 'features/purchasing/receive_stock_screen.dart';
+import 'features/purchasing/suppliers_screen.dart';
 import 'features/settings/printer_settings_screen.dart';
 import 'features/sync/sync_button.dart';
 import 'features/sync/sync_providers.dart';
@@ -56,6 +57,8 @@ class AppShell extends ConsumerWidget {
       _Destination(Icons.people_outline, l.customers, const CustomersScreen()),
       if (can(Permission.stockAdjust))
         _Destination(Icons.add_box_outlined, l.receiveStock, const ReceiveStockScreen()),
+      if (can(Permission.purchaseCost) || can(Permission.productManage))
+        _Destination(Icons.local_shipping_outlined, l.suppliers, const SuppliersScreen()),
       if (can(Permission.reportView))
         _Destination(Icons.dashboard_outlined, l.dashboard, const DashboardScreen()),
       if (can(Permission.userManage))

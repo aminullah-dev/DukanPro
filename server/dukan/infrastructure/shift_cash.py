@@ -11,6 +11,7 @@ from dukan.infrastructure.db.models import (
     PaymentModel,
     SaleModel,
     ShiftModel,
+    SupplierLedgerModel,
 )
 from dukan.shared.errors import ConflictError, NotFoundError
 
@@ -32,8 +33,9 @@ def require_open_shift(
 
 def expected_cash(session: Session, shift_id: str) -> int:
     """What the drawer should hold: the opening float, the cash taken by the
-    shift's settled sales, and the debts collected in it in cash. A voided
-    sale's cash went back; card and transfer money never reaches the drawer."""
+    shift's settled sales and the debts collected in it in cash, less the cash
+    paid out of it to suppliers. A voided sale's cash went back; card and
+    transfer money never reaches the drawer."""
     shift = session.get(ShiftModel, shift_id)
     opening = shift.opening_float_minor if shift is not None else 0
     sales = session.scalar(
@@ -51,4 +53,10 @@ def expected_cash(session: Session, shift_id: str) -> int:
             CustomerLedgerModel.method == "cash", CustomerLedgerModel.deleted_at.is_(None),
         )
     ) or 0
-    return int(opening) + int(sales) + int(collected)
+    paid_out = session.scalar(
+        select(func.coalesce(func.sum(SupplierLedgerModel.amount_minor), 0)).where(
+            SupplierLedgerModel.shift_id == shift_id, SupplierLedgerModel.type == "payment",
+            SupplierLedgerModel.method == "cash", SupplierLedgerModel.deleted_at.is_(None),
+        )
+    ) or 0
+    return int(opening) + int(sales) + int(collected) - int(paid_out)

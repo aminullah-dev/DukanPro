@@ -211,6 +211,9 @@ class Suppliers extends Table with RecordColumns {
 @DataClassName('SupplierLedgerRow')
 class SupplierLedger extends Table with RecordColumns {
   TextColumn get supplierId => text()();
+  /// A payment: how it was paid, and the shift whose drawer it came out of.
+  TextColumn get method => text().nullable()();
+  TextColumn get shiftId => text().nullable()();
   TextColumn get type => text()();
   IntColumn get amountMinor => integer()();
   TextColumn get currency => text().withDefault(const Constant('AFN'))();
@@ -251,7 +254,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -296,6 +299,13 @@ class AppDatabase extends _$AppDatabase {
             for (final column in [customerLedger.method, customerLedger.shiftId]) {
               if (!await _hasColumn('customer_ledger', column.$name)) {
                 await m.addColumn(customerLedger, column);
+              }
+            }
+          }
+          if (from < 11) {
+            for (final column in [supplierLedger.method, supplierLedger.shiftId]) {
+              if (!await _hasColumn('supplier_ledger', column.$name)) {
+                await m.addColumn(supplierLedger, column);
               }
             }
           }

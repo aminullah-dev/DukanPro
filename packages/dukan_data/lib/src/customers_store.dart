@@ -201,6 +201,33 @@ final class LocalPurchasing {
       0, (sum, r) => sum + (r.type == 'payment' ? -r.amountMinor : r.amountMinor));
   }
 
+  /// Pays a supplier what the shop owes them: never more (`SUPPLIER_OVERPAYMENT`),
+  /// in their currency. With a [shiftId] (the till's open shift), cash comes out
+  /// of that shift's drawer.
+  Future<void> paySupplier({
+    required Supplier supplier,
+    required int amountMinor,
+    PaymentMethod method = PaymentMethod.cash,
+    String? shiftId,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    assertSupplierPaymentValid(amountMinor: amountMinor, balanceMinor: await supplierBalance(supplier.id));
+    assertPaymentValid(method: method, amountMinor: amountMinor);
+    final ledgerId = newId();
+    await _db.transaction(() async {
+      await _db.into(_db.supplierLedger).insert(SupplierLedgerCompanion.insert(
+            id: ledgerId, supplierId: supplier.id, type: 'payment', amountMinor: amountMinor,
+            currency: Value(supplier.currency), method: Value(method.name), shiftId: Value(shiftId),
+            createdBy: Value(actorId),
+          ));
+      await _rec.record(table: 'supplier_ledger', rowId: ledgerId, op: 'insert', data: {
+        'supplier_id': supplier.id, 'type': 'payment', 'amount_minor': amountMinor,
+        'currency': supplier.currency, 'method': method.name, 'shift_id': shiftId,
+      }, actorId: actorId, deviceId: deviceId);
+    });
+  }
+
   /// A received cost is a versioned product edit, so it reaches the server and
   /// every other device, in the product's selling currency.
   Future<void> _recordCost(ReceiptLine l, {required String actorId, required String deviceId}) async {
@@ -227,14 +254,17 @@ final class LocalPurchasing {
     final total = receiptTotal(lines);
     await _db.transaction(() async {
       for (final l in lines) {
+        // A receipt without a cost (a stock keeper's) says nothing about the price
+        // paid: the product keeps its cost, as on the server.
+        if (l.unitCostMinor > 0) await _recordCost(l, actorId: actorId, deviceId: deviceId);
+        final product = await (_db.select(_db.products)..where((t) => t.id.equals(l.productId))).getSingleOrNull();
+        // An untracked product (a service) is billed and costed but moves no stock.
+        if (product != null && !product.trackStock) continue;
         final movementId = newId();
         await _db.into(_db.stockMovements).insert(StockMovementsCompanion.insert(
               id: movementId, productId: l.productId, branchId: branchId,
               qtyDelta: l.qtyMinor, reason: 'purchase', createdBy: Value(actorId),
             ));
-        // A receipt without a cost (a stock keeper's) says nothing about the price
-        // paid: the product keeps its cost, as on the server.
-        if (l.unitCostMinor > 0) await _recordCost(l, actorId: actorId, deviceId: deviceId);
         await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
           'product_id': l.productId, 'branch_id': branchId, 'qty_delta': l.qtyMinor, 'reason': 'purchase',
         }, actorId: actorId, deviceId: deviceId);

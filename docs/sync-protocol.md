@@ -68,16 +68,17 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 
 | Table, op | Permission (branch) | Rules |
 |---|---|---|
-| products insert | product.manage (active) | the unit exists; `category_id` and `cost_*` must be null; the currency one the shop's branches trade in (`PRICE_CURRENCY_INVALID`), as on REST |
-| products update | product.manage (active), plus price.change when the price or currency changes, plus purchase.cost for a cost | `base_version` required; only `name`, `sell_price_minor`, `sell_currency`, `is_active`, `cost_minor` (a goods receipt's cost, in the selling currency); the currency one the shop's branches trade in (`PRICE_CURRENCY_INVALID`), as on REST |
-| barcodes insert | product.manage (active) | the product exists |
+| products insert | product.manage (active) | the unit exists; `category_id` and `cost_*` must be null; the currency one the shop's branches trade in (`PRICE_CURRENCY_INVALID`), as on REST; a SKU another live product has is **flagged** (`sku_taken`), not refused |
+| products update | product.manage (active), plus price.change when the price or currency changes, plus purchase.cost for a cost | `base_version` required; only `name`, `sell_price_minor`, `sell_currency`, `is_active`, `track_stock`, `cost_minor` (a goods receipt's cost, in the selling currency); the currency one the shop's branches trade in (`PRICE_CURRENCY_INVALID`), as on REST |
+| barcodes insert | product.manage (active) | the product exists; a code a live barcode has is refused (`BARCODE_DUPLICATE`) |
+| barcodes update | product.manage (active) | `base_version` required; only `{deleted: true}`: the barcode is taken off its product (soft-deleted; its image carries `deleted_at`) |
 | units insert | any role in the active branch for the device seed (piece/0, kg/3, litre/3, dozen/0, meter/2); product.manage otherwise | |
 | customers insert | sale.create (active) | a credit limit other than 0 (null is unlimited) without customer.credit is stored as 0, and the audit keeps the requested limit |
 | customers update | sale.create (active), plus customer.credit when the credit limit or `is_active` changes | `base_version` required; only `name`, `phone`, `credit_limit_minor`, `is_active` |
 | suppliers insert | product.manage (active) | |
 | stock_movements insert, `adjustment` | stock.adjust (row) | qty ≠ 0; the product tracks stock |
-| stock_movements insert, `purchase` | stock.adjust (row) | qty > 0 |
-| stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product; a movement beyond the lines that have arrived, while some are still missing, is a retry (`SALE_LINES_NOT_FOUND`) |
+| stock_movements insert, `purchase` | stock.adjust (row) | qty > 0; the product tracks stock (`PRODUCT_NOT_STOCK_TRACKED`) |
+| stock_movements insert, `sale` | sale.create (row) | the product tracks stock (`PRODUCT_NOT_STOCK_TRACKED`); qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product; a movement beyond the lines that have arrived, while some are still missing, is a retry (`SALE_LINES_NOT_FOUND`) |
 | sales insert | sale.create (row), plus sale.discount for a discount above 0 | 0 ≤ discount ≤ subtotal; total = subtotal − discount + tax; paid ≥ total unless on credit, and never above the total (`SALE_OVERPAID`); the customer exists; a `shift_id` names the pusher's own shift in the branch (not arrived yet: `SHIFT_NOT_FOUND`, a retry; closed: **flagged** `after_shift_close`) |
 | shifts insert | sale.create (row) | the pusher's own shift (`user_id`); a float of 0 or more; opened at the device's time |
 | shifts update | sale.create for the shift's own seller, else report.view | `base_version` required; only an open shift closes (`SHIFT_ALREADY_CLOSED`); `status` closed and `counted_cash_minor`; the server sets the expected cash and the variance from its own rows |
@@ -87,6 +88,7 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused; `method` (cash, card, transfer) and a `shift_id` naming the pusher's own shift in the branch |
 | customer_ledger insert, `adjustment` | debt.write_off (active) | a write-off: a negative amount, `ref_type` `write_off`, no `ref_id`; the customer's currency; one past the balance is **flagged** (`exceeds_balance`), not refused |
 | supplier_ledger insert, `bill` | purchase.cost (active) | the supplier exists; the supplier's currency |
+| supplier_ledger insert, `payment` | purchase.cost (active) | the supplier exists; the supplier's currency; `method` (cash, card, transfer) and a `shift_id` naming the pusher's own shift in the branch; one past the balance is **flagged** (`overpaid`), not refused |
 
 Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories, updates of anything but products and customers, stock transfers, counts and returns, customer opening balances and adjustments, supplier payments. Offline ledger entries that break a limit online would enforce still apply, because two tills can both act while offline; the audit flag is what the owner reviews.
 

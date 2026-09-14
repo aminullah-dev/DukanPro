@@ -448,6 +448,47 @@ class AppLocalizationsPs extends AppLocalizations {
   String get errShiftAlreadyOpen => 'تاسو دلته دمخه یو پرانیستی شفټ لرئ.';
 
   @override
+  String get suppliers => 'عرضه کوونکي';
+
+  @override
+  String get paySupplier => 'عرضه کوونکي ته تادیه';
+
+  @override
+  String get addSupplier => 'عرضه کوونکی زیاتول';
+
+  @override
+  String get supplierName => 'د عرضه کوونکي نوم';
+
+  @override
+  String get noSuppliers => 'تر اوسه عرضه کوونکی نشته';
+
+  @override
+  String get paidToSuppliers => 'عرضه کوونکو ته نغدي تادیه';
+
+  @override
+  String get productActive => 'فعال (د پلور وړ)';
+
+  @override
+  String get barcodes => 'بارکوډونه';
+
+  @override
+  String get addBarcode => 'بارکوډ زیاتول';
+
+  @override
+  String get removeBarcode => 'بارکوډ لرې کول';
+
+  @override
+  String get errBarcodeTaken =>
+      'دا بارکوډ په بل توکي ثبت دی. لومړی یې له هغه ځایه لرې کړئ.';
+
+  @override
+  String get errSupplierOverpayment =>
+      'دا مبلغ د دې عرضه کوونکي له پور څخه زیات دی.';
+
+  @override
+  String get errNotStockTracked => 'د دې توکي زېرمه نه څارل کېږي.';
+
+  @override
   String get errSessionEnded =>
       'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
 

@@ -259,7 +259,8 @@ def test_stock_keeper_flows_and_limits(client: TestClient) -> None:
     )
     assert outcomes(bad) == [
         ("rejected", "STOCK_INVALID_QTY"), ("rejected", "STOCK_INVALID_QTY"),
-        ("rejected", "PRODUCT_NOT_STOCK_TRACKED"), ("rejected", "SYNC_OP_UNSUPPORTED"),
+        # A supplier payment is money out: purchase.cost, which a stock keeper lacks.
+        ("rejected", "PRODUCT_NOT_STOCK_TRACKED"), ("rejected", "ACCESS_DENIED"),
         ("rejected", "ACCESS_DENIED"), ("rejected", "ACCESS_DENIED"),
         ("rejected", "ACCESS_DENIED"), ("rejected", "ACCESS_DENIED"),
     ]

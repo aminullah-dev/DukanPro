@@ -20,9 +20,11 @@ from dukan.domain.purchasing import (
     SupplierEntryType,
     SupplierLedgerEntry,
     assert_receivable,
+    assert_supplier_payment_valid,
     receipt_total,
     supplier_balance,
 )
+from dukan.domain.sales import assert_payment_valid
 from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
@@ -35,6 +37,7 @@ from dukan.infrastructure.db.models import (
     UnitModel,
 )
 from dukan.infrastructure.scope import require_active_branch
+from dukan.infrastructure.shift_cash import require_open_shift
 from dukan.shared.errors import ConflictError, NotFoundError, ValidationError
 from dukan.shared.ids import new_id
 
@@ -168,13 +171,16 @@ class SqlPurchasingService(PurchasingService):
                     created_by=actor.id,
                 )
             )
-            movement = StockMovementModel(
-                id=new_id(), product_id=line.product_id, branch_id=branch_id,
-                qty_delta=line.qty_minor, reason="purchase", ref_type="goods_receipt",
-                ref_id=receipt.id, created_by=actor.id,
-            )
-            self._s.add(movement)
-            record_change(self._s, "stock_movements", movement, op="insert", branch_id=branch_id)
+            if product.track_stock:  # an untracked product (a service) moves no stock
+                movement = StockMovementModel(
+                    id=new_id(), product_id=line.product_id, branch_id=branch_id,
+                    qty_delta=line.qty_minor, reason="purchase", ref_type="goods_receipt",
+                    ref_id=receipt.id, created_by=actor.id,
+                )
+                self._s.add(movement)
+                record_change(
+                    self._s, "stock_movements", movement, op="insert", branch_id=branch_id
+                )
             # A quantity-only receipt leaves the last cost alone.
             if line.unit_cost_minor > 0 and line.unit_cost_minor != product.cost_minor:
                 self._s.add(
@@ -209,3 +215,41 @@ class SqlPurchasingService(PurchasingService):
         return GoodsReceiptView(
             id=receipt.id, number=receipt.number, supplier_id=supplier_id, total_cost_minor=total
         )
+
+    def pay_supplier(
+        self, *, actor: User, branch_id: str, supplier_id: str, amount_minor: int,
+        method: str = "cash", shift_id: str | None = None,
+    ) -> SupplierView:
+        """Pay what the shop owes a supplier: money out, so purchase.cost, never
+        more than owed, in the supplier's currency. Cash paid from a till's open
+        shift comes off its drawer."""
+        require_permission(_POLICY, actor, Permission.PURCHASE_COST, branch_id)
+        require_active_branch(self._s, branch_id)
+        supplier = self._s.scalar(
+            select(SupplierModel)
+            .where(SupplierModel.id == supplier_id, SupplierModel.deleted_at.is_(None))
+            .with_for_update()  # two payments to one supplier take turns
+        )
+        if supplier is None:
+            raise NotFoundError("SUPPLIER_NOT_FOUND", supplier_id=supplier_id)
+        balance = self._supplier_balance(supplier_id)
+        assert_supplier_payment_valid(amount_minor=amount_minor, balance_minor=balance)
+        assert_payment_valid(method=method, amount_minor=amount_minor)  # cash, card or transfer
+        if shift_id is not None:
+            require_open_shift(self._s, shift_id=shift_id, user_id=actor.id, branch_id=branch_id)
+        entry = SupplierLedgerModel(
+            id=new_id(), supplier_id=supplier_id, type="payment", amount_minor=amount_minor,
+            currency=supplier.currency, method=method, shift_id=shift_id, created_by=actor.id,
+        )
+        self._s.add(entry)
+        record_change(self._s, "supplier_ledger", entry, op="insert", branch_id=None)
+        self._s.add(
+            AuditEntryModel(
+                id=new_id(), action="supplier.payment_recorded", actor_id=actor.id,
+                entity_type="supplier", entity_id=supplier_id,
+                after={"amount": amount_minor, "method": method, "balance": balance},
+                origin="api",
+            )
+        )
+        self._s.commit()
+        return self._view(supplier)

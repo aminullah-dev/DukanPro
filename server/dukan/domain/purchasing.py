@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from dukan.domain.sales import line_total_fits, line_total_minor
-from dukan.shared.errors import ValidationError
+from dukan.shared.errors import ConflictError, ValidationError
 from dukan.shared.limits import MONEY_MAX
 
 
@@ -83,3 +83,13 @@ def receipt_total(lines: Iterable[ReceiptLine]) -> int:
     if total > MONEY_MAX:
         raise ValidationError("GRN_TOTAL_TOO_LARGE")
     return total
+
+
+def assert_supplier_payment_valid(*, amount_minor: int, balance_minor: int) -> None:
+    """A payment to a supplier is a positive amount, no more than the shop owes
+    them. Raises ValidationError SUPPLIER_PAYMENT_INVALID or ConflictError
+    SUPPLIER_OVERPAYMENT."""
+    if amount_minor <= 0:
+        raise ValidationError("SUPPLIER_PAYMENT_INVALID", amount=amount_minor)
+    if amount_minor > balance_minor:
+        raise ConflictError("SUPPLIER_OVERPAYMENT", amount=amount_minor, balance=balance_minor)

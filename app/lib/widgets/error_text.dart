@@ -15,5 +15,9 @@ String moneyErrorText(AppLocalizations l, AppError e) =>
       'DEBT_WRITE_OFF_EXCEEDS_BALANCE' => l.errWriteOffTooMuch,
       'SHIFT_NOT_OPEN' => l.errShiftNotOpen,
       'SHIFT_ALREADY_OPEN' => l.errShiftAlreadyOpen,
+      'SUPPLIER_OVERPAYMENT' => l.errSupplierOverpayment,
+      'BARCODE_DUPLICATE' => l.errBarcodeTaken,
+      'PRODUCT_DUPLICATE_SKU' => l.skuTaken,
+      'PRODUCT_NOT_STOCK_TRACKED' => l.errNotStockTracked,
       final code => code,
     };

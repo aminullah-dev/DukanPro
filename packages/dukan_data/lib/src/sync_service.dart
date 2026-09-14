@@ -318,6 +318,7 @@ final class SyncEngine {
         await _write(_db.barcodes, id, exists, BarcodesCompanion(
           id: Value(id), productId: _opt(d, 'product_id', _s), code: _opt(d, 'code', _s),
           symbology: _opt(d, 'symbology', _s), version: _opt(d, 'version', _i),
+          deletedAt: _opt(d, 'deleted_at', _tN), // a barcode taken off its product
         ));
       case 'units':
         await _write(_db.units, id, exists, UnitsCompanion(
@@ -392,7 +393,8 @@ final class SyncEngine {
         await _write(_db.supplierLedger, id, exists, SupplierLedgerCompanion(
           id: Value(id), supplierId: _opt(d, 'supplier_id', _s), type: _opt(d, 'type', _s),
           amountMinor: _opt(d, 'amount_minor', _i), currency: _opt(d, 'currency', _s),
-          occurredAt: _opt(d, 'occurred_at', _t),
+          occurredAt: _opt(d, 'occurred_at', _t), shiftId: _opt(d, 'shift_id', _sN),
+          method: _opt(d, 'method', _sN),
         ));
     }
   }

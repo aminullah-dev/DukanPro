@@ -54,6 +54,7 @@ class SaleLine:
     unit_price_minor: int
     unit_cost_minor: int
     currency: str
+    track_stock: bool = True  # an untracked product (a service) moves no stock
 
     @property
     def line_total(self) -> int:

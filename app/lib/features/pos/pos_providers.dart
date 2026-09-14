@@ -119,6 +119,7 @@ class PosCart extends Notifier<List<CartLine>> {
             productId: l.product.id, name: l.product.name, qtyMinor: l.qtyMinor,
             decimalPlaces: l.decimalPlaces, unitPriceMinor: l.product.sellPrice.amountMinor,
             unitCostMinor: l.product.cost?.amountMinor ?? 0, currency: l.product.sellPrice.currency,
+            trackStock: l.product.trackStock,
           ))
       .toList();
 

@@ -115,6 +115,30 @@ class _SqlSyncReader:
             decimal_places=unit.decimal_places if unit is not None else None,
         )
 
+    def barcode_taken(self, code: str) -> bool:
+        return self._s.scalar(
+            select(BarcodeModel.id)
+            .where(BarcodeModel.code == code, BarcodeModel.deleted_at.is_(None))
+            .limit(1)
+        ) is not None
+
+    def sku_taken(self, sku: str) -> bool:
+        return self._s.scalar(
+            select(ProductModel.id)
+            .where(ProductModel.sku == sku, ProductModel.deleted_at.is_(None))
+            .limit(1)
+        ) is not None
+
+    def supplier_balance(self, supplier_id: str) -> int:
+        # As dukan.domain.purchasing.supplier_balance: bills add, payments subtract.
+        rows = self._s.execute(
+            select(SupplierLedgerModel.type, SupplierLedgerModel.amount_minor).where(
+                SupplierLedgerModel.supplier_id == supplier_id,
+                SupplierLedgerModel.deleted_at.is_(None),
+            )
+        ).tuples()
+        return sum(-amount if kind == "payment" else amount for kind, amount in rows)
+
     def shift(self, shift_id: str) -> ShiftRef | None:
         s = self._s.get(ShiftModel, shift_id)
         if s is None or s.deleted_at is not None:

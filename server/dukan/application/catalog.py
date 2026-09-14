@@ -52,9 +52,14 @@ class CatalogService(Protocol):
         sell_price_minor: int | None,
         is_active: bool | None,
         version: int | None = None,
+        track_stock: bool | None = None,
     ) -> ProductView: ...
 
     def add_barcode(
+        self, *, actor: User, branch_id: str, product_id: str, code: str
+    ) -> ProductView: ...
+
+    def remove_barcode(
         self, *, actor: User, branch_id: str, product_id: str, code: str
     ) -> ProductView: ...
 

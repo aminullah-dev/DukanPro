@@ -14,7 +14,9 @@
 
 ## Invariants
 
-1. **`sku` is unique** among active products; **`barcode.code` is unique** among active barcodes (a scan must resolve to exactly one sellable item).
+1. **`sku` is unique** among live products and **`barcode.code` among live barcodes** (a scan must resolve to exactly one sellable item). The server holds barcodes to it with a partial unique index (0014 kept the oldest of any duplicates there already); REST and the device check both codes before a write (`PRODUCT_DUPLICATE_SKU`, `BARCODE_DUPLICATE`). A synced barcode whose code is taken is refused. A synced product whose SKU is taken is kept and flagged in the audit (`sku_taken`): two tills offline made two real products, and their sales depend on them.
+6. **A barcode can be taken off** its product (`DELETE /products/{id}/barcodes/{code}`, or from the product screen as a synced edit of the barcode row); the row is soft-deleted and devices drop it on their next pull, so the code can go on another product. A deactivated product keeps its barcodes but is not sold: a scan skips it.
+7. `track_stock` and `is_active` are editable (REST and synced); a device's edit carries only the fields that changed.
 2. A Price/Cost is always a `Money` with a currency; a product's default selling currency is the shop currency unless a PriceList overrides it.
 3. A unit's `decimal_places` governs quantity precision: selling 1.5 of a 0-dp unit (piece) is a `ValidationError`.
 4. Deactivating a product (`is_active=false`) hides it from new sales but never deletes history (soft delete / flag).

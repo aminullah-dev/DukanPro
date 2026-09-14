@@ -845,6 +845,84 @@ abstract class AppLocalizations {
   /// **'You already have an open shift here.'**
   String get errShiftAlreadyOpen;
 
+  /// No description provided for @suppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Suppliers'**
+  String get suppliers;
+
+  /// No description provided for @paySupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay supplier'**
+  String get paySupplier;
+
+  /// No description provided for @addSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Add supplier'**
+  String get addSupplier;
+
+  /// No description provided for @supplierName.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier name'**
+  String get supplierName;
+
+  /// No description provided for @noSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'No suppliers yet'**
+  String get noSuppliers;
+
+  /// No description provided for @paidToSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid to suppliers in cash'**
+  String get paidToSuppliers;
+
+  /// No description provided for @productActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active: offered for sale'**
+  String get productActive;
+
+  /// No description provided for @barcodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcodes'**
+  String get barcodes;
+
+  /// No description provided for @addBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Add barcode'**
+  String get addBarcode;
+
+  /// No description provided for @removeBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove barcode'**
+  String get removeBarcode;
+
+  /// No description provided for @errBarcodeTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This barcode is already on another product. Remove it there first.'**
+  String get errBarcodeTaken;
+
+  /// No description provided for @errSupplierOverpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'That is more than the shop owes this supplier.'**
+  String get errSupplierOverpayment;
+
+  /// No description provided for @errNotStockTracked.
+  ///
+  /// In en, this message translates to:
+  /// **'This product\'s stock is not tracked.'**
+  String get errNotStockTracked;
+
   /// No description provided for @errSessionEnded.
   ///
   /// In en, this message translates to:

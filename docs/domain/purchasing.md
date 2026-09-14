@@ -20,6 +20,8 @@
 6. Currencies: a PO/receipt/bill carries its own currency; supplier balance is per-currency; no implicit conversion.
 7. Receiving stock needs `stock.adjust`; a receipt that **bills a supplier or carries a cost** also needs `purchase.cost` (owner, manager). Without it a receipt only moves stock and leaves the product's last cost alone.
 8. A receipt's supplier must exist (`SUPPLIER_NOT_FOUND`).
+9. **Paying a supplier** is money out: it needs `purchase.cost`, is a positive amount of at most what the shop owes (`SUPPLIER_PAYMENT_INVALID`, `SUPPLIER_OVERPAYMENT`), in the supplier's currency, and records its method (cash, card, transfer) and the shift it came out of. Cash paid from a till's shift comes off that shift's expected cash. The suppliers screen records it offline and syncs it; `POST /suppliers/{id}/payments` (`{amount_minor, method, shift_id}`) does it online. A synced payment past the balance (another till paid meanwhile) is flagged in the audit, not refused.
+10. A receipt of a product whose stock is not tracked bills the supplier and sets the cost, but moves no stock.
 
 ## Error codes
 
@@ -31,6 +33,7 @@
 | `GRN_EMPTY` | receiving with no lines |
 | `SUPPLIER_NOT_FOUND` | receiving against an unknown supplier |
 | `GRN_LINE_INVALID` | a received line with a quantity of zero or less, or a negative cost |
+| `SUPPLIER_PAYMENT_INVALID` / `SUPPLIER_OVERPAYMENT` | a supplier payment of zero or less / of more than the shop owes |
 
 ## Test table
 

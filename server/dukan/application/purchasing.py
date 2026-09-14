@@ -42,3 +42,8 @@ class PurchasingService(Protocol):
     def receive_goods(
         self, *, actor: User, branch_id: str, supplier_id: str | None, lines: list[ReceiptLineInput]
     ) -> GoodsReceiptView: ...
+
+    def pay_supplier(
+        self, *, actor: User, branch_id: str, supplier_id: str, amount_minor: int,
+        method: str = "cash", shift_id: str | None = None,
+    ) -> SupplierView: ...
