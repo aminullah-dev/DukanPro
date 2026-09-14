@@ -103,11 +103,13 @@ final class FakeSyncClient implements SyncClient {
   final FakeSyncServer _server;
   final ChangeView? view;
   final List<OutboxOp> pushed = [];
+  final List<int> pushBatches = [];
   final List<int> pulledSince = [];
 
   @override
   Future<List<PushResult>> push(List<OutboxOp> ops) async {
     pushed.addAll(ops);
+    pushBatches.add(ops.length);
     return _server.push(ops);
   }
 
@@ -140,6 +142,10 @@ Map<String, Object?> _product(String sku, {int? cost}) => {
       'sell_currency': 'AFN', 'cost_minor': cost, 'cost_currency': cost == null ? null : 'AFN',
       'track_stock': true, 'is_active': true, 'version': 1,
     };
+
+Product _renamed(Product p, String name) => Product(
+      id: p.id, sku: p.sku, name: name, unitId: p.unitId, sellPrice: p.sellPrice, version: p.version,
+    );
 
 void main() {
   // The convergence test legitimately opens two independent in-memory DBs
@@ -359,5 +365,44 @@ void main() {
     await engine.pullSince(actorId: 'u1');
 
     expect(client.pulledSince, [1]); // nothing is pulled twice
+  });
+
+  test('pushPending sends the outbox in batches the server accepts', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final client = FakeSyncClient(FakeSyncServer());
+    final outbox = DriftSyncOutbox(db);
+    for (var i = 1; i <= 450; i++) {
+      await outbox.enqueue(_unitOp(i, 'u1'));
+    }
+
+    await SyncEngine(db, client, deviceId: 'd1').pushPending(actorId: 'u1');
+
+    expect(client.pushBatches, [200, 200, 50]);
+    expect(client.pushed.map((o) => o.localSeq), List.generate(450, (i) => i + 1)); // in order
+  });
+
+  test("another user's pull never rewinds a product with edits not yet pushed", () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final engine = SyncEngine(db, FakeSyncClient(FakeSyncServer()), deviceId: 'd1');
+    final catalog = LocalCatalog(db);
+    final p = Product(id: newId(), sku: 'A1', name: 'Rice', unitId: 'kg', sellPrice: Money(1000, 'AFN'));
+    await catalog.createProduct(p, actorId: 'uA', deviceId: 'd1');
+    await engine.syncNow(actorId: 'uA');
+    final synced = (await catalog.products.findById(p.id))!;
+    await catalog.updateProduct(_renamed(synced, 'Rice 2'), actorId: 'uA', deviceId: 'd1');
+
+    // User B's first pull on this device re-reads the product's insert image.
+    await engine.pullSince(actorId: 'uB');
+    final kept = (await catalog.products.findById(p.id))!;
+    expect(kept.name, 'Rice 2');
+    expect(kept.version, synced.version + 1);
+
+    // So A's next edit sends the right base_version, and both edits apply.
+    await catalog.updateProduct(_renamed(kept, 'Rice 3'), actorId: 'uA', deviceId: 'd1');
+    await engine.pushPending(actorId: 'uA');
+    expect(await engine.conflictCount(), 0);
+    expect(await engine.pendingCount(), 0);
   });
 }

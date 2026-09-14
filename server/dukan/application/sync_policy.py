@@ -34,6 +34,7 @@ from dukan.shared.limits import INT32_MAX, INT32_MIN
 
 POLICY = PermissionPolicy()
 PULL_LIMIT_MAX = 1000
+PUSH_OPS_MAX = 500  # ops per /sync/push request (the client sends batches of 200)
 DEFAULT_CURRENCY = "AFN"
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -197,7 +198,7 @@ _INSERT: dict[str, dict[str, _Field]] = {
         "qty_minor": _int(lo=1, required=True),
         "decimal_places": _int(lo=0, hi=6),
         "unit_price_minor": _int(lo=0, required=True),
-        "unit_cost_minor": _int(lo=0),  # accepted for compatibility; the server re-derives it
+        "unit_cost_minor": _int(),  # accepted but ignored: the server re-derives it
         "line_total_minor": _int(lo=0, required=True),
         "currency": _CURRENCY_F,
     },
@@ -493,6 +494,16 @@ def _own_sale(ctx: _Ctx, sale_id: str) -> SaleRef:
     return sale
 
 
+def _require_complete_lines(ctx: _Ctx, sale: SaleRef) -> None:
+    """Money against a sale (a payment or a credit charge) is accepted only once
+    the sale's lines add up to its header subtotal: the header totals are the
+    client's claim, the lines are what was sold. Lines precede that money in
+    local_seq, so a sale still missing lines is a retry (not recorded), not a
+    rejection."""
+    if ctx.reader.sale_lines_total(sale.id) != sale.subtotal_minor:
+        raise NotFoundError("SALE_LINES_NOT_FOUND", sale_id=sale.id)
+
+
 def _pick(values: Mapping[str, Any], *keys: str) -> dict[str, Any]:
     return {k: values[k] for k in keys if k in values}
 
@@ -695,7 +706,9 @@ def _payments_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
         raise ValidationError(
             "SYNC_FIELD_INVALID", table="payments", field="tendered_minor", reason="below_amount"
         )
-    if ctx.reader.sale_payments_total(sale.id) + amount > sale.paid_minor:
+    _require_complete_lines(ctx, sale)
+    # Payments never exceed what the sale says was paid, nor the sale's total.
+    if ctx.reader.sale_payments_total(sale.id) + amount > min(sale.paid_minor, sale.total_minor):
         raise ValidationError("SYNC_REF_MISMATCH", field="amount_minor", reason="exceeds_paid")
     after = _pick(v, "sale_id", "method", "amount_minor", "currency")
     return ApplyPlan(
@@ -722,6 +735,7 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
             )
         if currency != sale.currency:
             raise ConflictError("SALE_CURRENCY_MISMATCH", expected=sale.currency, got=currency)
+        _require_complete_lines(ctx, sale)
         if ctx.reader.sale_charges_total(sale.id) + amount > sale.total_minor - sale.paid_minor:
             raise ValidationError(
                 "SYNC_REF_MISMATCH", field="amount_minor", reason="exceeds_unpaid"
@@ -898,8 +912,9 @@ class PullScope:
         if table in _BRANCH_SCOPED_READ:
             legacy = data.get("branch_id")  # rows logged before change_log.branch_id existed
             branch = branch_id or (legacy if isinstance(legacy, str) else None)
-            if branch is not None:
-                perms = self.by_branch.get(branch, frozenset())
+            if branch is None:
+                return None  # a branch row whose branch is unknown is visible to nobody
+            perms = self.by_branch.get(branch, frozenset())
         if not perms & readers:
             return None
         # A hidden cost field is omitted, not nulled: the device keeps its local

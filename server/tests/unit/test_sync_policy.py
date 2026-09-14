@@ -127,6 +127,9 @@ def test_pull_scope_by_permission_branch_and_cost() -> None:
     assert cashier.view("sales", B2, {"number": "1"}) is None
     # Rows logged before change_log.branch_id existed fall back to data.branch_id.
     assert cashier.view("sales", None, {"branch_id": B2}) is None
+    # A branch row whose branch cannot be told (an old sale line or payment) is hidden.
+    assert cashier.view("sale_lines", None, {"sale_id": U}) is None
+    assert cashier.view("payments", None, {"sale_id": U}) is None
     line = {"unit_cost_minor": 700}
     assert cashier.view("sale_lines", B1, line) == {}
     manager = PullScope.for_actor(_user((B1, "manager")))

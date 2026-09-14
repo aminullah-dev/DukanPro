@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 
 from dukan.application.sync import OpInput, SyncService
-from dukan.application.sync_policy import PULL_LIMIT_MAX
+from dukan.application.sync_policy import PULL_LIMIT_MAX, PUSH_OPS_MAX
 from dukan.domain.identity import User
 from dukan.ui.deps import get_current_actor, get_sync_service
 
@@ -36,7 +36,7 @@ class OpReq(BaseModel):
 
 class PushRequest(BaseModel):
     device_id: str = Field(default="unknown", max_length=128)
-    ops: list[OpReq]
+    ops: list[OpReq] = Field(max_length=PUSH_OPS_MAX)
 
 
 @router.post("/push")

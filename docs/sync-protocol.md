@@ -39,7 +39,7 @@ Each client write appends an operation to a local `outbox` table **inside the sa
           "actor_id": "<uuid, omitted for system seeds>", "created_at": "2026-09-12T08:00:00.000Z"}]}
 ```
 
-1. The client sends, in `local_seq` order, the pending ops the **signed-in user** recorded plus system seeds. Another user's ops wait on the device for that user's own sync.
+1. The client sends, in `local_seq` order, the pending ops the **signed-in user** recorded plus system seeds. Another user's ops wait on the device for that user's own sync. The client sends at most 200 ops per request; the server accepts up to 500.
 2. The server handles each op in its own transaction, in request order:
    1. `op_id` must be a canonical lowercase UUID (otherwise `rejected` `SYNC_OP_INVALID`, not recorded).
    2. **Replay:** an op_id already recorded returns its stored outcome, code and `server_seq`; nothing applies twice.
@@ -78,9 +78,9 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | stock_movements insert, `purchase` | stock.adjust (row) | qty > 0 |
 | stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product |
 | sales insert | sale.create (row) | total = subtotal − discount + tax; paid ≥ total unless on credit; the customer exists; `shift_id` null |
-| sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up); lines ≤ subtotal; the sale's currency; `unit_cost_minor` is set by the server from the product's cost |
-| payments insert | sale.create (sale's) | the pusher's own sale; payments ≤ paid; tendered ≥ amount |
-| customer_ledger insert, `charge` | sale.create (sale's) | `ref_type` `sale` and `ref_id` of the pusher's own sale for that customer; charges ≤ total − paid; over the credit limit is **flagged** in the audit, not refused |
+| sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up); lines ≤ subtotal; the sale's currency; a pushed `unit_cost_minor` is ignored and set by the server from the product's cost |
+| payments insert | sale.create (sale's) | the pusher's own sale, whose lines add up to its subtotal; payments ≤ paid and ≤ total; tendered ≥ amount |
+| customer_ledger insert, `charge` | sale.create (sale's) | `ref_type` `sale` and `ref_id` of the pusher's own sale for that customer, whose lines add up to its subtotal; charges ≤ total − paid; over the credit limit is **flagged** in the audit, not refused |
 | customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused |
 | supplier_ledger insert, `bill` | stock.adjust (active) | the supplier exists; the supplier's currency |
 
@@ -91,10 +91,10 @@ Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories,
 `conflict`: `<TABLE>_VERSION_CONFLICT` (stale `base_version`), `<TABLE>_ALREADY_EXISTS` (insert on an existing master row).
 
 `rejected`:
-- Envelope: `SYNC_OP_INVALID`, `UNKNOWN_TABLE`, `SYNC_OP_UNSUPPORTED`, `SYNC_BASE_VERSION_REQUIRED`, `SYNC_ACTOR_MISMATCH`.
+- Envelope: `SYNC_OP_INVALID`, `UNKNOWN_TABLE`, `SYNC_OP_UNSUPPORTED`, `SYNC_BASE_VERSION_REQUIRED`, `SYNC_ACTOR_MISMATCH`, `SYNC_OP_ID_TAKEN` (another user's applied op already holds this op_id).
 - Fields: `SYNC_FIELD_NOT_ALLOWED`, `SYNC_FIELD_REQUIRED`, `SYNC_FIELD_INVALID`, `MONEY_CURRENCY_INVALID` (the context names the field and the reason).
 - Access: `ACCESS_DENIED`, `BRANCH_REQUIRED`.
-- References: `PRODUCT_NOT_FOUND`, `UNIT_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `SUPPLIER_NOT_FOUND`, `SALE_NOT_FOUND`, `SYNC_REF_MISMATCH`, `SYNC_ROW_EXISTS` (a ledger row id reused).
+- References: `PRODUCT_NOT_FOUND`, `UNIT_NOT_FOUND`, `CUSTOMER_NOT_FOUND`, `SUPPLIER_NOT_FOUND`, `SALE_NOT_FOUND`, `SALE_LINES_NOT_FOUND` (money against a sale whose lines have not all arrived), `SYNC_REF_MISMATCH`, `SYNC_ROW_EXISTS` (a ledger row id reused).
 - Domain: `STOCK_INVALID_QTY`, `PRODUCT_NOT_STOCK_TRACKED`, `SALE_UNDERPAID`, `SALE_CURRENCY_MISMATCH`, `DEBT_CURRENCY_MISMATCH`, `PURCHASE_CURRENCY_MISMATCH`.
 - `ROW_INVALID`: an unexpected server error on that op.
 
@@ -103,6 +103,8 @@ Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories,
 A recorded outcome is returned on every replay of its op_id. Outcomes that depend on server state that can change are **not** recorded, so a replay re-evaluates them: `ACCESS_DENIED`, `SYNC_ACTOR_MISMATCH`, `BRANCH_REQUIRED`, `ROW_INVALID` and every `*_NOT_FOUND`. Nothing was applied, so exactly-once still holds.
 
 The client mirrors this: such an op stays pending and is re-sent on the next sync, for example when a parent still queued by another user arrives, a role is granted, or the right user signs in. An op whose parent was rejected for good keeps coming back as `*_NOT_FOUND` and stays pending.
+
+A recorded outcome belongs to the user who pushed it. When another user pushes the same op_id, a recorded failure (nothing was written) is discarded and the op is decided afresh; an op_id already applied for someone else is `SYNC_OP_ID_TAKEN`.
 
 ## Master data concurrency
 
@@ -135,10 +137,16 @@ Cost fields (`products.cost_minor`, `products.cost_currency`, `sale_lines.unit_c
 
 The watermark is the last row scanned, visible or not, so paging is monotonic. Because the scope is per user, the client keeps **one cursor per user** on the device and pages until the watermark stops advancing. A user's first cursor starts from the device-wide cursor that earlier, unscoped pulls left behind.
 
+Two rules keep one user's pull from undoing another's work on a shared device:
+- A product post-image older than the local row is skipped. The local row is newer when it carries edits not yet pushed.
+- A branch row whose branch cannot be told is visible to nobody. Migration 0008 back-fills the branch of feed rows logged before `change_log.branch_id` existed.
+
 ## Known limitations
 
 - No tombstones yet: soft deletes do not reach devices.
-- No document atomicity: a sale's rows apply one op at a time, so the server can briefly hold a header whose lines are still queued.
+- No document atomicity: a sale's rows apply one op at a time. A header counts in reports as soon as it arrives, even while its lines are still queued; money against it (payments, charges) waits for the lines.
+- Line prices are the device's price at sale time. The server does not reprice them; the audit entry records the catalog price next to it.
+- `change_log.seq` is assigned before commit, so on PostgreSQL a pull can pass a row that commits later (review theme 6).
 - Business numbers are not leased yet (decision B below): devices number sales locally.
 
 ## Rollout of the hardened push

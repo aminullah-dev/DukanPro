@@ -214,7 +214,22 @@ class SqlSyncService(SyncService):
             return OpResult(op_id=op.op_id, outcome="rejected", code="SYNC_OP_INVALID")
         prior = self._s.get(ProcessedOpModel, op.op_id)
         if prior is not None:
-            return self._replay(prior)
+            if prior.actor_id in (None, actor.id):
+                return self._replay(prior)
+            if prior.result == "applied":
+                # The op_id is spent on another user's write: this op can never apply.
+                return OpResult(op_id=op.op_id, outcome="rejected", code="SYNC_OP_ID_TAKEN")
+            # Another user's failed attempt under this op_id wrote nothing and must not
+            # decide this user's op: forget it and decide the op on its own merits.
+            _log.warning(
+                "sync op %s: discarding %s's recorded %s", op.op_id, prior.actor_id, prior.result
+            )
+            try:
+                self._s.delete(prior)
+                self._s.commit()
+            except OperationalError as e:
+                self._s.rollback()
+                raise InfrastructureError("SYNC_UNAVAILABLE") from e
         for attempt in (1, 2):
             try:
                 seq = self._apply(actor, device_id, branch_id, op)

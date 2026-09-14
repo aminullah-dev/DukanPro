@@ -670,3 +670,77 @@ def test_a_database_outage_fails_the_request_so_nothing_is_lost(
     # The client re-sends both: the op applied before the outage replays, the other applies once.
     assert outcomes(shop.push(shop.owner, good, later)) == [("applied", None)] * 2
     assert client.get(f"/products/{pid}", headers=shop.owner).json()["on_hand"] == 3
+
+
+# ── follow-up review: money needs the sale's lines; op_id ownership; limits ──
+
+
+def test_payments_and_charges_wait_for_the_sales_lines(client: TestClient) -> None:
+    shop = Shop(client)
+    pid = shop.product()
+    cashier, _ = shop.employee("c1", "cashier")
+    cid = _uuid()
+    shop.push(shop.owner, op("customers", {"name": "C", "credit_limit_minor": 1000}, row_id=cid))
+    _, credit = sale_ops(shop.branch, pid, customer_id=cid, cash=2000)
+    header, line, move, payment, charge = credit
+    early = shop.push(cashier, header, payment, charge)
+    assert outcomes(early) == [("applied", None)] + [("rejected", "SALE_LINES_NOT_FOUND")] * 2
+    # The early rejections were not recorded: once the lines arrive, the same ops apply.
+    assert set(outcomes(shop.push(cashier, line, move, payment, charge))) == {("applied", None)}
+    # A header with no lines can never carry a debt, whatever total it claims.
+    _, fake = sale_ops(shop.branch, pid, customer_id=cid, price=50_000_000, qty=1)
+    assert outcomes(shop.push(cashier, fake[0], fake[-1])) == [
+        ("applied", None), ("rejected", "SALE_LINES_NOT_FOUND"),
+    ]
+    balance = client.get(f"/customers/{cid}", headers=shop.owner).json()["balance_minor"]
+    assert balance == 10000 - 2000
+
+
+def test_payments_never_exceed_the_sale_total(client: TestClient) -> None:
+    shop = Shop(client)
+    pid = shop.product()
+    cashier, _ = shop.employee("c1", "cashier")
+    _, ops = sale_ops(shop.branch, pid)  # total 10000, paid 10000
+    header, line, move, payment = ops
+    header["data"]["paid_minor"] = 50_000_000
+    payment["data"].update(amount_minor=50_000_000, tendered_minor=50_000_000)
+    assert outcomes(shop.push(cashier, header, line, move, payment)) == [
+        ("applied", None), ("applied", None), ("applied", None),
+        ("rejected", "SYNC_REF_MISMATCH"),
+    ]
+
+
+def test_another_users_op_id_cannot_decide_this_users_op(client: TestClient) -> None:
+    shop = Shop(client)
+    pid = shop.product()
+    cashier, _ = shop.employee("c1", "cashier")
+    keeper, _ = shop.employee("k1", "stock_keeper")
+    _, ops = sale_ops(shop.branch, pid)
+    # The keeper pushes junk under the cashier's op_id first: a recorded failure...
+    junk = {**ops[0], "data": {"bogus": 1}}
+    assert outcomes(shop.push(keeper, junk)) == [("rejected", "SYNC_FIELD_NOT_ALLOWED")]
+    # ...that does not decide the cashier's real op.
+    assert set(outcomes(shop.push(cashier, *ops))) == {("applied", None)}
+    # An op_id already applied for another user is spent.
+    seed = op("units", {"name": "piece", "decimal_places": 0})
+    assert outcomes(shop.push(keeper, seed)) == [("applied", None)]
+    taken = {**op("customers", {"name": "X"}), "op_id": seed["op_id"]}
+    assert outcomes(shop.push(cashier, taken)) == [("rejected", "SYNC_OP_ID_TAKEN")]
+
+
+def test_a_push_carries_at_most_500_ops(client: TestClient) -> None:
+    shop = Shop(client)
+    ops = [op("units", {"name": "piece", "decimal_places": 0}) for _ in range(501)]
+    r = client.post("/sync/push", headers=shop.owner, json={"device_id": "d", "ops": ops})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "REQUEST_INVALID"
+
+
+def test_the_pushed_unit_cost_is_ignored(client: TestClient) -> None:
+    shop = Shop(client)
+    pid = shop.product()
+    cashier, _ = shop.employee("c1", "cashier")
+    _, ops = sale_ops(shop.branch, pid)
+    ops[1]["data"]["unit_cost_minor"] = -700  # a bad local cost from an old receive screen
+    assert set(outcomes(shop.push(cashier, *ops))) == {("applied", None)}
+    line = next(c for c in shop.pull(shop.owner)["changes"] if c["table"] == "sale_lines")
+    assert line["data"]["unit_cost_minor"] == 0  # the server's cost snapshot (no cost yet)

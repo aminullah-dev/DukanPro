@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:drift/drift.dart';
 import 'package:dukan_core/dukan_core.dart' show systemActorId;
 import 'package:dukan_sync/dukan_sync.dart';
@@ -36,6 +38,9 @@ final class SyncEngine {
   /// Pull pages per sync at most; the next sync resumes from the saved cursor.
   static const maxPullPages = 50;
 
+  /// Ops per push request, below the server's cap of 500 (docs/sync-protocol.md).
+  static const maxPushBatch = 200;
+
   /// Pushes then pulls as [actorId], the signed-in user. Null pushes every
   /// pending op and pulls through one device-wide cursor.
   Future<void> syncNow({String? actorId}) async {
@@ -67,16 +72,17 @@ final class SyncEngine {
       for (final o in await outbox.pending())
         if (actorId == null || o.actorId == actorId || o.actorId == systemActorId) o,
     ];
-    if (pending.isEmpty) return;
-    final results = await _client.push(pending);
-    for (final r in results) {
-      switch (r.outcome) {
-        case OpOutcome.applied:
-          await outbox.markAcked(r.opId);
-        case OpOutcome.conflict:
-          await _setStatus(r.opId, 'conflict');
-        case OpOutcome.rejected:
-          if (!_retryable(r.code)) await _setStatus(r.opId, 'rejected');
+    for (var i = 0; i < pending.length; i += maxPushBatch) {
+      final results = await _client.push(pending.sublist(i, min(i + maxPushBatch, pending.length)));
+      for (final r in results) {
+        switch (r.outcome) {
+          case OpOutcome.applied:
+            await outbox.markAcked(r.opId);
+          case OpOutcome.conflict:
+            await _setStatus(r.opId, 'conflict');
+          case OpOutcome.rejected:
+            if (!_retryable(r.code)) await _setStatus(r.opId, 'rejected');
+        }
       }
     }
   }
@@ -127,6 +133,15 @@ final class SyncEngine {
   Future<void> _apply(String table, String id, String op, Map<String, Object?> d) async {
     switch (table) {
       case 'products':
+        // A post-image older than the local row (whose version is higher because of
+        // edits not yet pushed) must not rewind it: the server's newer image comes
+        // later in the feed. Another user of the device pulling from an older cursor
+        // re-reads such images.
+        final pulled = _iN(d['version']);
+        if (pulled != null) {
+          final local = await (_db.select(_db.products)..where((t) => t.id.equals(id))).getSingleOrNull();
+          if (local != null && local.version > pulled) return;
+        }
         if (op == 'update') {
           await (_db.update(_db.products)..where((t) => t.id.equals(id))).write(ProductsCompanion(
             name: Value(_s(d['name'])),
