@@ -735,12 +735,15 @@ def test_payments_never_exceed_the_sale_total(client: TestClient) -> None:
     cashier, _ = shop.employee("c1", "cashier")
     _, ops = sale_ops(shop.branch, pid)  # total 10000, paid 10000
     header, line, move, payment = ops
-    header["data"]["paid_minor"] = 50_000_000
     payment["data"].update(amount_minor=50_000_000, tendered_minor=50_000_000)
     assert outcomes(shop.push(cashier, header, line, move, payment)) == [
         ("applied", None), ("applied", None), ("applied", None),
         ("rejected", "SYNC_REF_MISMATCH"),
     ]
+    # Nor does a sale header claim more paid than its total.
+    _, ops = sale_ops(shop.branch, pid)
+    ops[0]["data"].update(number="INV-20260912-0002", paid_minor=50_000_000)
+    assert outcomes(shop.push(cashier, ops[0])) == [("rejected", "SALE_OVERPAID")]
 
 
 def test_another_users_op_id_cannot_decide_this_users_op(client: TestClient) -> None:

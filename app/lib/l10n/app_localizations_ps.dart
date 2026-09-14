@@ -431,6 +431,30 @@ class AppLocalizationsPs extends AppLocalizations {
   String get errGeneric => 'یوه ستونزه رامنځته شوه. بیا هڅه وکړئ.';
 
   @override
+  String get errAmountInvalid => 'مبلغ لکه ۲۵۰ یا ۲۵۰٫۵۰ ولیکئ.';
+
+  @override
+  String get errQtyInvalid => 'مقدار لکه ۳ یا ۲٫۵ ولیکئ.';
+
+  @override
+  String get errQtyPrecision => 'دا واحد دومره اعشاري رقمونه نه مني.';
+
+  @override
+  String get errMustBePositive => 'له صفر څخه لوی عدد ولیکئ.';
+
+  @override
+  String get errChooseProduct => 'یو توکی وټاکئ.';
+
+  @override
+  String get errRequired => 'دا برخه اړینه ده.';
+
+  @override
+  String get errTooLong => 'ډېر اوږد دی.';
+
+  @override
+  String get quantityReceived => 'ترلاسه شوی مقدار';
+
+  @override
   String get savedOk => 'وساتل شو.';
 
   @override

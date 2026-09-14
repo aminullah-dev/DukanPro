@@ -66,6 +66,23 @@ def compute_totals(lines: Sequence[SaleLine], discount_minor: int = 0) -> SaleTo
     )
 
 
+def assert_sale_lines_valid(lines: Sequence[SaleLine], *, currency: str) -> None:
+    """Every line sells a positive quantity at a price of zero or more, in the
+    sale's currency. Raises ValidationError SALE_EMPTY, SALE_LINE_INVALID_QTY or
+    SALE_LINE_INVALID_PRICE, or ConflictError SALE_CURRENCY_MISMATCH."""
+    if not lines:
+        raise ValidationError("SALE_EMPTY")
+    for l in lines:
+        if l.qty_minor <= 0:
+            raise ValidationError("SALE_LINE_INVALID_QTY", product_id=l.product_id, qty=l.qty_minor)
+        if l.unit_price_minor < 0:
+            raise ValidationError(
+                "SALE_LINE_INVALID_PRICE", product_id=l.product_id, price=l.unit_price_minor
+            )
+        if l.currency != currency:
+            raise ConflictError("SALE_CURRENCY_MISMATCH", expected=currency, got=l.currency)
+
+
 def assert_settleable(
     *,
     lines: Sequence[SaleLine],
@@ -74,13 +91,43 @@ def assert_settleable(
     currency: str,
     allow_credit: bool,
 ) -> None:
-    if not lines:
-        raise ValidationError("SALE_EMPTY")
-    for l in lines:
-        if l.currency != currency:
-            raise ConflictError("SALE_CURRENCY_MISMATCH", expected=currency, got=l.currency)
+    """paid_minor is the amount offered toward the balance. Raises what
+    assert_sale_lines_valid raises, SALE_PAYMENT_INVALID for a negative amount,
+    or (cash-only) SALE_UNDERPAID."""
+    assert_sale_lines_valid(lines, currency=currency)
+    if paid_minor < 0:
+        raise ValidationError("SALE_PAYMENT_INVALID", reason="amount", paid=paid_minor)
     if not allow_credit and paid_minor < total_minor:
         raise ConflictError("SALE_UNDERPAID", total=total_minor, paid=paid_minor)
+
+
+_TENDERS = frozenset({PaymentMethod.CASH, PaymentMethod.CARD})
+
+
+def assert_payment_valid(
+    *, method: str, amount_minor: int, tendered_minor: int | None = None
+) -> None:
+    """A payment is a positive amount by cash or card: credit is the unpaid
+    remainder, never a payment. Cash handed over is at least the amount, and only
+    cash is handed over. Raises ValidationError SALE_PAYMENT_INVALID."""
+    if method not in _TENDERS:
+        raise ValidationError("SALE_PAYMENT_INVALID", reason="method", method=method[:16])
+    if amount_minor <= 0:
+        raise ValidationError("SALE_PAYMENT_INVALID", reason="amount", amount=amount_minor)
+    if tendered_minor is not None and (
+        method != PaymentMethod.CASH or tendered_minor < amount_minor
+    ):
+        raise ValidationError(
+            "SALE_PAYMENT_INVALID", reason="tendered", amount=amount_minor, tendered=tendered_minor
+        )
+
+
+def assert_sale_not_overpaid(*, paid_minor: int, total_minor: int) -> None:
+    """The payments applied to a sale never add up to more than its total: cash
+    over the total is change handed back, not a payment. Raises ConflictError
+    SALE_OVERPAID."""
+    if paid_minor > total_minor:
+        raise ConflictError("SALE_OVERPAID", paid=paid_minor, total=total_minor)
 
 
 def assert_discount_valid(*, discount_minor: int, subtotal_minor: int) -> None:

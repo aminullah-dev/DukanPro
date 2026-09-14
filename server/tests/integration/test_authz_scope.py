@@ -247,7 +247,9 @@ def test_discounts_need_a_manager_and_stay_within_the_subtotal(client: TestClien
     for bad in (-1000, 6000):
         r = shop.sell(shop.owner_token, discount_minor=bad)
         assert (r.status_code, _code(r)) == (422, "SALE_DISCOUNT_INVALID"), bad
-    ok = shop.sell(shop.owner_token, discount_minor=1000)
+    ok = shop.sell(shop.owner_token, discount_minor=1000, payments=[
+        {"method": "cash", "amount_minor": 4000, "tendered_minor": 5000},
+    ])
     assert ok.status_code == 200 and ok.json()["total_minor"] == 4000
     assert client.get("/audit?action=discount.applied", headers=shop.owner).json()["entries"]
 

@@ -63,6 +63,13 @@ def assert_not_overpaid(*, balance_minor: int, payment_minor: int) -> None:
         raise ConflictError("DEBT_OVERPAYMENT", balance=balance_minor, payment=payment_minor)
 
 
+def assert_debt_payment_valid(*, amount_minor: int) -> None:
+    """A debt payment is a positive amount: a negative one would add debt past
+    the credit limit without a sale. Raises ValidationError DEBT_PAYMENT_INVALID."""
+    if amount_minor <= 0:
+        raise ValidationError("DEBT_PAYMENT_INVALID", amount=amount_minor)
+
+
 def assert_credit_limit_valid(*, credit_limit_minor: int | None) -> None:
     """A credit limit is None (unlimited) or a non-negative amount. Raises
     ValidationError CUSTOMER_CREDIT_LIMIT_INVALID."""

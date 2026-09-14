@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import 'customers_providers.dart';
 
-String _afn(int minor) => (minor / 100).toStringAsFixed(2);
+String _afn(int minor) => formatQuantity(minor, 2);
 
 class CustomersScreen extends ConsumerWidget {
   const CustomersScreen({super.key});
@@ -49,7 +50,8 @@ class CustomersScreen extends ConsumerWidget {
         ..invalidate(customerBalanceProvider(c.id));
     } on AppError catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.code)));
+        final message = numberErrorText(AppLocalizations.of(context), e) ?? e.code;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -127,6 +129,7 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _limit = TextEditingController();
+  String? _limitError;
 
   @override
   void dispose() {
@@ -146,10 +149,13 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
         TextField(controller: _phone, decoration: InputDecoration(labelText: l.phone)),
         if (widget.canGrantCredit)
           TextField(
-          controller: _limit,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: l.creditLimit, suffixText: 'AFN'),
-        ),
+            controller: _limit,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: l.creditLimit, suffixText: 'AFN', helperText: l.creditLimitHelp,
+              errorText: _limitError,
+            ),
+          ),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
@@ -159,15 +165,21 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
             // rejected at sync: name ≤ 128, phone ≤ 32, credit limit ≥ 0.
             final name = _name.text.trim();
             final phone = _phone.text.trim();
-            final limit = double.tryParse(_limit.text);
             if (name.isEmpty || name.length > 128 || phone.length > 32) return;
-            if (limit != null && (!limit.isFinite || limit < 0)) return;
+            int? limit;
+            try {
+              // Without customer.credit the customer gets no credit (limit 0).
+              limit = widget.canGrantCredit ? amountOrNull(_limit.text) : 0;
+            } on AppError catch (e) {
+              setState(() => _limitError = numberErrorText(l, e));
+              return;
+            }
             Navigator.pop(
               context,
               Customer(
                 id: newId(), name: name,
                 phone: phone.isEmpty ? null : phone,
-                creditLimitMinor: !widget.canGrantCredit ? 0 : (limit == null ? null : (limit * 100).round()),
+                creditLimitMinor: limit,
               ),
             );
           },
@@ -190,6 +202,7 @@ class _CreditLimitDialogState extends State<_CreditLimitDialog> {
   late final _limit = TextEditingController(
     text: switch (widget.customer.creditLimitMinor) { null => '', final v => _afn(v) },
   );
+  String? _error;
 
   @override
   void dispose() {
@@ -208,16 +221,19 @@ class _CreditLimitDialogState extends State<_CreditLimitDialog> {
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           labelText: l.creditLimit, suffixText: 'AFN', helperText: l.creditLimitHelp,
+          errorText: _error,
         ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
         FilledButton(
           onPressed: () {
-            final text = _limit.text.trim();
-            final v = double.tryParse(text);
-            if (text.isNotEmpty && (v == null || !v.isFinite || v < 0)) return;
-            Navigator.pop<({int? limit})>(context, (limit: v == null ? null : (v * 100).round()));
+            try {
+              final limit = amountOrNull(_limit.text);
+              Navigator.pop<({int? limit})>(context, (limit: limit));
+            } on AppError catch (e) {
+              setState(() => _error = numberErrorText(l, e));
+            }
           },
           child: Text(l.save),
         ),
@@ -235,6 +251,7 @@ class _PaymentDialog extends ConsumerStatefulWidget {
 
 class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   final _amount = TextEditingController();
+  String? _error;
   @override
   void dispose() {
     _amount.dispose();
@@ -257,16 +274,23 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
           controller: _amount,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: l.amount, suffixText: 'AFN'),
+          decoration: InputDecoration(labelText: l.amount, suffixText: 'AFN', errorText: _error),
         ),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
         FilledButton(
           onPressed: () {
-            final v = double.tryParse(_amount.text);
-            if (v == null || !v.isFinite || v <= 0) return;
-            Navigator.pop(context, (v * 100).round());
+            try {
+              final amount = amountOrNull(_amount.text);
+              if (amount == null || amount <= 0) {
+                setState(() => _error = l.errMustBePositive);
+                return;
+              }
+              Navigator.pop(context, amount);
+            } on AppError catch (e) {
+              setState(() => _error = numberErrorText(l, e));
+            }
           },
           child: Text(l.save),
         ),

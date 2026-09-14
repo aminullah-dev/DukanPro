@@ -82,6 +82,14 @@ void assertNotOverpaid({required int balanceMinor, required int paymentMinor}) {
   }
 }
 
+/// A debt payment is a positive amount: a negative one would add debt past the
+/// credit limit without a sale. Raises [ValidationError] `DEBT_PAYMENT_INVALID`.
+void assertDebtPaymentValid({required int amountMinor}) {
+  if (amountMinor <= 0) {
+    throw ValidationError('DEBT_PAYMENT_INVALID', {'amount': amountMinor});
+  }
+}
+
 /// A credit limit is null (unlimited) or a non-negative amount. Raises
 /// [ValidationError] `CUSTOMER_CREDIT_LIMIT_INVALID`.
 void assertCreditLimitValid({required int? creditLimitMinor}) {

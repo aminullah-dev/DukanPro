@@ -27,9 +27,10 @@
 |---|---|
 | `PO_OVER_RECEIPT` | received qty exceeds ordered (when disallowed) — context `sku, ordered, received, attempted` |
 | `PO_ILLEGAL_TRANSITION` | invalid status change |
-| `PURCHASE_CURRENCY_MISMATCH` | payment currency has no matching bills |
+| `PURCHASE_CURRENCY_MISMATCH` | a bill or payment in a currency other than the supplier's (a receipt at a cost bills in the supplier's currency) |
 | `GRN_EMPTY` | receiving with no lines |
 | `SUPPLIER_NOT_FOUND` | receiving against an unknown supplier |
+| `GRN_LINE_INVALID` | a received line with a quantity of zero or less, or a negative cost |
 
 ## Test table
 

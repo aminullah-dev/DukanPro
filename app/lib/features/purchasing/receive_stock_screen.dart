@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
 import '../customers/customers_providers.dart';
@@ -20,7 +21,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
   final _qty = TextEditingController();
   final _cost = TextEditingController();
   bool _busy = false;
-  String? _error;
+  String? _error; // a message ready to show
 
   @override
   void dispose() {
@@ -30,31 +31,33 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
   }
 
   Future<void> _receive(List<Product> products) async {
+    final l = AppLocalizations.of(context);
     final actor = ref.read(sessionActorProvider);
-    if (actor == null || !actor.can(Permission.stockAdjust) || _productId == null) {
-      setState(() => _error = 'PERM');
+    if (actor == null || !actor.can(Permission.stockAdjust)) {
+      setState(() => _error = l.permissionDenied);
+      return;
+    }
+    if (_productId == null) {
+      setState(() => _error = l.errChooseProduct);
       return;
     }
     final product = products.firstWhere((p) => p.id == _productId);
     final dp = ref.read(unitDecimalsProvider).maybeWhen(data: (m) => m[product.unitId] ?? 0, orElse: () => 0);
-    int qtyMinor;
-    try {
-      qtyMinor = quantityToMinor(_qty.text, dp);
-    } on AppError {
-      setState(() => _error = 'QTY');
-      return;
-    }
-    // A cost or a supplier bill needs purchase.cost; without it a receipt only
-    // moves stock.
+    // A cost or a supplier bill needs purchase.cost; without it, or with no cost
+    // typed, a receipt only moves stock.
     final canCost = actor.can(Permission.purchaseCost);
-    final cost = canCost ? (double.tryParse(_cost.text) ?? 0) : 0.0;
-    // A receipt adds stock at a cost: the server rejects a zero or negative
-    // quantity and a negative cost, so the device must not record one.
-    if (qtyMinor <= 0 || !cost.isFinite || cost < 0) {
-      setState(() => _error = 'QTY');
+    late final ReceiptLine line;
+    try {
+      line = ReceiptLine(
+        productId: product.id,
+        qtyMinor: quantityToMinor(_qty.text, dp),
+        unitCostMinor: canCost ? (amountOrNull(_cost.text) ?? 0) : 0,
+      );
+      assertReceivable(line);
+    } on AppError catch (e) {
+      setState(() => _error = numberErrorText(l, e) ?? l.errGeneric);
       return;
     }
-    final costMinor = (cost * 100).round();
     setState(() {
       _busy = true;
       _error = null;
@@ -62,13 +65,15 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
     try {
       await ref.read(localPurchasingProvider).receiveGoods(
             supplierId: canCost ? _supplierId : null,
-            lines: [ReceiptLine(productId: product.id, qtyMinor: qtyMinor, unitCostMinor: costMinor)],
+            lines: [line],
             branchId: actor.branchId, actorId: actor.user.id, deviceId: 'app',
           );
       ref
         ..invalidate(productsProvider)
         ..invalidate(suppliersProvider);
       if (mounted) Navigator.of(context).pop();
+    } on AppError catch (e) {
+      if (mounted) setState(() => _error = numberErrorText(l, e) ?? l.errGeneric);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -98,7 +103,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
             TextField(
               controller: _qty,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(labelText: l.quantityDelta, border: const OutlineInputBorder()),
+              decoration: InputDecoration(labelText: l.quantityReceived, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             if (canCost) ...[
@@ -125,8 +130,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(_error == 'PERM' ? l.permissionDenied : l.wrongSecret,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ),
             const SizedBox(height: 16),
             FilledButton.icon(

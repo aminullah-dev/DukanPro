@@ -29,7 +29,13 @@ from dukan.domain.customers import (
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.domain.inventory import StockReason, adjust_stock
 from dukan.domain.purchasing import SupplierEntryType
-from dukan.domain.sales import PaymentMethod, assert_discount_valid, line_total_minor
+from dukan.domain.sales import (
+    PaymentMethod,
+    assert_discount_valid,
+    assert_payment_valid,
+    assert_sale_not_overpaid,
+    line_total_minor,
+)
 from dukan.shared.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
 from dukan.shared.limits import INT32_MAX, INT32_MIN, MONEY_MAX
 
@@ -703,6 +709,7 @@ def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
         raise ValidationError(
             "SYNC_FIELD_INVALID", table="sales", field="total_minor", reason="arithmetic"
         )
+    assert_sale_not_overpaid(paid_minor=v["paid_minor"], total_minor=total)
     customer_id = v.get("customer_id")
     if customer_id is None:
         if v["paid_minor"] < total:
@@ -762,11 +769,9 @@ def _payments_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     currency = v.get("currency", DEFAULT_CURRENCY)
     if currency != sale.currency:
         raise ConflictError("SALE_CURRENCY_MISMATCH", expected=sale.currency, got=currency)
-    tendered = v.get("tendered_minor")
-    if tendered is not None and tendered < amount:
-        raise ValidationError(
-            "SYNC_FIELD_INVALID", table="payments", field="tendered_minor", reason="below_amount"
-        )
+    assert_payment_valid(
+        method=v["method"], amount_minor=amount, tendered_minor=v.get("tendered_minor")
+    )
     _require_complete_lines(ctx, sale)
     # Payments never exceed what the sale says was paid, nor the sale's total.
     if ctx.reader.sale_payments_total(sale.id) + amount > min(sale.paid_minor, sale.total_minor):

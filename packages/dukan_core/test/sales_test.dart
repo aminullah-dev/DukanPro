@@ -45,4 +45,37 @@ void main() {
       assertSettleable(lines: [_line(500, 1, 0)], totalMinor: 500, paidMinor: 500, currency: 'AFN', allowCredit: false);
     });
   });
+
+  group('sale inputs', () {
+    SaleLine line({int qty = 1, int price = 5000}) => SaleLine(
+          productId: 'p', name: 'Soap', qtyMinor: qty, decimalPlaces: 0, unitPriceMinor: price,
+          unitCostMinor: 0, currency: 'AFN',
+        );
+    Matcher code(String c) => throwsA(isA<AppError>().having((e) => e.code, 'code', c));
+
+    test('lines sell a positive quantity at a price of zero or more', () {
+      expect(() => assertSaleLinesValid([line(qty: 0)], currency: 'AFN'), code('SALE_LINE_INVALID_QTY'));
+      expect(() => assertSaleLinesValid([line(qty: -5)], currency: 'AFN'), code('SALE_LINE_INVALID_QTY'));
+      expect(() => assertSaleLinesValid([line(price: -1)], currency: 'AFN'), code('SALE_LINE_INVALID_PRICE'));
+      assertSaleLinesValid([line(price: 0)], currency: 'AFN');
+    });
+
+    test('a payment is a positive cash or card amount', () {
+      expect(() => assertPaymentValid(method: PaymentMethod.credit, amountMinor: 100), code('SALE_PAYMENT_INVALID'));
+      expect(() => assertPaymentValid(method: PaymentMethod.cash, amountMinor: 0), code('SALE_PAYMENT_INVALID'));
+      expect(() => assertPaymentValid(method: PaymentMethod.cash, amountMinor: 500, tenderedMinor: 400),
+          code('SALE_PAYMENT_INVALID'));
+      expect(() => assertPaymentValid(method: PaymentMethod.card, amountMinor: 500, tenderedMinor: 600),
+          code('SALE_PAYMENT_INVALID'));
+      assertPaymentValid(method: PaymentMethod.cash, amountMinor: 500, tenderedMinor: 600);
+    });
+
+    test('payments never exceed the total, and none is negative', () {
+      expect(() => assertSaleNotOverpaid(paidMinor: 600, totalMinor: 500), code('SALE_OVERPAID'));
+      expect(
+        () => assertSettleable(lines: [line()], totalMinor: 5000, paidMinor: -1, currency: 'AFN', allowCredit: true),
+        code('SALE_PAYMENT_INVALID'),
+      );
+    });
+  });
 }

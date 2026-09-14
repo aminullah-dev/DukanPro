@@ -18,7 +18,7 @@
 4. Settling a stock-tracked sale emits **one** set of negative StockMovements (idempotent — a replay does not double-decrement).
 5. `unit_price` is **snapshotted**; a later catalog price change never alters a past sale.
 6. A settled sale is **immutable**; corrections are a **void** (reverses stock + payments + ledger) or a **refund** (new negative sale referencing the original). No in-place edits.
-7. Change is computed for cash tender; over-tender yields `change`, never a negative payment.
+7. Change is computed for cash tender; over-tender yields `change`, never a negative payment. Payments are cash or card: credit is the unpaid remainder (it needs a customer), never a payment. The payments never add up to more than the total.
 8. Payments are append-only; you cannot delete a payment, only void the sale or record a refund.
 9. A **void** needs `sale.void` (owner, manager) in the **sale's** branch and a reason, recorded in the audit entry. A sale whose shift is already closed cannot be voided (`SALE_SHIFT_CLOSED`): its cash was counted.
 10. A discount lies between 0 and the subtotal (`SALE_DISCOUNT_INVALID`); any discount needs `sale.discount` and writes `discount.applied`.
@@ -35,6 +35,9 @@
 | `SALE_CURRENCY_MISMATCH` | payment currency ≠ sale currency (no implicit conversion) |
 | `SHIFT_NOT_OPEN` | ringing a sale with no open shift (when shifts required) |
 | `SALE_DISCOUNT_INVALID` | discount below 0 or above the subtotal |
+| `SALE_LINE_INVALID_QTY` / `SALE_LINE_INVALID_PRICE` | a line with a quantity of zero or less, or a negative price |
+| `SALE_PAYMENT_INVALID` | a payment that is not a positive cash or card amount; cash tendered below its amount; tendered on a card payment |
+| `SALE_OVERPAID` | payments adding up to more than the total (money over it is change, recorded as tendered) |
 | `SALE_NOT_VOIDABLE` / `SALE_VOID_REASON_REQUIRED` / `SALE_SHIFT_CLOSED` | voiding a sale that is not settled / without a reason / after its shift closed |
 | `SHIFT_ALREADY_CLOSED` | closing a closed shift |
 

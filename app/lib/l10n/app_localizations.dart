@@ -839,6 +839,54 @@ abstract class AppLocalizations {
   /// **'Something went wrong. Please try again.'**
   String get errGeneric;
 
+  /// No description provided for @errAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an amount such as 250 or 250.50.'**
+  String get errAmountInvalid;
+
+  /// No description provided for @errQtyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a quantity such as 3 or 2.5.'**
+  String get errQtyInvalid;
+
+  /// No description provided for @errQtyPrecision.
+  ///
+  /// In en, this message translates to:
+  /// **'This unit does not take that many decimal places.'**
+  String get errQtyPrecision;
+
+  /// No description provided for @errMustBePositive.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number greater than zero.'**
+  String get errMustBePositive;
+
+  /// No description provided for @errChooseProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a product.'**
+  String get errChooseProduct;
+
+  /// No description provided for @errRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required.'**
+  String get errRequired;
+
+  /// No description provided for @errTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Too long.'**
+  String get errTooLong;
+
+  /// No description provided for @quantityReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity received'**
+  String get quantityReceived;
+
   /// No description provided for @savedOk.
   ///
   /// In en, this message translates to:

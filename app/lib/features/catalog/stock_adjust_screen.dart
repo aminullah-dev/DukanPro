@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import 'catalog_providers.dart';
 
@@ -16,7 +17,7 @@ class StockAdjustScreen extends ConsumerStatefulWidget {
 class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
   final _qty = TextEditingController();
   bool _busy = false;
-  String? _error; // 'PERM' | 'QTY'
+  String? _error; // a message ready to show
 
   @override
   void dispose() {
@@ -25,16 +26,17 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
   }
 
   Future<void> _apply(int decimalPlaces) async {
+    final l = AppLocalizations.of(context);
     final actor = ref.read(sessionActorProvider);
     if (actor == null || !actor.can(Permission.stockAdjust)) {
-      setState(() => _error = 'PERM');
+      setState(() => _error = l.permissionDenied);
       return;
     }
-    int qtyDelta;
+    late final int qtyDelta;
     try {
       qtyDelta = quantityToMinor(_qty.text, decimalPlaces);
-    } on AppError {
-      setState(() => _error = 'QTY');
+    } on AppError catch (e) {
+      setState(() => _error = numberErrorText(l, e) ?? l.errGeneric);
       return;
     }
     setState(() {
@@ -52,6 +54,8 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
           );
       ref.invalidate(onHandProvider((widget.product.id, branchId)));
       if (mounted) Navigator.of(context).pop();
+    } on AppError catch (e) {
+      if (mounted) setState(() => _error = numberErrorText(l, e) ?? l.errGeneric);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -98,10 +102,7 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    _error == 'PERM' ? l.permissionDenied : l.wrongSecret,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
+                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ),
               const SizedBox(height: 16),
               FilledButton(

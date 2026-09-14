@@ -15,7 +15,13 @@ from dukan.application.purchasing import (
     SupplierView,
 )
 from dukan.domain.identity import Permission, PermissionPolicy, User
-from dukan.domain.purchasing import SupplierEntryType, SupplierLedgerEntry, supplier_balance
+from dukan.domain.purchasing import (
+    ReceiptLine,
+    SupplierEntryType,
+    SupplierLedgerEntry,
+    assert_receivable,
+    supplier_balance,
+)
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     GoodsReceiptLineModel,
@@ -26,7 +32,7 @@ from dukan.infrastructure.db.models import (
     SupplierModel,
 )
 from dukan.infrastructure.scope import require_active_branch
-from dukan.shared.errors import NotFoundError, ValidationError
+from dukan.shared.errors import ConflictError, NotFoundError, ValidationError
 from dukan.shared.ids import new_id
 
 _POLICY = PermissionPolicy()
@@ -95,16 +101,26 @@ class SqlPurchasingService(PurchasingService):
         require_active_branch(self._s, branch_id)
         if not lines:
             raise ValidationError("GRN_EMPTY")
+        for l in lines:
+            assert_receivable(
+                ReceiptLine(
+                    product_id=l.product_id, qty_minor=l.qty_minor,
+                    unit_cost_minor=l.unit_cost_minor,
+                )
+            )
         if supplier_id is not None or any(l.unit_cost_minor > 0 for l in lines):
             # A supplier bill is a debt and a cost sets every later margin: both need
             # purchase.cost. Without it a receipt only moves stock.
             require_permission(_POLICY, actor, Permission.PURCHASE_COST, branch_id)
-        if supplier_id is not None and self._s.scalar(
-            select(SupplierModel).where(
-                SupplierModel.id == supplier_id, SupplierModel.deleted_at.is_(None)
+        supplier: SupplierModel | None = None
+        if supplier_id is not None:
+            supplier = self._s.scalar(
+                select(SupplierModel).where(
+                    SupplierModel.id == supplier_id, SupplierModel.deleted_at.is_(None)
+                )
             )
-        ) is None:
-            raise NotFoundError("SUPPLIER_NOT_FOUND", supplier_id=supplier_id)
+            if supplier is None:
+                raise NotFoundError("SUPPLIER_NOT_FOUND", supplier_id=supplier_id)
         total = sum(l.unit_cost_minor * l.qty_minor for l in lines)
         receipt = GoodsReceiptModel(
             id=new_id(), number=self._next_number(), supplier_id=supplier_id, branch_id=branch_id,
@@ -133,12 +149,30 @@ class SqlPurchasingService(PurchasingService):
                 )
             )
             if l.unit_cost_minor > 0:  # a quantity-only receipt leaves the last cost alone
+                if supplier is not None and product.sell_currency != supplier.currency:
+                    # The bill is in the supplier's currency; no implicit conversion.
+                    raise ConflictError(
+                        "PURCHASE_CURRENCY_MISMATCH",
+                        expected=supplier.currency, got=product.sell_currency,
+                    )
+                before = product.cost_minor
                 product.cost_minor = l.unit_cost_minor
                 product.cost_currency = product.sell_currency
+                if before != l.unit_cost_minor:
+                    self._s.add(
+                        AuditEntryModel(
+                            id=new_id(), action="cost.valuation_changed", actor_id=actor.id,
+                            entity_type="product", entity_id=product.id,
+                            before={"cost_minor": before},
+                            after={"cost_minor": l.unit_cost_minor, "receipt_id": receipt.id},
+                            origin="api",
+                        )
+                    )
         if supplier_id is not None:
             self._s.add(
                 SupplierLedgerModel(
                     id=new_id(), supplier_id=supplier_id, type="bill", amount_minor=total,
+                    currency=supplier.currency if supplier else "AFN",
                     ref_type="goods_receipt", ref_id=receipt.id, created_by=actor.id,
                 )
             )

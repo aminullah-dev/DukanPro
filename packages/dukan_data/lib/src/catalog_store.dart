@@ -210,6 +210,7 @@ final class LocalCatalog {
     required String actorId,
     required String deviceId,
   }) async {
+    assertPriceValid(sellPriceMinor: product.sellPrice.amountMinor);
     await _db.transaction(() async {
       await products.create(product, barcodes: barcodes);
       await _rec.record(
@@ -231,6 +232,7 @@ final class LocalCatalog {
     required String actorId,
     required String deviceId,
   }) async {
+    assertPriceValid(sellPriceMinor: product.sellPrice.amountMinor);
     await _db.transaction(() async {
       await products.update(product);
       await _rec.record(

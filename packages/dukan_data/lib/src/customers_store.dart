@@ -90,6 +90,7 @@ final class LocalCustomers {
     required String actorId,
     required String deviceId,
   }) async {
+    assertDebtPaymentValid(amountMinor: amountMinor);
     assertNotOverpaid(balanceMinor: await balance(customerId), paymentMinor: amountMinor);
     final ledgerId = newId();
     await _db.transaction(() async {
@@ -153,6 +154,7 @@ final class LocalPurchasing {
     required String actorId,
     required String deviceId,
   }) async {
+    lines.forEach(assertReceivable);
     final total = lines.fold<int>(0, (s, l) => s + l.lineCost);
     await _db.transaction(() async {
       for (final l in lines) {

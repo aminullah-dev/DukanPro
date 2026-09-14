@@ -46,4 +46,10 @@ void main() {
     expect(p.sellPrice, Money(52000, 'AFN'));
     expect(p.trackStock, isTrue);
   });
+
+  test('a price is zero or more', () {
+    expect(() => assertPriceValid(sellPriceMinor: -1),
+        throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'CATALOG_PRICE_INVALID')));
+    assertPriceValid(sellPriceMinor: 0);
+  });
 }

@@ -3,20 +3,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import 'catalog_providers.dart';
 
 // Field bounds mirror the server's columns (docs/sync-protocol.md, "Push
 // validation"), so a product saved here is never rejected at sync.
 
-String? _requiredText(String? v, int maxLength) {
+String? _requiredText(AppLocalizations l, String? v, int maxLength) {
   final t = (v ?? '').trim();
-  return (t.isEmpty || t.length > maxLength) ? '' : null;
+  if (t.isEmpty) return l.errRequired;
+  return t.length > maxLength ? l.errTooLong : null;
 }
 
-String? _nonNegativeAmount(String? v) {
-  final amount = double.tryParse(v ?? '');
-  return (amount == null || !amount.isFinite || amount < 0) ? '' : null;
+/// A price: an amount of zero or more, typed with Persian or Latin digits.
+String? _priceError(AppLocalizations l, String? v) {
+  try {
+    final minor = amountOrNull(v ?? '');
+    if (minor == null) return l.errRequired;
+    assertPriceValid(sellPriceMinor: minor);
+    return null;
+  } on AppError catch (e) {
+    return numberErrorText(l, e) ?? l.errAmountInvalid;
+  }
 }
 
 class ProductEditScreen extends ConsumerStatefulWidget {
@@ -35,7 +44,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
   String? _unitId;
   bool _track = true;
   bool _busy = false;
-  String? _error; // 'PERM' | 'SKU'
+  String? _error; // a message ready to show
 
   bool get _isNew => widget.product == null;
 
@@ -46,7 +55,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
     _name = TextEditingController(text: p?.name ?? '');
     _sku = TextEditingController(text: p?.sku ?? '');
     _price = TextEditingController(
-        text: p == null ? '' : (p.sellPrice.amountMinor / 100).toStringAsFixed(2));
+        text: p == null ? '' : formatQuantity(p.sellPrice.amountMinor, 2));
     _barcode = TextEditingController();
     _unitId = p?.unitId;
     _track = p?.trackStock ?? true;
@@ -63,9 +72,10 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
+    final l = AppLocalizations.of(context);
     final actor = ref.read(sessionActorProvider);
     if (actor == null || !actor.can(Permission.productManage)) {
-      setState(() => _error = 'PERM');
+      setState(() => _error = l.permissionDenied);
       return;
     }
     setState(() {
@@ -73,13 +83,13 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
       _error = null;
     });
     final catalog = ref.read(localCatalogProvider);
-    final priceMinor = ((double.tryParse(_price.text) ?? 0) * 100).round();
+    final priceMinor = amountOrNull(_price.text) ?? 0; // the form validated it
     try {
       if (_isNew) {
         if (await catalog.products.skuTaken(_sku.text.trim())) {
           setState(() {
             _busy = false;
-            _error = 'SKU';
+            _error = l.skuTaken;
           });
           return;
         }
@@ -102,6 +112,8 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
         await catalog.updateProduct(product, actorId: actor.user.id, deviceId: 'app');
       }
       if (mounted) Navigator.of(context).pop();
+    } on AppError catch (e) {
+      if (mounted) setState(() => _error = numberErrorText(l, e) ?? l.errGeneric);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -126,14 +138,14 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                 TextFormField(
                   controller: _name,
                   decoration: InputDecoration(labelText: l.productName, border: const OutlineInputBorder()),
-                  validator: (v) => _requiredText(v, 200),
+                  validator: (v) => _requiredText(l, v, 200),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _sku,
                   readOnly: !_isNew,
                   decoration: InputDecoration(labelText: l.sku, border: const OutlineInputBorder()),
-                  validator: (v) => _requiredText(v, 64),
+                  validator: (v) => _requiredText(l, v, 64),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -147,14 +159,14 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                   controller: _price,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(labelText: l.price, suffixText: 'AFN', border: const OutlineInputBorder()),
-                  validator: _nonNegativeAmount,
+                  validator: (v) => _priceError(l, v),
                 ),
                 const SizedBox(height: 12),
                 if (_isNew)
                   TextFormField(
                     controller: _barcode,
                     decoration: InputDecoration(labelText: l.barcodeLabel, border: const OutlineInputBorder()),
-                    validator: (v) => (v ?? '').trim().length > 64 ? '' : null,
+                    validator: (v) => (v ?? '').trim().length > 64 ? l.errTooLong : null,
                   ),
                 const SizedBox(height: 4),
                 SwitchListTile(
@@ -167,7 +179,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
-                      _error == 'PERM' ? l.permissionDenied : l.skuTaken,
+                      _error!,
                       style: TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
                   ),

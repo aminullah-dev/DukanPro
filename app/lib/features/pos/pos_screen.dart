@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/number_input.dart';
 import '../../widgets/locale_toggle.dart';
 import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
@@ -13,7 +14,7 @@ import '../settings/settings_providers.dart';
 import 'pos_providers.dart';
 import 'receipt_builder.dart';
 
-String _afn(int minor) => (minor / 100).toStringAsFixed(2);
+String _afn(int minor) => formatQuantity(minor, 2);
 
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
@@ -253,12 +254,20 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     super.dispose();
   }
 
-  int get _tenderedMinor => ((double.tryParse(_tendered.text) ?? 0) * 100).round();
+  /// The cash received as typed, or null while it is not a valid amount.
+  int? get _tenderedMinor {
+    try {
+      return amountOrNull(_tendered.text) ?? 0;
+    } on AppError {
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final change = _tenderedMinor - widget.totalMinor;
+    final tendered = _tenderedMinor;
+    final change = tendered == null ? -1 : tendered - widget.totalMinor;
     final customersAsync = ref.watch(customersProvider);
     return AlertDialog(
       title: Text(l.charge),
@@ -274,7 +283,10 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
             controller: _tendered,
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: l.tendered, border: const OutlineInputBorder(), suffixText: 'AFN'),
+            decoration: InputDecoration(
+              labelText: l.tendered, border: const OutlineInputBorder(), suffixText: 'AFN',
+              errorText: tendered == null ? l.errAmountInvalid : null,
+            ),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 8),
@@ -303,23 +315,26 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
         if (_customer != null)
           FilledButton.tonal(
-            onPressed: () => Navigator.pop(
-              context,
-              _PayResult(
-                credit: true,
-                cashMinor: _tenderedMinor > widget.totalMinor ? widget.totalMinor : _tenderedMinor,
-                tenderedMinor: _tenderedMinor,
-                customerId: _customer!.id,
-                creditLimit: _customer!.creditLimitMinor,
-              ),
-            ),
+            onPressed: tendered == null
+                ? null
+                : () => Navigator.pop(
+                      context,
+                      _PayResult(
+                        credit: true,
+                        // Cash toward a credit sale is at most its total; the rest is the debt.
+                        cashMinor: tendered > widget.totalMinor ? widget.totalMinor : tendered,
+                        tenderedMinor: tendered,
+                        customerId: _customer!.id,
+                        creditLimit: _customer!.creditLimitMinor,
+                      ),
+                    ),
             child: Text(l.credit),
           ),
         FilledButton(
-          onPressed: _tenderedMinor >= widget.totalMinor
+          onPressed: tendered != null && tendered >= widget.totalMinor
               ? () => Navigator.pop(
                     context,
-                    _PayResult(credit: false, cashMinor: widget.totalMinor, tenderedMinor: _tenderedMinor),
+                    _PayResult(credit: false, cashMinor: widget.totalMinor, tenderedMinor: tendered),
                   )
               : null,
           child: Text(l.cash),

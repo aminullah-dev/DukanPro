@@ -48,3 +48,9 @@ A first-class requirement, not a post-launch pass. Three locales, two directions
 - PDF export **always embeds fonts**. Demo/unlicensed state watermarks the document.
 
 See [`docs/glossary.md`](glossary.md) for the bilingual domain vocabulary that seeds the i18n keys.
+
+## Numbers people type
+
+Money and quantity fields accept Persian (۰-۹) and Arabic-Indic (٠-٩) digits as well as Latin ones, `٫` or `.` as the decimal separator, and `٬` or `,` between thousands (in groups of three).
+- The value becomes integer minor units without passing through a floating-point number: `numbers.dart` and `numbers.py`, checked against one shared table of examples.
+- Anything else is refused with a translated message, never read as 0 or as "no limit": `MONEY_AMOUNT_INVALID`, `CATALOG_QTY_INVALID`, or `CATALOG_UNIT_PRECISION` (more decimals than the unit allows).

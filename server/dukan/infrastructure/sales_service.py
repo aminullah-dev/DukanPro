@@ -23,7 +23,15 @@ from dukan.domain.customers import (
     ledger_balance,
 )
 from dukan.domain.identity import Permission, PermissionPolicy, User
-from dukan.domain.sales import SaleLine, assert_discount_valid, assert_settleable, compute_totals
+from dukan.domain.sales import (
+    SaleLine,
+    assert_discount_valid,
+    assert_payment_valid,
+    assert_sale_lines_valid,
+    assert_sale_not_overpaid,
+    assert_settleable,
+    compute_totals,
+)
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     CustomerLedgerModel,
@@ -139,6 +147,7 @@ class SqlSalesService(SalesService):
                 )
             )
 
+        assert_sale_lines_valid(domain_lines, currency=currency)
         totals = compute_totals(domain_lines, discount_minor)
         assert_discount_valid(discount_minor=discount_minor, subtotal_minor=totals.subtotal_minor)
         if discount_minor > 0:
@@ -149,9 +158,13 @@ class SqlSalesService(SalesService):
             lines=domain_lines, total_minor=totals.total_minor, paid_minor=paid,
             currency=currency, allow_credit=customer_id is not None,
         )
-        change = sum(
-            max(0, (p.tendered_minor or p.amount_minor) - p.amount_minor) for p in payments
-        )
+        for p in payments:
+            assert_payment_valid(
+                method=p.method, amount_minor=p.amount_minor, tendered_minor=p.tendered_minor
+            )
+        assert_sale_not_overpaid(paid_minor=paid, total_minor=totals.total_minor)
+        # Change is cash handed back over a cash payment (tendered >= amount).
+        change = sum((p.tendered_minor or p.amount_minor) - p.amount_minor for p in payments)
 
         sale = SaleModel(
             id=new_id(), number=self._next_number(), branch_id=branch_id, shift_id=shift_id,
@@ -182,7 +195,11 @@ class SqlSalesService(SalesService):
             self._s.add(
                 PaymentModel(
                     id=new_id(), sale_id=sale.id, method=p.method, amount_minor=p.amount_minor,
-                    currency=currency, tendered_minor=p.tendered_minor, created_by=actor.id,
+                    currency=currency, tendered_minor=p.tendered_minor,
+                    change_minor=(
+                        None if p.tendered_minor is None else p.tendered_minor - p.amount_minor
+                    ),
+                    created_by=actor.id,
                 )
             )
         # Credit sale: the unpaid remainder goes to the customer ledger (Phase 4).

@@ -435,6 +435,30 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errGeneric => 'مشکلی پیش آمد. دوباره تلاش کنید.';
 
   @override
+  String get errAmountInvalid => 'مبلغ را مانند ۲۵۰ یا ۲۵۰٫۵۰ وارد کنید.';
+
+  @override
+  String get errQtyInvalid => 'مقدار را مانند ۳ یا ۲٫۵ وارد کنید.';
+
+  @override
+  String get errQtyPrecision => 'این واحد این‌قدر رقم اعشاری نمی‌پذیرد.';
+
+  @override
+  String get errMustBePositive => 'عددی بزرگ‌تر از صفر وارد کنید.';
+
+  @override
+  String get errChooseProduct => 'یک کالا انتخاب کنید.';
+
+  @override
+  String get errRequired => 'این بخش لازم است.';
+
+  @override
+  String get errTooLong => 'خیلی طولانی است.';
+
+  @override
+  String get quantityReceived => 'مقدار دریافت‌شده';
+
+  @override
   String get savedOk => 'ذخیره شد.';
 
   @override
@@ -941,6 +965,30 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get errGeneric => 'مشکلی پیش آمد. دوباره تلاش کنید.';
+
+  @override
+  String get errAmountInvalid => 'مبلغ را مانند ۲۵۰ یا ۲۵۰٫۵۰ وارد کنید.';
+
+  @override
+  String get errQtyInvalid => 'مقدار را مانند ۳ یا ۲٫۵ وارد کنید.';
+
+  @override
+  String get errQtyPrecision => 'این واحد این‌قدر رقم اعشاری نمی‌پذیرد.';
+
+  @override
+  String get errMustBePositive => 'عددی بزرگ‌تر از صفر وارد کنید.';
+
+  @override
+  String get errChooseProduct => 'یک کالا انتخاب کنید.';
+
+  @override
+  String get errRequired => 'این بخش لازم است.';
+
+  @override
+  String get errTooLong => 'خیلی طولانی است.';
+
+  @override
+  String get quantityReceived => 'مقدار دریافت‌شده';
 
   @override
   String get savedOk => 'ذخیره شد.';

@@ -434,6 +434,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errGeneric => 'Something went wrong. Please try again.';
 
   @override
+  String get errAmountInvalid => 'Enter an amount such as 250 or 250.50.';
+
+  @override
+  String get errQtyInvalid => 'Enter a quantity such as 3 or 2.5.';
+
+  @override
+  String get errQtyPrecision =>
+      'This unit does not take that many decimal places.';
+
+  @override
+  String get errMustBePositive => 'Enter a number greater than zero.';
+
+  @override
+  String get errChooseProduct => 'Choose a product.';
+
+  @override
+  String get errRequired => 'Required.';
+
+  @override
+  String get errTooLong => 'Too long.';
+
+  @override
+  String get quantityReceived => 'Quantity received';
+
+  @override
   String get savedOk => 'Saved.';
 
   @override

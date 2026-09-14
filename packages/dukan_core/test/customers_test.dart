@@ -41,4 +41,12 @@ void main() {
   test('receipt line cost', () {
     expect(const ReceiptLine(productId: 'p', qtyMinor: 10, unitCostMinor: 40000).lineCost, 400000);
   });
+
+  test('a debt payment is a positive amount', () {
+    for (final amount in [0, -500]) {
+      expect(() => assertDebtPaymentValid(amountMinor: amount),
+          throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'DEBT_PAYMENT_INVALID')));
+    }
+    assertDebtPaymentValid(amountMinor: 1);
+  });
 }

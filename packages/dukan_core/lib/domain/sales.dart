@@ -63,10 +63,29 @@ SaleTotals computeTotals(List<SaleLine> lines, {int discountMinor = 0}) {
   return SaleTotals(subtotalMinor: subtotal, taxMinor: tax, totalMinor: subtotal - discountMinor + tax);
 }
 
-/// Validate a settlement. [paidMinor] is the amount applied toward the balance.
-/// Raises `SALE_EMPTY`, `SALE_CURRENCY_MISMATCH`, or (cash-only) `SALE_UNDERPAID`.
-/// [allowCredit] is true once a customer is attached (the remainder goes to the
-/// customer ledger — Phase 4).
+/// Every line sells a positive quantity at a price of zero or more, in the
+/// sale's [currency]. Raises [ValidationError] `SALE_EMPTY`,
+/// `SALE_LINE_INVALID_QTY` or `SALE_LINE_INVALID_PRICE`, or [ConflictError]
+/// `SALE_CURRENCY_MISMATCH`.
+void assertSaleLinesValid(List<SaleLine> lines, {required String currency}) {
+  if (lines.isEmpty) throw ValidationError('SALE_EMPTY', {});
+  for (final l in lines) {
+    if (l.qtyMinor <= 0) {
+      throw ValidationError('SALE_LINE_INVALID_QTY', {'product_id': l.productId, 'qty': l.qtyMinor});
+    }
+    if (l.unitPriceMinor < 0) {
+      throw ValidationError('SALE_LINE_INVALID_PRICE', {'product_id': l.productId, 'price': l.unitPriceMinor});
+    }
+    if (l.currency != currency) {
+      throw ConflictError('SALE_CURRENCY_MISMATCH', {'expected': currency, 'got': l.currency});
+    }
+  }
+}
+
+/// Validate a settlement. [paidMinor] is the amount offered toward the balance.
+/// Raises what [assertSaleLinesValid] raises, `SALE_PAYMENT_INVALID` for a
+/// negative amount, or (cash-only) `SALE_UNDERPAID`. [allowCredit] is true once
+/// a customer is attached (the remainder goes to the customer ledger).
 void assertSettleable({
   required List<SaleLine> lines,
   required int totalMinor,
@@ -74,14 +93,37 @@ void assertSettleable({
   required String currency,
   required bool allowCredit,
 }) {
-  if (lines.isEmpty) throw ValidationError('SALE_EMPTY', {});
-  for (final l in lines) {
-    if (l.currency != currency) {
-      throw ConflictError('SALE_CURRENCY_MISMATCH', {'expected': currency, 'got': l.currency});
-    }
+  assertSaleLinesValid(lines, currency: currency);
+  if (paidMinor < 0) {
+    throw ValidationError('SALE_PAYMENT_INVALID', {'reason': 'amount', 'paid': paidMinor});
   }
   if (!allowCredit && paidMinor < totalMinor) {
     throw ConflictError('SALE_UNDERPAID', {'total': totalMinor, 'paid': paidMinor});
+  }
+}
+
+/// A payment is a positive amount by cash or card: credit is the unpaid
+/// remainder, never a payment. Cash handed over is at least the amount, and
+/// only cash is handed over. Raises [ValidationError] `SALE_PAYMENT_INVALID`.
+void assertPaymentValid({required PaymentMethod method, required int amountMinor, int? tenderedMinor}) {
+  if (method == PaymentMethod.credit) {
+    throw ValidationError('SALE_PAYMENT_INVALID', {'reason': 'method', 'method': method.name});
+  }
+  if (amountMinor <= 0) {
+    throw ValidationError('SALE_PAYMENT_INVALID', {'reason': 'amount', 'amount': amountMinor});
+  }
+  if (tenderedMinor != null && (method != PaymentMethod.cash || tenderedMinor < amountMinor)) {
+    throw ValidationError(
+        'SALE_PAYMENT_INVALID', {'reason': 'tendered', 'amount': amountMinor, 'tendered': tenderedMinor});
+  }
+}
+
+/// The payments applied to a sale never add up to more than its total: cash
+/// over the total is change handed back, not a payment. Raises [ConflictError]
+/// `SALE_OVERPAID`.
+void assertSaleNotOverpaid({required int paidMinor, required int totalMinor}) {
+  if (paidMinor > totalMinor) {
+    throw ConflictError('SALE_OVERPAID', {'paid': paidMinor, 'total': totalMinor});
   }
 }
 

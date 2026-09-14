@@ -14,6 +14,7 @@ from dukan.domain.customers import (
     CustomerLedgerEntry,
     LedgerEntryType,
     assert_credit_limit_valid,
+    assert_debt_payment_valid,
     assert_not_overpaid,
     ledger_balance,
 )
@@ -165,6 +166,7 @@ class SqlCustomerService(CustomerService):
     ) -> CustomerView:
         require_permission(_POLICY, actor, Permission.SALE_CREATE, branch_id)
         require_active_branch(self._s, branch_id)
+        assert_debt_payment_valid(amount_minor=amount_minor)
         customer = self._get(customer_id)
         assert_not_overpaid(balance_minor=self._balance(customer_id), payment_minor=amount_minor)
         self._s.add(

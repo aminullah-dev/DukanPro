@@ -7,7 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from dukan.domain.numbers import NumberProblem, parse_scaled
 from dukan.shared.errors import ConflictError, ValidationError
+from dukan.shared.limits import MONEY_MAX
 from dukan.shared.money import Money
 
 
@@ -58,24 +60,24 @@ def assert_unique_barcode(*, code: str, taken: bool) -> None:
 
 
 def quantity_to_minor(value: str, decimal_places: int) -> int:
-    """Parse a user quantity into integer minor units.
+    """Parse a user quantity (Persian or Latin digits) into integer minor units.
 
     Raises ValidationError CATALOG_UNIT_PRECISION (too many decimals) or
-    CATALOG_QTY_INVALID (not a number).
+    CATALOG_QTY_INVALID (not a number, or too large).
     """
-    trimmed = value.strip()
-    negative = trimmed.startswith("-")
-    body = trimmed[1:] if negative else trimmed
-    parts = body.split(".")
-    if len(parts) > 2 or body == "":
-        raise ValidationError("CATALOG_QTY_INVALID", input=value)
-    frac = parts[1] if len(parts) == 2 else ""
-    if len(frac) > decimal_places:
-        raise ValidationError("CATALOG_UNIT_PRECISION", decimals=len(frac), allowed=decimal_places)
-    whole = int(parts[0]) if parts[0] else 0
-    frac_value = int(frac.ljust(decimal_places, "0")) if frac else 0
-    magnitude = whole * (10**decimal_places) + frac_value
-    return -magnitude if negative else magnitude
+    parsed, problem = parse_scaled(value, decimal_places)
+    if problem is NumberProblem.TOO_PRECISE:
+        raise ValidationError("CATALOG_UNIT_PRECISION", allowed=decimal_places)
+    if parsed is None:
+        raise ValidationError("CATALOG_QTY_INVALID", input=value[:32])
+    return parsed
+
+
+def assert_price_valid(*, sell_price_minor: int) -> None:
+    """A selling price is zero or more: a free item is fine, a negative price
+    would pay the customer. Raises ValidationError CATALOG_PRICE_INVALID."""
+    if not 0 <= sell_price_minor <= MONEY_MAX:
+        raise ValidationError("CATALOG_PRICE_INVALID", price=sell_price_minor)
 
 
 def format_quantity(minor: int, decimal_places: int) -> str:

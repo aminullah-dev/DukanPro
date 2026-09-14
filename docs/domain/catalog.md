@@ -27,7 +27,10 @@
 | `PRODUCT_DUPLICATE_SKU` | sku collides with an active product |
 | `BARCODE_DUPLICATE` | barcode collides with an active barcode |
 | `CATALOG_UNIT_PRECISION` | quantity has more decimals than the unit allows |
-| `PRICE_CURRENCY_INVALID` | price currency not a configured shop currency |
+| `PRICE_CURRENCY_INVALID` | price currency is not the currency of any branch |
+| `CATALOG_PRICE_INVALID` | a negative selling price |
+| `CATEGORY_NOT_FOUND` | a product in a category that does not exist |
+| `CATALOG_QTY_INVALID` | a typed quantity that is not a number |
 
 ## Test table
 

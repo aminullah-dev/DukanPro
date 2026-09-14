@@ -116,4 +116,40 @@ void main() {
     expect(await catalog.onHand(p.id, 'B1'), 3);
     expect((await catalog.products.findById(p.id))?.cost?.amountMinor, 7000);
   });
+
+  test('money inputs are checked before anything is written', () async {
+    final p = Product(id: newId(), sku: 'P9', name: 'Tea', unitId: 'piece', sellPrice: Money(5000, 'AFN'));
+    await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    final c = Customer(id: newId(), name: 'Karim');
+    await customers.createCustomer(c, actorId: 'u1', deviceId: 'app');
+    final before = (await DriftSyncOutbox(db).pending()).length;
+    Matcher code(String c) => throwsA(isA<AppError>().having((e) => e.code, 'code', c));
+
+    Future<SaleRow> credit(int qty, int cash) => sales.settle(
+          lines: [_line(p.id, 5000, qty)], cashMinor: cash, customerId: c.id,
+          branchId: 'B1', actorId: 'u1', deviceId: 'app',
+        );
+    await expectLater(credit(1, -100), code('SALE_PAYMENT_INVALID'));
+    await expectLater(credit(1, 6000), code('SALE_OVERPAID'));
+    await expectLater(credit(0, 0), code('SALE_LINE_INVALID_QTY'));
+    await expectLater(
+      customers.recordPayment(customerId: c.id, amountMinor: 0, actorId: 'u1', deviceId: 'app'),
+      code('DEBT_PAYMENT_INVALID'),
+    );
+    await expectLater(
+      purchasing.receiveGoods(
+        lines: [ReceiptLine(productId: p.id, qtyMinor: -5, unitCostMinor: 100)],
+        branchId: 'B1', actorId: 'u1', deviceId: 'app',
+      ),
+      code('GRN_LINE_INVALID'),
+    );
+    await expectLater(
+      catalog.createProduct(
+        Product(id: newId(), sku: 'NEG', name: 'Neg', unitId: 'piece', sellPrice: Money(-1, 'AFN')),
+        actorId: 'u1', deviceId: 'app',
+      ),
+      code('CATALOG_PRICE_INVALID'),
+    );
+    expect((await DriftSyncOutbox(db).pending()).length, before);
+  });
 }

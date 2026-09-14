@@ -29,6 +29,7 @@
 | `DEBT_CURRENCY_MISMATCH` | payment currency has no matching charges |
 | `CUSTOMER_INACTIVE` | charging/crediting an inactive customer |
 | `CUSTOMER_CREDIT_LIMIT_INVALID` | a negative credit limit |
+| `DEBT_PAYMENT_INVALID` | a debt payment of zero or less (a correction is an adjustment, not a negative payment) |
 
 ## Test table
 

@@ -45,6 +45,7 @@ final class LocalSales {
     String? shiftId,
   }) async {
     final currency = lines.isEmpty ? 'AFN' : lines.first.currency;
+    assertSaleLinesValid(lines, currency: currency);
     final totals = computeTotals(lines, discountMinor: discountMinor);
     assertDiscountValid(discountMinor: discountMinor, subtotalMinor: totals.subtotalMinor);
     final tendered = tenderedMinor ?? cashMinor;
@@ -53,6 +54,13 @@ final class LocalSales {
       lines: lines, totalMinor: totals.totalMinor,
       paidMinor: onCredit ? cashMinor : tendered, currency: currency, allowCredit: onCredit,
     );
+    // Cash toward a credit sale is at most its total: the rest is the debt.
+    final paid = onCredit ? cashMinor : totals.totalMinor;
+    assertSaleNotOverpaid(paidMinor: paid, totalMinor: totals.totalMinor);
+    if (paid > 0) {
+      assertPaymentValid(
+          method: PaymentMethod.cash, amountMinor: paid, tenderedMinor: onCredit ? null : tendered);
+    }
     final remainder = onCredit ? (totals.totalMinor - cashMinor) : 0;
     if (onCredit && remainder > 0) {
       assertWithinCreditLimit(
@@ -60,7 +68,6 @@ final class LocalSales {
         chargeMinor: remainder, creditLimitMinor: customerCreditLimitMinor,
       );
     }
-    final paid = onCredit ? cashMinor : totals.totalMinor;
     final change = onCredit ? 0 : (tendered - totals.totalMinor);
     final saleId = newId();
     final number = await _nextNumber();

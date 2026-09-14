@@ -9,12 +9,18 @@ from sqlalchemy.orm import Session
 
 from dukan.application.access import require_any_permission, require_permission
 from dukan.application.catalog import CatalogService, ProductView
-from dukan.domain.catalog import assert_unique_barcode, assert_unique_sku
+from dukan.domain.catalog import (
+    assert_price_valid,
+    assert_unique_barcode,
+    assert_unique_sku,
+)
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.domain.inventory import adjust_stock
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     BarcodeModel,
+    BranchModel,
+    CategoryModel,
     ProductModel,
     StockMovementModel,
     UnitModel,
@@ -108,6 +114,20 @@ class SqlCatalogService(CatalogService):
         require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
         require_active_branch(self._s, branch_id)
         Money(sell_price_minor, currency).validated()
+        assert_price_valid(sell_price_minor=sell_price_minor)
+        shop_currencies = set(
+            self._s.scalars(
+                select(BranchModel.currency_default).where(BranchModel.deleted_at.is_(None))
+            )
+        )
+        if currency not in shop_currencies:
+            raise ValidationError("PRICE_CURRENCY_INVALID", currency=currency)
+        if category_id is not None and self._s.scalar(
+            select(CategoryModel).where(
+                CategoryModel.id == category_id, CategoryModel.deleted_at.is_(None)
+            )
+        ) is None:
+            raise NotFoundError("CATEGORY_NOT_FOUND", category_id=category_id)
         if self._s.scalar(
             select(UnitModel).where(UnitModel.id == unit_id, UnitModel.deleted_at.is_(None))
         ) is None:
@@ -156,6 +176,8 @@ class SqlCatalogService(CatalogService):
             product.name = name
         if is_active is not None:
             product.is_active = is_active
+        if sell_price_minor is not None:
+            assert_price_valid(sell_price_minor=sell_price_minor)
         if sell_price_minor is not None and sell_price_minor != product.sell_price_minor:
             # A price change is money — needs price.change and is audited.
             require_permission(_POLICY, actor, Permission.PRICE_CHANGE, branch_id)

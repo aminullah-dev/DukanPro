@@ -19,6 +19,7 @@ export 'domain/customers.dart';
 export 'domain/identity.dart';
 export 'domain/insights.dart';
 export 'domain/inventory.dart';
+export 'domain/numbers.dart';
 export 'domain/purchasing.dart';
 export 'domain/sales.dart';
 

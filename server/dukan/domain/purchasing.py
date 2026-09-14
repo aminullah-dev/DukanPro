@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from dukan.shared.errors import ValidationError
+
 
 class SupplierEntryType(StrEnum):
     BILL = "bill"
@@ -51,3 +53,13 @@ class ReceiptLine:
     @property
     def line_cost(self) -> int:
         return self.unit_cost_minor * self.qty_minor
+
+
+def assert_receivable(line: ReceiptLine) -> None:
+    """A received line adds a positive quantity at a cost of zero or more (zero:
+    a quantity-only receipt). Raises ValidationError GRN_LINE_INVALID."""
+    if line.qty_minor <= 0 or line.unit_cost_minor < 0:
+        raise ValidationError(
+            "GRN_LINE_INVALID", product_id=line.product_id, qty=line.qty_minor,
+            cost=line.unit_cost_minor,
+        )

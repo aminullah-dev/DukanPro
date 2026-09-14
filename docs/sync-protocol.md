@@ -78,9 +78,9 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | stock_movements insert, `adjustment` | stock.adjust (row) | qty ≠ 0; the product tracks stock |
 | stock_movements insert, `purchase` | stock.adjust (row) | qty > 0 |
 | stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product |
-| sales insert | sale.create (row), plus sale.discount for a discount above 0 | 0 ≤ discount ≤ subtotal; total = subtotal − discount + tax; paid ≥ total unless on credit; the customer exists; `shift_id` null |
+| sales insert | sale.create (row), plus sale.discount for a discount above 0 | 0 ≤ discount ≤ subtotal; total = subtotal − discount + tax; paid ≥ total unless on credit, and never above the total (`SALE_OVERPAID`); the customer exists; `shift_id` null |
 | sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up); lines ≤ subtotal; the sale's currency; a pushed `unit_cost_minor` is ignored and set by the server from the product's cost; a unit price under the catalog price needs sale.discount or price.change, unless the product had that price within the last 45 days (a till that had not pulled a price change yet) |
-| payments insert | sale.create (sale's) | the pusher's own sale, whose lines add up to its subtotal; payments ≤ paid and ≤ total; tendered ≥ amount |
+| payments insert | sale.create (sale's) | the pusher's own sale, whose lines add up to its subtotal; payments ≤ paid and ≤ total; cash or card, a positive amount, and tendered (cash only) ≥ amount (`SALE_PAYMENT_INVALID`) |
 | customer_ledger insert, `charge` | sale.create (sale's) | `ref_type` `sale` and `ref_id` of the pusher's own sale for that customer, whose lines add up to its subtotal; charges ≤ total − paid; over the credit limit is **flagged** in the audit, not refused |
 | customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused |
 | supplier_ledger insert, `bill` | purchase.cost (active) | the supplier exists; the supplier's currency |

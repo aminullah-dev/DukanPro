@@ -1,5 +1,6 @@
 import '../shared/errors.dart';
 import '../shared/money.dart';
+import 'numbers.dart';
 
 /// Catalog domain — simple products with multiple barcodes (no variants in
 /// Phase 2). Mirrors docs/domain/catalog.md and server/dukan/domain/catalog.py.
@@ -76,26 +77,25 @@ int _pow10(int n) {
   return r;
 }
 
-/// Parse a user-entered quantity into integer minor units for a unit with
-/// [decimalPlaces]. Raises [ValidationError] `CATALOG_UNIT_PRECISION` when the
-/// input has more decimals than the unit allows (e.g. 1.5 of a piece), or
-/// `CATALOG_QTY_INVALID` when it is not a number.
+/// Parse a user-entered quantity (Persian or Latin digits) into integer minor
+/// units for a unit with [decimalPlaces]. Raises [ValidationError]
+/// `CATALOG_UNIT_PRECISION` when the input has more decimals than the unit
+/// allows (e.g. 1.5 of a piece), or `CATALOG_QTY_INVALID` when it is not a
+/// number (or too large).
 int quantityToMinor(String input, int decimalPlaces) {
-  final trimmed = input.trim();
-  final negative = trimmed.startsWith('-');
-  final body = negative ? trimmed.substring(1) : trimmed;
-  final parts = body.split('.');
-  if (parts.length > 2 || body.isEmpty) {
-    throw ValidationError('CATALOG_QTY_INVALID', {'input': input});
+  final parsed = parseScaled(input, decimalPlaces);
+  if (parsed.problem == NumberProblem.tooPrecise) {
+    throw ValidationError('CATALOG_UNIT_PRECISION', {'allowed': decimalPlaces});
   }
-  final frac = parts.length == 2 ? parts[1] : '';
-  if (frac.length > decimalPlaces) {
-    throw ValidationError('CATALOG_UNIT_PRECISION', {'decimals': frac.length, 'allowed': decimalPlaces});
+  return parsed.value ?? (throw ValidationError('CATALOG_QTY_INVALID', {'input': input}));
+}
+
+/// A selling price is zero or more: a free item is fine, a negative price would
+/// pay the customer. Raises [ValidationError] `CATALOG_PRICE_INVALID`.
+void assertPriceValid({required int sellPriceMinor}) {
+  if (sellPriceMinor < 0 || sellPriceMinor > moneyMax) {
+    throw ValidationError('CATALOG_PRICE_INVALID', {'price': sellPriceMinor});
   }
-  final whole = parts[0].isEmpty ? 0 : int.parse(parts[0]);
-  final fracValue = frac.isEmpty ? 0 : int.parse(frac.padRight(decimalPlaces, '0'));
-  final magnitude = whole * _pow10(decimalPlaces) + fracValue;
-  return negative ? -magnitude : magnitude;
 }
 
 /// Render integer minor units as a decimal string for a unit's [decimalPlaces].

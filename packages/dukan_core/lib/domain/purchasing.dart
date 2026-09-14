@@ -4,6 +4,8 @@
 /// supplier. The supplier balance is derived from an append-only ledger.
 library;
 
+import '../shared/errors.dart';
+
 enum SupplierEntryType { bill, payment, adjustment }
 
 final class Supplier {
@@ -60,4 +62,14 @@ final class ReceiptLine {
   final int unitCostMinor;
 
   int get lineCost => unitCostMinor * qtyMinor;
+}
+
+/// A received line adds a positive quantity at a cost of zero or more (zero: a
+/// quantity-only receipt). Raises [ValidationError] `GRN_LINE_INVALID`.
+void assertReceivable(ReceiptLine line) {
+  if (line.qtyMinor <= 0 || line.unitCostMinor < 0) {
+    throw ValidationError('GRN_LINE_INVALID', {
+      'product_id': line.productId, 'qty': line.qtyMinor, 'cost': line.unitCostMinor,
+    });
+  }
 }
