@@ -69,7 +69,7 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | Table, op | Permission (branch) | Rules |
 |---|---|---|
 | products insert | product.manage (active) | the unit exists; `category_id` and `cost_*` must be null |
-| products update | product.manage (active), plus price.change when the price or currency changes | `base_version` required; only `name`, `sell_price_minor`, `sell_currency`, `is_active` |
+| products update | product.manage (active), plus price.change when the price or currency changes, plus purchase.cost for a cost | `base_version` required; only `name`, `sell_price_minor`, `sell_currency`, `is_active`, `cost_minor` (a goods receipt's cost, in the selling currency) |
 | barcodes insert | product.manage (active) | the product exists |
 | units insert | any role in the active branch for the device seed (piece/0, kg/3, litre/3, dozen/0, meter/2); product.manage otherwise | |
 | customers insert | sale.create (active) | a credit limit other than 0 (null is unlimited) without customer.credit is stored as 0, and the audit keeps the requested limit |
@@ -109,7 +109,14 @@ A recorded outcome belongs to the user who pushed it. When another user pushes t
 
 ## Master data concurrency
 
-An update is a compare-and-set: `UPDATE … WHERE id = :row_id AND version = :base_version AND deleted_at IS NULL`, then `version + 1`. Zero rows updated is a `conflict`, so two concurrent pushes can never both win. The pulled post-image carries the new `version` and the client stores it, so its next edit sends a current `base_version`.
+An update is a compare-and-set: `UPDATE … WHERE id = :row_id AND version = :base_version AND deleted_at IS NULL`, then `version + 1`. Zero rows updated is a `conflict`, so two concurrent pushes can never both win. REST edits bump the version too (`PATCH /products/{id}` takes an optional `version` and answers `PRODUCT_VERSION_CONFLICT` when it is stale).
+
+- A device bumps its local version with each edit and sends the version before the edit as `base_version`, so offline edits to one row chain.
+- An applied master op returns the row's new `version`. A conflict returns `current`, the server's row as the pusher may read it (replays too).
+- On a conflict the server's state wins. The device replaces its local copy with `current` and keeps the edit in a review list (Sync issues).
+  - There the user can apply it again: the edit is written locally and queued against the server's version.
+  - Or set it aside: it stays in the outbox for support, off the counts.
+- A pulled master post-image older than the local row is skipped, so edits not yet pushed are never rewound.
 
 ## Attribution
 
@@ -142,13 +149,26 @@ Two rules keep one user's pull from undoing another's work on a shared device:
 - A product post-image older than the local row is skipped. The local row is newer when it carries edits not yet pushed.
 - A branch row whose branch cannot be told is visible to nobody. Migration 0008 back-fills the branch of feed rows logged before `change_log.branch_id` existed.
 
+## Change feed and device time
+
+- **One feed for every write.** Every write to a synced table, through sync or REST (products, barcodes, stock, customers, debt payments, suppliers, receipts, sales, voids), appends the row's post-image to `change_log` in the same transaction.
+  - On PostgreSQL a transaction-scoped advisory lock taken before the append and held until commit makes `seq` follow commit order, so a pull never passes a row that commits later.
+- **Restores.** Pull returns `max_seq`. A device whose cursor is past it is talking to a server restored from a backup, and reads the feed again from the start (applying is idempotent).
+- **Device time.** Append-only rows (sales, stock movements, customer and supplier ledger entries) take the op's `created_at`, the moment the device recorded it, when it lies between 45 days before and 5 minutes after the server's clock. Otherwise they take the server's time. A till offline from Monday to Wednesday keeps Monday's sales on Monday. `occurred_at` itself is still never accepted in `data`.
+- **Unreadable changes.** A pulled change the device cannot read is set aside (app setting `sync.quarantine`, the last 50) and the cursor still advances, so one bad row never stops every device's pull.
+- **Receipt costs** travel as a `products` update of `cost_minor` against the version the device read.
+- **Device identity.** Each install makes a UUIDv7 once and keeps it. It is sent at sign-in and push.
+  - Sale numbers are `INV-<last 6 of the device id>-<local date>-<n>`, counted inside the settle transaction.
+  - The server keeps a sale whose number another sale in the branch already has, and flags it in the audit entry (`number_taken`).
+- **When it syncs.** The app syncs a few seconds after a local write and every two minutes while someone is signed in. Its counts follow the outbox live.
+
 ## Known limitations
 
 - No tombstones yet: soft deletes do not reach devices.
-- No document atomicity: a sale's rows apply one op at a time. A header counts in reports as soon as it arrives, even while its lines are still queued; money against it (payments, charges) waits for the lines.
+- No document atomicity: a sale's rows apply one op at a time. A header counts in reports as soon as it arrives, even while its lines are still queued; money against it (payments, charges) waits for the lines. Grouping a device transaction into one all-or-nothing push is still to do.
+- A rejected append-only op (a sale line, a payment) is not undone on the device: it is listed for review, and its local effect stays until someone acts on it.
 - Line prices are the device's price at sale time. The server does not reprice them; the audit entry records the catalog price next to it, and flags a line under it (`below_catalog`). A line under every price the product had in the last 45 days needs sale.discount or price.change (`ACCESS_DENIED`, retried: granting the role lets it apply). The price history comes from the audit trail's `product.price_changed` entries.
-- `change_log.seq` is assigned before commit, so on PostgreSQL a pull can pass a row that commits later (review theme 6).
-- Business numbers are not leased yet (decision B below): devices number sales locally.
+- Business numbers are not leased yet (decision B below); device-prefixed numbers keep devices from colliding.
 
 ## Rollout of the hardened push
 

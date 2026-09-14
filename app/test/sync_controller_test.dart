@@ -27,6 +27,7 @@ ProviderContainer _container(AppDatabase db, FakeSyncClient client, SessionActor
     databaseProvider.overrideWithValue(db),
     syncClientProvider.overrideWithValue(client),
     deviceIdProvider.overrideWithValue('test-device'),
+    autoSyncProvider.overrideWithValue(false),
     sessionActorProvider.overrideWithValue(actor),
   ]);
   addTearDown(container.dispose);
@@ -85,5 +86,28 @@ void main() {
     final status = container.read(syncControllerProvider);
     expect(status.rejected, 1);
     expect(status.pending, 0);
+  });
+
+  test('the counts follow the outbox without a sync, and issues can be set aside', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+    final client = FakeSyncClient(
+      outcome: (op) => PushResult(op.opId, OpOutcome.conflict, code: 'PRODUCTS_ALREADY_EXISTS'),
+    );
+    final c = _container(db, client, _signedIn('u1'));
+    c.read(syncControllerProvider);
+    await LocalCatalog(db).createProduct(_rice('R1'), actorId: 'u1', deviceId: 'test-device');
+    await pumpEventQueue();
+    expect(c.read(syncControllerProvider).pending, 1); // no refresh needed: it is live
+
+    await c.read(syncControllerProvider.notifier).syncNow();
+    await pumpEventQueue();
+    expect(c.read(syncControllerProvider).conflicts, 1);
+    final issues = await c.read(syncIssuesProvider.future);
+    expect((issues.single.table, issues.single.code), ('products', 'PRODUCTS_ALREADY_EXISTS'));
+
+    await c.read(syncEngineProvider).dismiss(issues.single.opId);
+    await pumpEventQueue();
+    expect(c.read(syncControllerProvider).conflicts, 0);
   });
 }

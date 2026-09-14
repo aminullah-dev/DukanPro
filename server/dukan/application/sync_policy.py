@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 from dukan.application.access import require_any_permission, require_permission
@@ -242,10 +242,11 @@ _INSERT: dict[str, dict[str, _Field]] = {
 
 _UPDATE: dict[str, dict[str, _Field]] = {
     "products": {
-        "name": _str(200, required=True),
+        "name": _str(200),
         "sell_price_minor": _int(lo=0, hi=MONEY_MAX),
         "sell_currency": _CURRENCY_F,
         "is_active": _BOOL,
+        "cost_minor": _int(lo=0, hi=MONEY_MAX),  # a goods receipt's cost, purchase.cost
     },
     "customers": {
         "name": _str(128),
@@ -320,6 +321,22 @@ def _check(table: str, name: str, f: _Field, value: Any) -> Any:
 
 
 # ── Envelope ─────────────────────────────────────────────────────────────────
+
+
+# Append-only rows the device dates: a sale made offline on Monday stays on Monday.
+# The device's time (the outbox created_at) counts within a window around the
+# server's clock (the 30-day offline unlock window plus time to push); outside it,
+# or when absent, the server's time is used.
+DATED_TABLES = frozenset({"sales", "stock_movements", "customer_ledger", "supplier_ledger"})
+EVENT_TIME_PAST = timedelta(days=45)
+EVENT_TIME_FUTURE = timedelta(minutes=5)
+
+
+def event_time(recorded_at: str | None, now: datetime) -> datetime:
+    at = parse_recorded_at(recorded_at) if recorded_at else None
+    if at is None or not now - EVENT_TIME_PAST <= at <= now + EVENT_TIME_FUTURE:
+        return now
+    return at.astimezone(UTC)
 
 
 def parse_recorded_at(value: str) -> datetime | None:
@@ -421,6 +438,8 @@ class SyncReader(Protocol):
     def sale_charges_total(self, sale_id: str) -> int: ...
 
     def branch_active(self, branch_id: str) -> bool: ...
+
+    def sale_number_taken(self, branch_id: str, number: str) -> bool: ...
 
     def recent_sell_prices(self, product_id: str, since: datetime) -> frozenset[int]:
         """Every sell price the product had at some moment since `since`."""
@@ -565,10 +584,17 @@ def _products_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     price_changed = "sell_price_minor" in changed or "sell_currency" in changed
     if price_changed:
         _need(ctx, Permission.PRICE_CHANGE, branch)
+    if "cost_minor" in v:
+        # A cost sets every later margin: purchase.cost. It is in the product's
+        # selling currency, as a REST receipt sets it.
+        _need(ctx, Permission.PURCHASE_COST, branch)
+        v = {**v, "cost_currency": v.get("sell_currency", current.values.get("sell_currency"))}
     if price_changed:
         action = "product.price_changed"
     elif changed.get("is_active") is False:
         action = "product.deactivated"
+    elif set(changed) == {"cost_minor"}:
+        action = "cost.valuation_changed"
     else:
         action = "product.updated"
     before = {k: current.values.get(k) for k in changed}
@@ -720,6 +746,9 @@ def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
         v, "number", "branch_id", "customer_id", "currency", "discount_minor", "total_minor",
         "paid_minor",
     )
+    if ctx.reader.sale_number_taken(branch, v["number"]):
+        # Two devices numbered a sale alike: kept (the sale happened), flagged.
+        after = {**after, "number_taken": True}
     return ApplyPlan(v, branch, branch, AuditIntent("sale.settled", "sale", after))
 
 
@@ -896,6 +925,8 @@ def plan_op(
     assert_branch_active(
         branch_id=plan.auth_branch_id, is_active=reader.branch_active(plan.auth_branch_id)
     )
+    if op.op == "insert" and op.table in DATED_TABLES:
+        plan = replace(plan, values={**plan.values, "occurred_at": event_time(op.created_at, now)})
     return plan
 
 

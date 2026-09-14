@@ -113,6 +113,12 @@ class $OutboxEntriesTable extends OutboxEntries
   late final GeneratedColumn<int> baseVersion = GeneratedColumn<int>(
       'base_version', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _lastErrorMeta =
+      const VerificationMeta('lastError');
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+      'last_error', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -130,7 +136,8 @@ class $OutboxEntriesTable extends OutboxEntries
         deviceId,
         actorId,
         status,
-        baseVersion
+        baseVersion,
+        lastError
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -227,6 +234,10 @@ class $OutboxEntriesTable extends OutboxEntries
           baseVersion.isAcceptableOrUnknown(
               data['base_version']!, _baseVersionMeta));
     }
+    if (data.containsKey('last_error')) {
+      context.handle(_lastErrorMeta,
+          lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta));
+    }
     return context;
   }
 
@@ -268,6 +279,8 @@ class $OutboxEntriesTable extends OutboxEntries
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       baseVersion: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}base_version']),
+      lastError: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}last_error']),
     );
   }
 
@@ -294,6 +307,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
   final String actorId;
   final String status;
   final int? baseVersion;
+
+  /// The server's code for an op it conflicted or rejected (shown for review).
+  final String? lastError;
   const OutboxRow(
       {required this.id,
       required this.createdAt,
@@ -310,7 +326,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       required this.deviceId,
       required this.actorId,
       required this.status,
-      this.baseVersion});
+      this.baseVersion,
+      this.lastError});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -337,6 +354,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || baseVersion != null) {
       map['base_version'] = Variable<int>(baseVersion);
+    }
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
     }
     return map;
   }
@@ -367,6 +387,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       baseVersion: baseVersion == null && nullToAbsent
           ? const Value.absent()
           : Value(baseVersion),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
     );
   }
 
@@ -390,6 +413,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       actorId: serializer.fromJson<String>(json['actorId']),
       status: serializer.fromJson<String>(json['status']),
       baseVersion: serializer.fromJson<int?>(json['baseVersion']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
     );
   }
   @override
@@ -412,6 +436,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       'actorId': serializer.toJson<String>(actorId),
       'status': serializer.toJson<String>(status),
       'baseVersion': serializer.toJson<int?>(baseVersion),
+      'lastError': serializer.toJson<String?>(lastError),
     };
   }
 
@@ -431,7 +456,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           String? deviceId,
           String? actorId,
           String? status,
-          Value<int?> baseVersion = const Value.absent()}) =>
+          Value<int?> baseVersion = const Value.absent(),
+          Value<String?> lastError = const Value.absent()}) =>
       OutboxRow(
         id: id ?? this.id,
         createdAt: createdAt ?? this.createdAt,
@@ -449,6 +475,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
         actorId: actorId ?? this.actorId,
         status: status ?? this.status,
         baseVersion: baseVersion.present ? baseVersion.value : this.baseVersion,
+        lastError: lastError.present ? lastError.value : this.lastError,
       );
   OutboxRow copyWithCompanion(OutboxEntriesCompanion data) {
     return OutboxRow(
@@ -472,6 +499,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       status: data.status.present ? data.status.value : this.status,
       baseVersion:
           data.baseVersion.present ? data.baseVersion.value : this.baseVersion,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
     );
   }
 
@@ -493,7 +521,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           ..write('deviceId: $deviceId, ')
           ..write('actorId: $actorId, ')
           ..write('status: $status, ')
-          ..write('baseVersion: $baseVersion')
+          ..write('baseVersion: $baseVersion, ')
+          ..write('lastError: $lastError')
           ..write(')'))
         .toString();
   }
@@ -515,7 +544,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       deviceId,
       actorId,
       status,
-      baseVersion);
+      baseVersion,
+      lastError);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -535,7 +565,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           other.deviceId == this.deviceId &&
           other.actorId == this.actorId &&
           other.status == this.status &&
-          other.baseVersion == this.baseVersion);
+          other.baseVersion == this.baseVersion &&
+          other.lastError == this.lastError);
 }
 
 class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
@@ -555,6 +586,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
   final Value<String> actorId;
   final Value<String> status;
   final Value<int?> baseVersion;
+  final Value<String?> lastError;
   final Value<int> rowid;
   const OutboxEntriesCompanion({
     this.id = const Value.absent(),
@@ -573,6 +605,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     this.actorId = const Value.absent(),
     this.status = const Value.absent(),
     this.baseVersion = const Value.absent(),
+    this.lastError = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   OutboxEntriesCompanion.insert({
@@ -592,6 +625,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     required String actorId,
     this.status = const Value.absent(),
     this.baseVersion = const Value.absent(),
+    this.lastError = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         aggregateType = Value(aggregateType),
@@ -618,6 +652,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     Expression<String>? actorId,
     Expression<String>? status,
     Expression<int>? baseVersion,
+    Expression<String>? lastError,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -637,6 +672,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       if (actorId != null) 'actor_id': actorId,
       if (status != null) 'status': status,
       if (baseVersion != null) 'base_version': baseVersion,
+      if (lastError != null) 'last_error': lastError,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -658,6 +694,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       Value<String>? actorId,
       Value<String>? status,
       Value<int?>? baseVersion,
+      Value<String?>? lastError,
       Value<int>? rowid}) {
     return OutboxEntriesCompanion(
       id: id ?? this.id,
@@ -676,6 +713,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       actorId: actorId ?? this.actorId,
       status: status ?? this.status,
       baseVersion: baseVersion ?? this.baseVersion,
+      lastError: lastError ?? this.lastError,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -731,6 +769,9 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     if (baseVersion.present) {
       map['base_version'] = Variable<int>(baseVersion.value);
     }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -756,6 +797,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
           ..write('actorId: $actorId, ')
           ..write('status: $status, ')
           ..write('baseVersion: $baseVersion, ')
+          ..write('lastError: $lastError, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9940,6 +9982,7 @@ typedef $$OutboxEntriesTableCreateCompanionBuilder = OutboxEntriesCompanion
   required String actorId,
   Value<String> status,
   Value<int?> baseVersion,
+  Value<String?> lastError,
   Value<int> rowid,
 });
 typedef $$OutboxEntriesTableUpdateCompanionBuilder = OutboxEntriesCompanion
@@ -9960,6 +10003,7 @@ typedef $$OutboxEntriesTableUpdateCompanionBuilder = OutboxEntriesCompanion
   Value<String> actorId,
   Value<String> status,
   Value<int?> baseVersion,
+  Value<String?> lastError,
   Value<int> rowid,
 });
 
@@ -10019,6 +10063,9 @@ class $$OutboxEntriesTableFilterComposer
 
   ColumnFilters<int> get baseVersion => $composableBuilder(
       column: $table.baseVersion, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+      column: $table.lastError, builder: (column) => ColumnFilters(column));
 }
 
 class $$OutboxEntriesTableOrderingComposer
@@ -10078,6 +10125,9 @@ class $$OutboxEntriesTableOrderingComposer
 
   ColumnOrderings<int> get baseVersion => $composableBuilder(
       column: $table.baseVersion, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+      column: $table.lastError, builder: (column) => ColumnOrderings(column));
 }
 
 class $$OutboxEntriesTableAnnotationComposer
@@ -10136,6 +10186,9 @@ class $$OutboxEntriesTableAnnotationComposer
 
   GeneratedColumn<int> get baseVersion => $composableBuilder(
       column: $table.baseVersion, builder: (column) => column);
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
 }
 
 class $$OutboxEntriesTableTableManager extends RootTableManager<
@@ -10177,6 +10230,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             Value<String> actorId = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<int?> baseVersion = const Value.absent(),
+            Value<String?> lastError = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               OutboxEntriesCompanion(
@@ -10196,6 +10250,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             actorId: actorId,
             status: status,
             baseVersion: baseVersion,
+            lastError: lastError,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -10215,6 +10270,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             required String actorId,
             Value<String> status = const Value.absent(),
             Value<int?> baseVersion = const Value.absent(),
+            Value<String?> lastError = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               OutboxEntriesCompanion.insert(
@@ -10234,6 +10290,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             actorId: actorId,
             status: status,
             baseVersion: baseVersion,
+            lastError: lastError,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

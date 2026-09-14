@@ -32,6 +32,7 @@ from dukan.domain.sales import (
     assert_settleable,
     compute_totals,
 )
+from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     CustomerLedgerModel,
@@ -177,34 +178,35 @@ class SqlSalesService(SalesService):
             change_minor=change, created_by=actor.id, updated_by=actor.id,
         )
         self._s.add(sale)
+        record_change(self._s, "sales", sale, op="insert", branch_id=branch_id)
         for dl in domain_lines:
-            self._s.add(
-                SaleLineModel(
-                    id=new_id(), sale_id=sale.id, product_id=dl.product_id, name=dl.name,
-                    qty_minor=dl.qty_minor, decimal_places=dl.decimal_places,
-                    unit_price_minor=dl.unit_price_minor, unit_cost_minor=dl.unit_cost_minor,
-                    line_total_minor=dl.line_total, currency=dl.currency, created_by=actor.id,
-                )
+            line_row = SaleLineModel(
+                id=new_id(), sale_id=sale.id, product_id=dl.product_id, name=dl.name,
+                qty_minor=dl.qty_minor, decimal_places=dl.decimal_places,
+                unit_price_minor=dl.unit_price_minor, unit_cost_minor=dl.unit_cost_minor,
+                line_total_minor=dl.line_total, currency=dl.currency, created_by=actor.id,
             )
+            self._s.add(line_row)
+            record_change(self._s, "sale_lines", line_row, op="insert", branch_id=branch_id)
             if products[dl.product_id].track_stock:
-                self._s.add(
-                    StockMovementModel(
-                        id=new_id(), product_id=dl.product_id, branch_id=branch_id,
-                        qty_delta=-dl.qty_minor, reason="sale", ref_type="sale", ref_id=sale.id,
-                        created_by=actor.id,
-                    )
-                )
-        for p in payments:
-            self._s.add(
-                PaymentModel(
-                    id=new_id(), sale_id=sale.id, method=p.method, amount_minor=p.amount_minor,
-                    currency=currency, tendered_minor=p.tendered_minor,
-                    change_minor=(
-                        None if p.tendered_minor is None else p.tendered_minor - p.amount_minor
-                    ),
+                sold = StockMovementModel(
+                    id=new_id(), product_id=dl.product_id, branch_id=branch_id,
+                    qty_delta=-dl.qty_minor, reason="sale", ref_type="sale", ref_id=sale.id,
                     created_by=actor.id,
                 )
+                self._s.add(sold)
+                record_change(self._s, "stock_movements", sold, op="insert", branch_id=branch_id)
+        for p in payments:
+            payment = PaymentModel(
+                id=new_id(), sale_id=sale.id, method=p.method, amount_minor=p.amount_minor,
+                currency=currency, tendered_minor=p.tendered_minor,
+                change_minor=(
+                    None if p.tendered_minor is None else p.tendered_minor - p.amount_minor
+                ),
+                created_by=actor.id,
             )
+            self._s.add(payment)
+            record_change(self._s, "payments", payment, op="insert", branch_id=branch_id)
         # Credit sale: the unpaid remainder goes to the customer ledger (Phase 4).
         if customer_id is not None and paid < totals.total_minor:
             remainder = totals.total_minor - paid
@@ -219,12 +221,12 @@ class SqlSalesService(SalesService):
                 balance_minor=self._customer_balance(customer_id), charge_minor=remainder,
                 credit_limit_minor=customer.credit_limit_minor,
             )
-            self._s.add(
-                CustomerLedgerModel(
-                    id=new_id(), customer_id=customer_id, type="charge", amount_minor=remainder,
-                    currency=currency, ref_type="sale", ref_id=sale.id, created_by=actor.id,
-                )
+            charge = CustomerLedgerModel(
+                id=new_id(), customer_id=customer_id, type="charge", amount_minor=remainder,
+                currency=currency, ref_type="sale", ref_id=sale.id, created_by=actor.id,
             )
+            self._s.add(charge)
+            record_change(self._s, "customer_ledger", charge, op="insert", branch_id=None)
             self._audit(
                 "debt.charge_posted", actor.id, sale.id,
                 {"customer_id": customer_id, "amount": remainder},
@@ -259,14 +261,15 @@ class SqlSalesService(SalesService):
             raise ConflictError("SALE_SHIFT_CLOSED", shift_id=shift.id)
         sale.status = "voided"
         lines = self._s.scalars(select(SaleLineModel).where(SaleLineModel.sale_id == sale.id)).all()
+        record_change(self._s, "sales", sale, op="update", branch_id=sale.branch_id)
         for l in lines:
-            self._s.add(
-                StockMovementModel(
-                    id=new_id(), product_id=l.product_id, branch_id=sale.branch_id,
-                    qty_delta=l.qty_minor, reason="returned", ref_type="void", ref_id=sale.id,
-                    created_by=actor.id,
-                )
+            back = StockMovementModel(
+                id=new_id(), product_id=l.product_id, branch_id=sale.branch_id,
+                qty_delta=l.qty_minor, reason="returned", ref_type="void", ref_id=sale.id,
+                created_by=actor.id,
             )
+            self._s.add(back)
+            record_change(self._s, "stock_movements", back, op="insert", branch_id=sale.branch_id)
         self._audit(
             "sale.voided", actor.id, sale.id,
             {"number": sale.number, "status": "voided", "reason": reason.strip()},

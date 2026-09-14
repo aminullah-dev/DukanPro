@@ -30,6 +30,8 @@ class OutboxEntries extends Table with RecordColumns {
   TextColumn get actorId => text()();
   TextColumn get status => text().withDefault(const Constant('pending'))();
   IntColumn get baseVersion => integer().nullable()();
+  /// The server's code for an op it conflicted or rejected (shown for review).
+  TextColumn get lastError => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -246,7 +248,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -277,11 +279,20 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             await m.createTable(appSettings);
           }
+          if (from < 8 && !await _hasColumn('outbox_entries', 'last_error')) {
+            // First: the v7 step reads the outbox through today's table definition.
+            await m.addColumn(outboxEntries, outboxEntries.lastError);
+          }
           if (from < 7) {
             await _refLegacySaleMovements();
           }
         },
       );
+
+  Future<bool> _hasColumn(String table, String column) async {
+    final rows = await customSelect('PRAGMA table_info("$table")').get();
+    return rows.any((r) => r.read<String>('name') == column);
+  }
 
   /// Sale stock movements the app recorded before v7 carry no ref to their
   /// sale, and the hardened server rejects them (docs/sync-protocol.md,

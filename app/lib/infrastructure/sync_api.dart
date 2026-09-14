@@ -65,6 +65,7 @@ class DioSyncClient implements SyncClient {
       final changes = (data['changes'] as List).cast<Map<String, dynamic>>();
       return PullResult(
         watermark: (data['watermark'] as num).toInt(),
+        maxSeq: (data['max_seq'] as num?)?.toInt(),
         changed: changes.map((c) => c.cast<String, Object?>()).toList(growable: false),
         tombstones: const [],
       );
@@ -82,8 +83,10 @@ class DioSyncClient implements SyncClient {
   PushResult _toPushResult(Map<String, dynamic> j) => PushResult(
         j['op_id'] as String,
         _outcome(j['outcome'] as String),
-        version: (j['server_seq'] as num?)?.toInt(),
+        version: (j['version'] as num?)?.toInt(),
+        serverSeq: (j['server_seq'] as num?)?.toInt(),
         code: j['code'] as String?,
+        current: (j['current'] as Map?)?.cast<String, Object?>(),
       );
 
   OpOutcome _outcome(String s) => switch (s) {

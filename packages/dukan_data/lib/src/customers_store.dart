@@ -44,6 +44,8 @@ final class LocalCustomers {
             creditLimitMinor: Value(creditLimitMinor),
             updatedBy: Value(actorId),
             updatedAt: Value(DateTime.now().toUtc()),
+            // The next edit chains on this one; a pull of an older image leaves it.
+            version: Value(c.version + 1),
           ));
       await _rec.record(
         table: 'customers', rowId: c.id, op: 'update', baseVersion: c.version,
@@ -147,6 +149,21 @@ final class LocalPurchasing {
       0, (sum, r) => sum + (r.type == 'payment' ? -r.amountMinor : r.amountMinor));
   }
 
+  /// A received cost is a versioned product edit, so it reaches the server and
+  /// every other device, in the product's selling currency.
+  Future<void> _recordCost(ReceiptLine l, {required String actorId, required String deviceId}) async {
+    final p = await (_db.select(_db.products)..where((t) => t.id.equals(l.productId))).getSingleOrNull();
+    if (p == null || p.costMinor == l.unitCostMinor) return;
+    await (_db.update(_db.products)..where((t) => t.id.equals(p.id))).write(ProductsCompanion(
+      costMinor: Value(l.unitCostMinor), costCurrency: Value(p.sellCurrency),
+      updatedAt: Value(DateTime.now().toUtc()), version: Value(p.version + 1),
+    ));
+    await _rec.record(
+      table: 'products', rowId: p.id, op: 'update', baseVersion: p.version,
+      data: {'cost_minor': l.unitCostMinor}, actorId: actorId, deviceId: deviceId,
+    );
+  }
+
   Future<void> receiveGoods({
     String? supplierId,
     required List<ReceiptLine> lines,
@@ -163,16 +180,9 @@ final class LocalPurchasing {
               id: movementId, productId: l.productId, branchId: branchId,
               qtyDelta: l.qtyMinor, reason: 'purchase', createdBy: Value(actorId),
             ));
-        if (l.unitCostMinor > 0) {
-          // A receipt without a cost (a stock keeper's) says nothing about the
-          // price paid: the product keeps its cost, as on the server.
-          await (_db.update(_db.products)..where((t) => t.id.equals(l.productId))).write(
-            ProductsCompanion(
-              costMinor: Value(l.unitCostMinor), costCurrency: const Value('AFN'),
-              updatedAt: Value(DateTime.now().toUtc()),
-            ),
-          );
-        }
+        // A receipt without a cost (a stock keeper's) says nothing about the price
+        // paid: the product keeps its cost, as on the server.
+        if (l.unitCostMinor > 0) await _recordCost(l, actorId: actorId, deviceId: deviceId);
         await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
           'product_id': l.productId, 'branch_id': branchId, 'qty_delta': l.qtyMinor, 'reason': 'purchase',
         }, actorId: actorId, deviceId: deviceId);

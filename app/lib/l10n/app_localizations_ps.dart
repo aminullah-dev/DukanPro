@@ -431,6 +431,28 @@ class AppLocalizationsPs extends AppLocalizations {
   String get errGeneric => 'یوه ستونزه رامنځته شوه. بیا هڅه وکړئ.';
 
   @override
+  String get syncIssuesTitle => 'د همغږۍ ستونزې';
+
+  @override
+  String get syncIssuesReview => 'کتنه';
+
+  @override
+  String get syncIssueConflict =>
+      'مخکې په بل ځای کې بدل شوی و؛ هغه بدلون وساتل شو';
+
+  @override
+  String get syncIssueRejected => 'سرور دا بدلون ونه مانه';
+
+  @override
+  String get syncIssueRetry => 'بیا یې پلي کړئ';
+
+  @override
+  String get syncIssueDismiss => 'یو طرف ته یې کېږدئ';
+
+  @override
+  String get syncIssuesEmpty => 'د کتنې لپاره هیڅ نشته.';
+
+  @override
   String get errUnitUnknown =>
       'د دې توکي واحد لا نه دی راغلی. همغږي یې کړئ، بیا هڅه وکړئ.';
 

@@ -16,6 +16,7 @@ from dukan.domain.catalog import (
 )
 from dukan.domain.identity import Permission, PermissionPolicy, User
 from dukan.domain.inventory import adjust_stock
+from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     BarcodeModel,
@@ -26,7 +27,7 @@ from dukan.infrastructure.db.models import (
     UnitModel,
 )
 from dukan.infrastructure.scope import require_active_branch
-from dukan.shared.errors import NotFoundError, ValidationError
+from dukan.shared.errors import ConflictError, NotFoundError, ValidationError
 from dukan.shared.ids import new_id
 from dukan.shared.money import Money
 
@@ -71,15 +72,14 @@ class SqlCatalogService(CatalogService):
             id=p.id, sku=p.sku, name=p.name, unit_id=p.unit_id,
             sell_price_minor=p.sell_price_minor, sell_currency=p.sell_currency,
             category_id=p.category_id, track_stock=p.track_stock, is_active=p.is_active,
-            on_hand=self._on_hand(p.id, branch_id), barcodes=tuple(codes),
+            on_hand=self._on_hand(p.id, branch_id), barcodes=tuple(codes), version=p.version,
         )
 
-    def _get(self, product_id: str) -> ProductModel:
-        p = self._s.scalar(
-            select(ProductModel).where(
-                ProductModel.id == product_id, ProductModel.deleted_at.is_(None)
-            )
+    def _get(self, product_id: str, *, lock: bool = False) -> ProductModel:
+        stmt = select(ProductModel).where(
+            ProductModel.id == product_id, ProductModel.deleted_at.is_(None)
         )
+        p = self._s.scalar(stmt.with_for_update() if lock else stmt)
         if p is None:
             raise NotFoundError("PRODUCT_NOT_FOUND", product_id=product_id)
         return p
@@ -139,6 +139,7 @@ class SqlCatalogService(CatalogService):
             created_by=actor.id, updated_by=actor.id,
         )
         self._s.add(product)
+        record_change(self._s, "products", product, op="insert", branch_id=None)
         for code in barcodes:
             taken = self._s.scalar(
                 select(BarcodeModel).where(
@@ -146,9 +147,11 @@ class SqlCatalogService(CatalogService):
                 )
             ) is not None
             assert_unique_barcode(code=code, taken=taken)
-            self._s.add(
-                BarcodeModel(id=new_id(), product_id=product.id, code=code, created_by=actor.id)
+            barcode = BarcodeModel(
+                id=new_id(), product_id=product.id, code=code, created_by=actor.id
             )
+            self._s.add(barcode)
+            record_change(self._s, "barcodes", barcode, op="insert", branch_id=None)
         self._audit("product.created", actor.id, product.id, {"sku": sku, "name": name})
         self._s.commit()
         return self._view(product, branch_id)
@@ -162,10 +165,16 @@ class SqlCatalogService(CatalogService):
         name: str | None,
         sell_price_minor: int | None,
         is_active: bool | None,
+        version: int | None = None,
     ) -> ProductView:
         require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
         require_active_branch(self._s, branch_id)
-        product = self._get(product_id)
+        product = self._get(product_id, lock=True)
+        if version is not None and version != product.version:
+            # An edit made against an older version is a conflict, never an overwrite.
+            raise ConflictError(
+                "PRODUCT_VERSION_CONFLICT", base_version=version, current_version=product.version
+            )
         if name is not None:
             product.name = name
         if is_active is not None:
@@ -182,6 +191,8 @@ class SqlCatalogService(CatalogService):
                 after={"price_minor": sell_price_minor}, before={"price_minor": before},
             )
         product.updated_by = actor.id
+        product.version += 1  # devices send it back as base_version with their next edit
+        record_change(self._s, "products", product, op="update", branch_id=None)
         self._s.commit()
         return self._view(product, branch_id)
 
@@ -197,9 +208,9 @@ class SqlCatalogService(CatalogService):
             )
         ) is not None
         assert_unique_barcode(code=code, taken=taken)
-        self._s.add(
-            BarcodeModel(id=new_id(), product_id=product.id, code=code, created_by=actor.id)
-        )
+        barcode = BarcodeModel(id=new_id(), product_id=product.id, code=code, created_by=actor.id)
+        self._s.add(barcode)
+        record_change(self._s, "barcodes", barcode, op="insert", branch_id=None)
         self._audit("barcode.added", actor.id, product.id, {"code": code})
         self._s.commit()
         return self._view(product, branch_id)
@@ -235,13 +246,13 @@ class SqlCatalogService(CatalogService):
             id=new_id(), product_id=product.id, branch_id=branch_id,
             qty_delta=qty_delta, at=datetime.now(UTC),
         )
-        self._s.add(
-            StockMovementModel(
-                id=movement.id, product_id=movement.product_id, branch_id=movement.branch_id,
-                qty_delta=movement.qty_delta, reason=movement.reason.value,
-                occurred_at=movement.occurred_at, created_by=actor.id,
-            )
+        row = StockMovementModel(
+            id=movement.id, product_id=movement.product_id, branch_id=movement.branch_id,
+            qty_delta=movement.qty_delta, reason=movement.reason.value,
+            occurred_at=movement.occurred_at, created_by=actor.id,
         )
+        self._s.add(row)
+        record_change(self._s, "stock_movements", row, op="insert", branch_id=branch_id)
         self._audit("stock.adjusted", actor.id, product.id, {"qty_delta": qty_delta})
         self._s.commit()
         return self._view(product, branch_id)

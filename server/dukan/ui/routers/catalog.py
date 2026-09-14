@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from dukan.application.catalog import CatalogService
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_catalog_service, get_current_actor
-from dukan.ui.fields import Currency, Id, Money, Str64, Str200
+from dukan.ui.fields import Currency, Id, Int32, Money, Str64, Str200
 from dukan.ui.serializers import product_view_dict
 
 router = APIRouter(tags=["catalog"])
@@ -35,6 +35,7 @@ class UpdateProductRequest(BaseModel):
     name: Str200 | None = None
     sell_price_minor: Money | None = None
     is_active: bool | None = None
+    version: Int32 | None = None  # the version edited; a newer one is a conflict
 
 
 class AddBarcodeRequest(BaseModel):
@@ -107,6 +108,7 @@ def update_product(
             name=body.name,
             sell_price_minor=body.sell_price_minor,
             is_active=body.is_active,
+            version=body.version,
         )
     )
 

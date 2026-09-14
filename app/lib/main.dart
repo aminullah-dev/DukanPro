@@ -13,6 +13,7 @@ import 'features/insights/insights_providers.dart';
 import 'infrastructure/audit_api.dart';
 import 'infrastructure/auth_api.dart';
 import 'infrastructure/biometric.dart';
+import 'infrastructure/device_id.dart';
 import 'infrastructure/http.dart';
 import 'infrastructure/iam_api.dart';
 import 'infrastructure/insights_api.dart';
@@ -26,6 +27,7 @@ import 'router.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final db = await openAppDatabase();
+  final deviceId = await loadDeviceId(db);
   const apiBase = String.fromEnvironment('DUKAN_API', defaultValue: 'http://localhost:8088');
   final secureStore = FlutterSecureStore();
   final authApi = DioAuthApi(baseUrl: apiBase);
@@ -37,6 +39,7 @@ Future<void> main() async {
   final container = ProviderContainer(
     overrides: [
       databaseProvider.overrideWithValue(db),
+      deviceIdProvider.overrideWithValue(deviceId),
       secureStoreProvider.overrideWithValue(secureStore),
       authApiProvider.overrideWithValue(authApi),
       tokenRefresherProvider.overrideWithValue(refresher),

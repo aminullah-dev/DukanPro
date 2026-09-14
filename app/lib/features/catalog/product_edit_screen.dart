@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
+import '../auth/providers.dart';
 import 'catalog_providers.dart';
 
 // Field bounds mirror the server's columns (docs/sync-protocol.md, "Push
@@ -101,7 +102,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
         final barcodes = _barcode.text.trim().isEmpty
             ? <Barcode>[]
             : [Barcode(id: newId(), productId: id, code: _barcode.text.trim())];
-        await catalog.createProduct(product, barcodes: barcodes, actorId: actor.user.id, deviceId: 'app');
+        await catalog.createProduct(product, barcodes: barcodes, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
       } else {
         final p = widget.product!;
         final product = Product(
@@ -109,7 +110,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
           sellPrice: Money(priceMinor, 'AFN'), categoryId: p.categoryId, cost: p.cost,
           trackStock: _track, isActive: p.isActive, version: p.version,
         );
-        await catalog.updateProduct(product, actorId: actor.user.id, deviceId: 'app');
+        await catalog.updateProduct(product, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
       }
       if (mounted) Navigator.of(context).pop();
     } on AppError catch (e) {

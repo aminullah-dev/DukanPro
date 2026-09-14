@@ -839,6 +839,48 @@ abstract class AppLocalizations {
   /// **'Something went wrong. Please try again.'**
   String get errGeneric;
 
+  /// No description provided for @syncIssuesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync issues'**
+  String get syncIssuesTitle;
+
+  /// No description provided for @syncIssuesReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get syncIssuesReview;
+
+  /// No description provided for @syncIssueConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'changed elsewhere first; that change was kept'**
+  String get syncIssueConflict;
+
+  /// No description provided for @syncIssueRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'the server did not accept this change'**
+  String get syncIssueRejected;
+
+  /// No description provided for @syncIssueRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply again'**
+  String get syncIssueRetry;
+
+  /// No description provided for @syncIssueDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Set aside'**
+  String get syncIssueDismiss;
+
+  /// No description provided for @syncIssuesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to review.'**
+  String get syncIssuesEmpty;
+
   /// No description provided for @errUnitUnknown.
   ///
   /// In en, this message translates to:

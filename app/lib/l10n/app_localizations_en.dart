@@ -434,6 +434,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errGeneric => 'Something went wrong. Please try again.';
 
   @override
+  String get syncIssuesTitle => 'Sync issues';
+
+  @override
+  String get syncIssuesReview => 'Review';
+
+  @override
+  String get syncIssueConflict =>
+      'changed elsewhere first; that change was kept';
+
+  @override
+  String get syncIssueRejected => 'the server did not accept this change';
+
+  @override
+  String get syncIssueRetry => 'Apply again';
+
+  @override
+  String get syncIssueDismiss => 'Set aside';
+
+  @override
+  String get syncIssuesEmpty => 'Nothing to review.';
+
+  @override
   String get errUnitUnknown =>
       'This product\'s unit isn\'t loaded yet. Sync, then try again.';
 

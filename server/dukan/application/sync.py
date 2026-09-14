@@ -26,8 +26,10 @@ class OpInput:
 class OpResult:
     op_id: str
     outcome: str  # applied | conflict | rejected
-    server_seq: int | None = None
+    server_seq: int | None = None  # the change_log seq of an applied op
     code: str | None = None
+    version: int | None = None  # the master row's new version, when just applied
+    current: dict[str, Any] | None = None  # the server's row, for a conflict
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +45,7 @@ class ChangeItem:
 class PullResult:
     changes: list[ChangeItem]
     watermark: int
+    max_seq: int = 0  # the feed's newest seq: a device ahead of it was restored from
 
 
 class SyncService(Protocol):

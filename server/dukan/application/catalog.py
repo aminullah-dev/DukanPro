@@ -21,6 +21,7 @@ class ProductView:
     is_active: bool
     on_hand: int
     barcodes: tuple[str, ...]
+    version: int = 1
 
 
 class CatalogService(Protocol):
@@ -50,6 +51,7 @@ class CatalogService(Protocol):
         name: str | None,
         sell_price_minor: int | None,
         is_active: bool | None,
+        version: int | None = None,
     ) -> ProductView: ...
 
     def add_barcode(

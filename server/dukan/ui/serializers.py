@@ -79,6 +79,7 @@ def product_view_dict(v: ProductView) -> dict:
         "is_active": v.is_active,
         "on_hand": v.on_hand,
         "barcodes": list(v.barcodes),
+        "version": v.version,
     }
 
 

@@ -31,7 +31,7 @@ class OpReq(BaseModel):
     data: dict[str, Any] = {}
     base_version: int | None = None
     actor_id: str | None = None  # outbox actorId: must equal the pusher when present
-    created_at: str | None = None  # outbox createdAt: informational (audit only)
+    created_at: str | None = None  # outbox createdAt: dates append-only rows (see policy)
 
 
 class PushRequest(BaseModel):
@@ -57,7 +57,10 @@ def push(body: PushRequest, actor: Actor, svc: Sync, x_branch_id: BranchHeader =
     )
     return {
         "results": [
-            {"op_id": r.op_id, "outcome": r.outcome, "server_seq": r.server_seq, "code": r.code}
+            {
+                "op_id": r.op_id, "outcome": r.outcome, "server_seq": r.server_seq,
+                "code": r.code, "version": r.version, "current": r.current,
+            }
             for r in results
         ]
     }
@@ -73,6 +76,7 @@ def pull(
     result = svc.pull(actor=actor, since=since, limit=limit)
     return {
         "watermark": result.watermark,
+        "max_seq": result.max_seq,
         "changes": [
             {"seq": c.seq, "table": c.table, "row_id": c.row_id, "op": c.op, "data": c.data}
             for c in result.changes

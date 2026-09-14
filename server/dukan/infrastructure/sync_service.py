@@ -11,6 +11,7 @@ applied them), so nothing double-counts.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -21,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from dukan.application.sync import ChangeItem, OpInput, OpResult, PullResult, SyncService
 from dukan.application.sync_policy import (
+    MASTER_TABLES,
     READ_FIELDS,
     CustomerRef,
     ProductRef,
@@ -38,6 +40,7 @@ from dukan.application.sync_policy import (
 )
 from dukan.domain.customers import CustomerLedgerEntry, LedgerEntryType, ledger_balance
 from dukan.domain.identity import User
+from dukan.infrastructure.change_feed import post_image, record_change
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     BarcodeModel,
@@ -75,10 +78,6 @@ _MODELS: dict[str, type[Any]] = {
     "customer_ledger": CustomerLedgerModel,
     "supplier_ledger": SupplierLedgerModel,
 }
-
-
-def _jsonable(value: Any) -> Any:
-    return value.isoformat() if isinstance(value, datetime) else value
 
 
 def _snapshot(table: str, row: Any) -> RowSnapshot | None:
@@ -198,6 +197,14 @@ class _SqlSyncReader:
         b = self._s.get(BranchModel, branch_id)
         return b is not None and b.deleted_at is None and b.is_active
 
+    def sale_number_taken(self, branch_id: str, number: str) -> bool:
+        return self._s.scalar(
+            select(SaleModel.id).where(
+                SaleModel.branch_id == branch_id, SaleModel.number == number,
+                SaleModel.deleted_at.is_(None),
+            ).limit(1)
+        ) is not None
+
     def recent_sell_prices(self, product_id: str, since: datetime) -> frozenset[int]:
         """The price now and both sides of every price change since `since`, from
         the audit trail (REST records `price_minor`, sync `sell_price_minor`)."""
@@ -239,7 +246,7 @@ class SqlSyncService(SyncService):
         prior = self._s.get(ProcessedOpModel, op.op_id)
         if prior is not None:
             if prior.actor_id in (None, actor.id):
-                return self._replay(prior)
+                return self._replay(prior, actor, op)
             if prior.result == "applied":
                 # The op_id is spent on another user's write: this op can never apply.
                 return OpResult(op_id=op.op_id, outcome="rejected", code="SYNC_OP_ID_TAKEN")
@@ -256,7 +263,7 @@ class SqlSyncService(SyncService):
                 raise InfrastructureError("SYNC_UNAVAILABLE") from e
         for attempt in (1, 2):
             try:
-                seq = self._apply(actor, device_id, branch_id, op)
+                seq, version = self._apply(actor, device_id, branch_id, op)
                 self._s.add(
                     ProcessedOpModel(
                         op_id=op.op_id, result="applied", server_seq=seq, actor_id=actor.id,
@@ -264,10 +271,13 @@ class SqlSyncService(SyncService):
                     )
                 )
                 self._s.commit()
-                return OpResult(op_id=op.op_id, outcome="applied", server_seq=seq)
+                return OpResult(
+                    op_id=op.op_id, outcome="applied", server_seq=seq, version=version
+                )
             except SyncConflict as e:
                 self._s.rollback()
-                return self._settle(op, actor, device_id, "conflict", e.code)
+                settled = self._settle(op, actor, device_id, "conflict", e.code)
+                return replace(settled, current=self._current(actor, op))
             except AppError as e:
                 self._s.rollback()
                 return self._settle(op, actor, device_id, "rejected", e.code)
@@ -277,7 +287,7 @@ class SqlSyncService(SyncService):
                 self._s.rollback()
                 prior = self._s.get(ProcessedOpModel, op.op_id)
                 if prior is not None:
-                    return self._replay(prior)
+                    return self._replay(prior, actor, op)
                 if attempt == 2:
                     break
             except OperationalError as e:
@@ -289,10 +299,23 @@ class SqlSyncService(SyncService):
                 break
         return OpResult(op_id=op.op_id, outcome="rejected", code="ROW_INVALID")
 
-    def _replay(self, prior: ProcessedOpModel) -> OpResult:
-        return OpResult(
+    def _replay(self, prior: ProcessedOpModel, actor: User, op: OpInput) -> OpResult:
+        result = OpResult(
             op_id=prior.op_id, outcome=prior.result, server_seq=prior.server_seq, code=prior.code
         )
+        if prior.result == "conflict":
+            return replace(result, current=self._current(actor, op))
+        return result
+
+    def _current(self, actor: User, op: OpInput) -> dict[str, Any] | None:
+        """The server's row for a conflicted master op, as this user may read it: the
+        device replaces its losing local copy with it."""
+        if op.table not in MASTER_TABLES:
+            return None
+        row = self._s.get(_MODELS[op.table], op.row_id)
+        if row is None or row.deleted_at is not None:
+            return None
+        return PullScope.for_actor(actor).view(op.table, None, post_image(op.table, row))
 
     def _settle(
         self, op: OpInput, actor: User, device_id: str, outcome: str, code: str
@@ -311,13 +334,17 @@ class SqlSyncService(SyncService):
                 self._s.rollback()
                 prior = self._s.get(ProcessedOpModel, op.op_id)
                 if prior is not None:
-                    return self._replay(prior)
+                    return self._replay(prior, actor, op)
             except OperationalError as e:
                 self._s.rollback()
                 raise InfrastructureError("SYNC_UNAVAILABLE") from e
         return OpResult(op_id=op.op_id, outcome=outcome, code=code)
 
-    def _apply(self, actor: User, device_id: str, branch_id: str | None, op: OpInput) -> int:
+    def _apply(
+        self, actor: User, device_id: str, branch_id: str | None, op: OpInput
+    ) -> tuple[int, int | None]:
+        """Writes the op; returns its change_log seq and, for a master row, its new
+        version."""
         check_envelope(op, actor)
         model = _MODELS[op.table]
         now = datetime.now(UTC)
@@ -354,13 +381,7 @@ class SqlSyncService(SyncService):
                     f"{op.table.upper()}_VERSION_CONFLICT", base_version=op.base_version
                 )
             row = self._s.get(model, op.row_id, populate_existing=True)
-        image = {k: _jsonable(getattr(row, k)) for k in READ_FIELDS[op.table]}
-        entry = ChangeLogModel(
-            table_name=op.table, row_id=op.row_id, op=op.op, data=image,
-            branch_id=plan.row_branch_id,
-        )
-        self._s.add(entry)
-        self._s.flush()
+        seq = record_change(self._s, op.table, row, op=op.op, branch_id=plan.row_branch_id)
         self._s.add(
             AuditEntryModel(
                 id=new_id(),
@@ -383,7 +404,7 @@ class SqlSyncService(SyncService):
                 origin="sync",
             )
         )
-        return entry.seq
+        return seq, (row.version if op.table in MASTER_TABLES else None)
 
     # ---- pull -------------------------------------------------------------
     def pull(self, *, actor: User, since: int, limit: int) -> PullResult:
@@ -405,4 +426,7 @@ class SqlSyncService(SyncService):
                 )
         # The watermark advances past rows this actor may not see, so paging stays
         # monotonic and a scoped reader never re-scans them.
-        return PullResult(changes=changes, watermark=rows[-1].seq if rows else since)
+        max_seq = int(self._s.scalar(select(func.max(ChangeLogModel.seq))) or 0)
+        return PullResult(
+            changes=changes, watermark=rows[-1].seq if rows else since, max_seq=max_seq
+        )

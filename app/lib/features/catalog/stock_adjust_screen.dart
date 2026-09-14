@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
+import '../auth/providers.dart';
 import 'catalog_providers.dart';
 
 class StockAdjustScreen extends ConsumerStatefulWidget {
@@ -51,7 +52,7 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
             branchId: branchId,
             qtyDelta: qtyDelta,
             actorId: actor.user.id,
-            deviceId: 'app',
+            deviceId: ref.read(deviceIdProvider),
           );
       ref.invalidate(onHandProvider((widget.product.id, branchId)));
       if (mounted) Navigator.of(context).pop();

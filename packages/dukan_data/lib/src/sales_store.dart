@@ -70,10 +70,10 @@ final class LocalSales {
     }
     final change = onCredit ? 0 : (tendered - totals.totalMinor);
     final saleId = newId();
-    final number = await _nextNumber();
     late SaleRow saved;
 
     await _db.transaction(() async {
+      final number = await _nextNumber(deviceId);
       await _db.into(_db.sales).insert(SalesCompanion.insert(
             id: saleId, number: number, branchId: branchId, customerId: Value(customerId),
             status: const Value('settled'), currency: Value(currency),
@@ -157,12 +157,21 @@ final class LocalSales {
     return ledgerBalance(entries);
   }
 
-  Future<String> _nextNumber() async {
-    final countCol = _db.sales.id.count();
-    final row = await (_db.selectOnly(_db.sales)..addColumns([countCol])).getSingle();
-    final n = (row.read(countCol) ?? 0) + 1;
+  /// A sale number no other device can issue: `INV-<device>-<local date>-<n>`.
+  /// Counted inside the settle transaction, so two settles on one till never
+  /// share one either.
+  Future<String> _nextNumber(String deviceId) async {
     final now = DateTime.now();
     String two(int x) => x.toString().padLeft(2, '0');
-    return 'INV-${now.year}${two(now.month)}${two(now.day)}-${n.toString().padLeft(4, '0')}';
+    final device = deviceId.replaceAll(RegExp('[^A-Za-z0-9]'), '');
+    final tag = (device.length > 6 ? device.substring(device.length - 6) : device).toUpperCase();
+    final prefix = 'INV-$tag-${now.year}${two(now.month)}${two(now.day)}-';
+    final countCol = _db.sales.id.count();
+    final row = await (_db.selectOnly(_db.sales)
+          ..addColumns([countCol])
+          ..where(_db.sales.number.like('$prefix%')))
+        .getSingle();
+    final n = (row.read(countCol) ?? 0) + 1;
+    return '$prefix${n.toString().padLeft(4, '0')}';
   }
 }

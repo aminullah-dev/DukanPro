@@ -7,6 +7,7 @@ import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
 import '../customers/customers_providers.dart';
+import '../auth/providers.dart';
 
 class ReceiveStockScreen extends ConsumerStatefulWidget {
   const ReceiveStockScreen({super.key});
@@ -71,7 +72,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
       await ref.read(localPurchasingProvider).receiveGoods(
             supplierId: canCost ? _supplierId : null,
             lines: [line],
-            branchId: actor.branchId, actorId: actor.user.id, deviceId: 'app',
+            branchId: actor.branchId, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider),
           );
       ref
         ..invalidate(productsProvider)

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
+import 'sync_issues_screen.dart';
 import 'sync_providers.dart';
 
 /// AppBar action: a cloud icon that triggers [SyncController.syncNow], badged
@@ -90,6 +91,13 @@ class SyncStatusCard extends ConsumerWidget {
                     Text(
                       l.syncRejected(status.rejected),
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                    ),
+                  if (status.conflicts > 0 || status.rejected > 0)
+                    TextButton(
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                      onPressed: () => Navigator.of(context)
+                          .push(MaterialPageRoute<void>(builder: (_) => const SyncIssuesScreen())),
+                      child: Text(l.syncIssuesReview),
                     ),
                 ],
               ),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
+import '../auth/providers.dart';
 import 'customers_providers.dart';
 
 String _afn(int minor) => formatQuantity(minor, 2);
@@ -20,7 +21,7 @@ class CustomersScreen extends ConsumerWidget {
       builder: (_) => _AddCustomerDialog(canGrantCredit: actor.can(Permission.customerCredit)),
     );
     if (created == null) return;
-    await ref.read(localCustomersProvider).createCustomer(created, actorId: actor.user.id, deviceId: 'app');
+    await ref.read(localCustomersProvider).createCustomer(created, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
     ref.invalidate(customersProvider);
   }
 
@@ -33,7 +34,7 @@ class CustomersScreen extends ConsumerWidget {
     );
     if (result == null) return;
     await ref.read(localCustomersProvider).setCreditLimit(
-          c, result.limit, actorId: actor.user.id, deviceId: 'app');
+          c, result.limit, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
     ref.invalidate(customersProvider);
   }
 
@@ -44,7 +45,7 @@ class CustomersScreen extends ConsumerWidget {
     if (amount == null) return;
     try {
       await ref.read(localCustomersProvider).recordPayment(
-            customerId: c.id, amountMinor: amount, actorId: actor.user.id, deviceId: 'app');
+            customerId: c.id, amountMinor: amount, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
       ref
         ..invalidate(customersProvider)
         ..invalidate(customerBalanceProvider(c.id));

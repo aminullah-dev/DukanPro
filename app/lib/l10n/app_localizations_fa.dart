@@ -435,6 +435,28 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errGeneric => 'مشکلی پیش آمد. دوباره تلاش کنید.';
 
   @override
+  String get syncIssuesTitle => 'مشکلات همگام‌سازی';
+
+  @override
+  String get syncIssuesReview => 'بررسی';
+
+  @override
+  String get syncIssueConflict =>
+      'پیش‌تر جای دیگری تغییر کرده بود؛ آن تغییر نگه داشته شد';
+
+  @override
+  String get syncIssueRejected => 'سرور این تغییر را نپذیرفت';
+
+  @override
+  String get syncIssueRetry => 'دوباره اعمال شود';
+
+  @override
+  String get syncIssueDismiss => 'کنار گذاشته شود';
+
+  @override
+  String get syncIssuesEmpty => 'چیزی برای بررسی نیست.';
+
+  @override
   String get errUnitUnknown =>
       'واحد این کالا هنوز بارگذاری نشده است. همگام‌سازی کنید و دوباره امتحان کنید.';
 
@@ -972,6 +994,28 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get errGeneric => 'مشکلی پیش آمد. دوباره تلاش کنید.';
+
+  @override
+  String get syncIssuesTitle => 'مشکلات همگام‌سازی';
+
+  @override
+  String get syncIssuesReview => 'بررسی';
+
+  @override
+  String get syncIssueConflict =>
+      'پیش‌تر جای دیگری تغییر کرده بود؛ آن تغییر نگه داشته شد';
+
+  @override
+  String get syncIssueRejected => 'سرور این تغییر را نپذیرفت';
+
+  @override
+  String get syncIssueRetry => 'دوباره اعمال شود';
+
+  @override
+  String get syncIssueDismiss => 'کنار گذاشته شود';
+
+  @override
+  String get syncIssuesEmpty => 'چیزی برای بررسی نیست.';
 
   @override
   String get errUnitUnknown =>

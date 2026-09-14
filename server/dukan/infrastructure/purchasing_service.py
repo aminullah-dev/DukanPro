@@ -22,6 +22,7 @@ from dukan.domain.purchasing import (
     assert_receivable,
     supplier_balance,
 )
+from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     GoodsReceiptLineModel,
@@ -74,6 +75,7 @@ class SqlPurchasingService(PurchasingService):
             id=new_id(), name=name, phone=phone, created_by=actor.id, updated_by=actor.id
         )
         self._s.add(s)
+        record_change(self._s, "suppliers", s, op="insert", branch_id=None)
         self._s.commit()
         return self._view(s)
 
@@ -165,13 +167,13 @@ class SqlPurchasingService(PurchasingService):
                     created_by=actor.id,
                 )
             )
-            self._s.add(
-                StockMovementModel(
-                    id=new_id(), product_id=line.product_id, branch_id=branch_id,
-                    qty_delta=line.qty_minor, reason="purchase", ref_type="goods_receipt",
-                    ref_id=receipt.id, created_by=actor.id,
-                )
+            movement = StockMovementModel(
+                id=new_id(), product_id=line.product_id, branch_id=branch_id,
+                qty_delta=line.qty_minor, reason="purchase", ref_type="goods_receipt",
+                ref_id=receipt.id, created_by=actor.id,
             )
+            self._s.add(movement)
+            record_change(self._s, "stock_movements", movement, op="insert", branch_id=branch_id)
             # A quantity-only receipt leaves the last cost alone.
             if line.unit_cost_minor > 0 and line.unit_cost_minor != product.cost_minor:
                 self._s.add(
@@ -185,14 +187,16 @@ class SqlPurchasingService(PurchasingService):
                 )
                 product.cost_minor = line.unit_cost_minor
                 product.cost_currency = product.sell_currency
+                product.version += 1
+                record_change(self._s, "products", product, op="update", branch_id=None)
         if supplier is not None and total > 0:  # a zero bill owes nothing
-            self._s.add(
-                SupplierLedgerModel(
-                    id=new_id(), supplier_id=supplier.id, type="bill", amount_minor=total,
-                    currency=supplier.currency, ref_type="goods_receipt", ref_id=receipt.id,
-                    created_by=actor.id,
-                )
+            bill = SupplierLedgerModel(
+                id=new_id(), supplier_id=supplier.id, type="bill", amount_minor=total,
+                currency=supplier.currency, ref_type="goods_receipt", ref_id=receipt.id,
+                created_by=actor.id,
             )
+            self._s.add(bill)
+            record_change(self._s, "supplier_ledger", bill, op="insert", branch_id=None)
         self._s.add(
             AuditEntryModel(
                 id=new_id(), action="purchase.received", actor_id=actor.id,

@@ -19,6 +19,7 @@ from dukan.domain.customers import (
     ledger_balance,
 )
 from dukan.domain.identity import Permission, PermissionPolicy, User
+from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import AuditEntryModel, CustomerLedgerModel, CustomerModel
 from dukan.infrastructure.scope import require_active_branch
 from dukan.shared.errors import ConflictError, NotFoundError
@@ -92,6 +93,7 @@ class SqlCustomerService(CustomerService):
             created_by=actor.id, updated_by=actor.id,
         )
         self._s.add(c)
+        record_change(self._s, "customers", c, op="insert", branch_id=None)
         self._audit(
             "customer.created", actor.id, c.id,
             {"name": name, "credit_limit_minor": credit_limit_minor},
@@ -153,12 +155,13 @@ class SqlCustomerService(CustomerService):
             raise ConflictError(
                 "CUSTOMER_VERSION_CONFLICT", base_version=version, current_version=current_version
             )
+        self._s.refresh(customer)  # the compare-and-set wrote around the loaded row
+        record_change(self._s, "customers", customer, op="update", branch_id=None)
         self._audit(
             "customer.credit_limit_changed", actor.id, customer_id,
             {"credit_limit_minor": credit_limit_minor}, before={"credit_limit_minor": before},
         )
         self._s.commit()
-        self._s.refresh(customer)  # the compare-and-set wrote around the loaded row
         return self._view(customer)
 
     def record_payment(
@@ -169,12 +172,12 @@ class SqlCustomerService(CustomerService):
         assert_debt_payment_valid(amount_minor=amount_minor)
         customer = self._get(customer_id)
         assert_not_overpaid(balance_minor=self._balance(customer_id), payment_minor=amount_minor)
-        self._s.add(
-            CustomerLedgerModel(
-                id=new_id(), customer_id=customer_id, type="payment", amount_minor=amount_minor,
-                currency=customer.currency, ref_type="manual", created_by=actor.id,
-            )
+        entry = CustomerLedgerModel(
+            id=new_id(), customer_id=customer_id, type="payment", amount_minor=amount_minor,
+            currency=customer.currency, ref_type="manual", created_by=actor.id,
         )
+        self._s.add(entry)
+        record_change(self._s, "customer_ledger", entry, op="insert", branch_id=None)
         self._audit("debt.payment_recorded", actor.id, customer_id, {"amount": amount_minor})
         self._s.commit()
         return self._view(customer)

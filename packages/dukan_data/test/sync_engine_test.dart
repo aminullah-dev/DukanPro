@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:dukan_core/dukan_core.dart';
@@ -53,14 +55,14 @@ final class FakeSyncServer {
     if (!_master.contains(table)) {
       // append-only ledger: insert-if-absent, never conflicts.
       log(table, op.aggregateId, op.opType, op.payload);
-      return PushResult(op.opId, OpOutcome.applied, version: _log.length);
+      return PushResult(op.opId, OpOutcome.applied, serverSeq: _log.length);
     }
     final key = '$table/${op.aggregateId}';
     final current = _rows[key];
     final prefix = table.toUpperCase();
     if (op.opType == 'insert') {
       if (current != null) {
-        return PushResult(op.opId, OpOutcome.conflict, code: '${prefix}_ALREADY_EXISTS');
+        return PushResult(op.opId, OpOutcome.conflict, code: '${prefix}_ALREADY_EXISTS', current: current);
       }
       _rows[key] = {...op.payload, 'version': 1};
     } else {
@@ -71,12 +73,12 @@ final class FakeSyncServer {
         return PushResult(op.opId, OpOutcome.rejected, code: 'PRODUCT_NOT_FOUND'); // app updates products only
       }
       if (op.baseVersion != current['version']) {
-        return PushResult(op.opId, OpOutcome.conflict, code: '${prefix}_VERSION_CONFLICT');
+        return PushResult(op.opId, OpOutcome.conflict, code: '${prefix}_VERSION_CONFLICT', current: current);
       }
       _rows[key] = {...current, ...op.payload, 'version': (current['version']! as int) + 1};
     }
     log(table, op.aggregateId, op.opType, _rows[key]!); // the post-image, not the payload
-    return PushResult(op.opId, OpOutcome.applied, version: _log.length);
+    return PushResult(op.opId, OpOutcome.applied, version: _rows[key]!['version']! as int, serverSeq: _log.length);
   }
 
   /// Appends a change_log row (a post-image), as an applied write would.
@@ -89,6 +91,7 @@ final class FakeSyncServer {
   PullResult pull(int since, {ChangeView? view}) {
     final page = _log.skip(since).take(pageSize).toList();
     return PullResult(
+      maxSeq: _log.length,
       watermark: page.isEmpty ? since : page.last['seq']! as int,
       changed: [for (final c in page) view == null ? c : view(c)].whereType<Map<String, Object?>>().toList(),
       tombstones: const [],
@@ -404,5 +407,105 @@ void main() {
     await engine.pushPending(actorId: 'uA');
     expect(await engine.conflictCount(), 0);
     expect(await engine.pendingCount(), 0);
+  });
+
+  test("a stale edit takes the server's row and can be made again on top of it", () async {
+    final server = FakeSyncServer();
+    final dbA = AppDatabase(NativeDatabase.memory());
+    final dbB = AppDatabase(NativeDatabase.memory());
+    addTearDown(() async {
+      await dbA.close();
+      await dbB.close();
+    });
+    final a = SyncEngine(dbA, FakeSyncClient(server), deviceId: 'A');
+    final b = SyncEngine(dbB, FakeSyncClient(server), deviceId: 'B');
+    final catA = LocalCatalog(dbA);
+    final catB = LocalCatalog(dbB);
+    final p = Product(id: newId(), sku: 'T1', name: 'Tea', unitId: 'piece', sellPrice: Money(5000, 'AFN'));
+    await catA.createProduct(p, actorId: 'u1', deviceId: 'A');
+    await a.syncNow();
+    await b.syncNow();
+
+    Product priced(Product at, int price) => Product(
+          id: at.id, sku: at.sku, name: at.name, unitId: at.unitId, sellPrice: Money(price, 'AFN'),
+          version: at.version,
+        );
+    await catA.updateProduct(priced((await catA.products.findById(p.id))!, 6000), actorId: 'u1', deviceId: 'A');
+    await catB.updateProduct(priced((await catB.products.findById(p.id))!, 4000), actorId: 'u1', deviceId: 'B');
+    await a.syncNow();
+    await b.pushPending();
+
+    // B lost: its copy is the server's again, and its edit waits for review.
+    expect((await catB.products.findById(p.id))!.sellPrice.amountMinor, 6000);
+    final issues = await b.issues();
+    expect((issues.single.status, issues.single.code, issues.single.canRetry),
+        ('conflict', 'PRODUCTS_VERSION_CONFLICT', true));
+
+    // Made again on top of the server's version, it applies and both devices agree.
+    expect(await b.retry(issues.single.opId), isTrue);
+    await b.syncNow();
+    await a.syncNow();
+    expect((await catA.products.findById(p.id))!.sellPrice.amountMinor, 4000);
+    expect((await catB.products.findById(p.id))!.sellPrice.amountMinor, 4000);
+    expect(await b.issues(), isEmpty);
+    expect(await b.conflictCount(), 0);
+  });
+
+  test('a change the device cannot read is set aside and the pull goes on', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final server = FakeSyncServer()
+      ..log('stock_movements', newId(), 'insert',
+          {'product_id': 'p', 'branch_id': 'B1', 'qty_delta': 'five', 'reason': 'purchase'})
+      ..log('units', newId(), 'insert', {'name': 'kg', 'decimal_places': 3, 'version': 1});
+    final engine = SyncEngine(db, FakeSyncClient(server), deviceId: 'd1');
+    await engine.pullSince();
+
+    expect((await db.select(db.units).get()).map((u) => u.name), ['kg']);
+    final kept = jsonDecode((await SettingsStore(db).get(SyncEngine.quarantineKey))!) as List;
+    expect((kept.single as Map)['table'], 'stock_movements');
+    final client = FakeSyncClient(server);
+    await SyncEngine(db, client, deviceId: 'd1').pullSince();
+    expect(client.pulledSince.first, 2); // past it: the next pull does not trip on it again
+  });
+
+  test('a server restored from a backup is read again from the start', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final before = FakeSyncServer();
+    for (var i = 0; i < 3; i++) {
+      before.log('units', newId(), 'insert', {'name': 'u$i', 'decimal_places': 0, 'version': 1});
+    }
+    await SyncEngine(db, FakeSyncClient(before), deviceId: 'd1').pullSince();
+    final restored = FakeSyncServer()
+      ..log('units', newId(), 'insert', {'name': 'box', 'decimal_places': 0, 'version': 1});
+    await SyncEngine(db, FakeSyncClient(restored), deviceId: 'd1').pullSince();
+    expect((await db.select(db.units).get()).map((u) => u.name), contains('box'));
+  });
+
+  test('pulled rows keep their time; customers keep their version and pending edits', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final at = DateTime.utc(2026, 9, 10, 8, 30);
+    final saleId = newId();
+    final customerId = newId();
+    final server = FakeSyncServer()
+      ..log('sales', saleId, 'insert', {
+        'number': 'INV-1', 'branch_id': 'B1', 'status': 'settled', 'currency': 'AFN',
+        'total_minor': 100, 'occurred_at': at.toIso8601String(),
+      })
+      ..log('customers', customerId, 'insert',
+          {'name': 'Karim', 'credit_limit_minor': 0, 'currency': 'AFN', 'is_active': true, 'version': 1});
+    final engine = SyncEngine(db, FakeSyncClient(server), deviceId: 'd1');
+    await engine.pullSince();
+    expect((await (db.select(db.sales)..where((t) => t.id.equals(saleId))).getSingle()).occurredAt.toUtc(), at);
+
+    final customers = LocalCustomers(db);
+    await customers.setCreditLimit((await customers.find(customerId))!, 500000, actorId: 'm1', deviceId: 'd1');
+    server.log('customers', customerId, 'update',
+        {'name': 'Karim', 'credit_limit_minor': 0, 'currency': 'AFN', 'is_active': true, 'version': 1});
+    await engine.pullSince();
+    final kept = (await customers.find(customerId))!;
+    expect((kept.creditLimitMinor, kept.version), (500000, 2)); // the older image did not rewind it
   });
 }

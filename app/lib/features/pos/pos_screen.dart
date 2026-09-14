@@ -11,6 +11,7 @@ import '../auth/session.dart';
 import '../catalog/catalog_providers.dart';
 import '../customers/customers_providers.dart';
 import '../settings/settings_providers.dart';
+import '../auth/providers.dart';
 import 'pos_providers.dart';
 import 'receipt_builder.dart';
 
@@ -59,11 +60,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           ? await sales.settle(
               lines: lines, cashMinor: result.cashMinor, tenderedMinor: result.tenderedMinor,
               customerId: result.customerId, customerCreditLimitMinor: result.creditLimit,
-              branchId: actor.branchId, actorId: actor.user.id, deviceId: 'app',
+              branchId: actor.branchId, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider),
             )
           : await sales.settleCash(
               lines: lines, tenderedMinor: result.tenderedMinor, branchId: actor.branchId,
-              actorId: actor.user.id, deviceId: 'app',
+              actorId: actor.user.id, deviceId: ref.read(deviceIdProvider),
             );
       final saleLines = await sales.saleLinesFor(sale.id);
       ref.read(posCartProvider.notifier).clear();

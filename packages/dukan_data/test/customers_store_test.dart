@@ -167,4 +167,34 @@ void main() {
     expect(await catalog.onHand(p.id, 'B1'), 2500);
     expect(await purchasing.supplierBalance(s.id), 10000); // 2.500 kg at 40.00 is 100.00
   });
+
+  test('a received cost is queued as a product edit against the version it read', () async {
+    final p = Product(id: newId(), sku: 'C1', name: 'Oil', unitId: 'piece', sellPrice: Money(9000, 'AFN'));
+    await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    await purchasing.receiveGoods(
+      lines: [ReceiptLine(productId: p.id, qtyMinor: 2, unitCostMinor: 7000, decimalPlaces: 0)],
+      branchId: 'B1', actorId: 'u1', deviceId: 'app',
+    );
+    final edit = (await DriftSyncOutbox(db).pending())
+        .singleWhere((o) => o.aggregateType == 'products' && o.opType == 'update');
+    expect(edit.payload, {'cost_minor': 7000});
+    expect(edit.baseVersion, 1);
+    expect((await catalog.products.findById(p.id))!.version, 2);
+  });
+
+  test('sale numbers carry the device, so two tills never issue the same one', () async {
+    final p = Product(id: newId(), sku: 'N1', name: 'Pen', unitId: 'piece', sellPrice: Money(1000, 'AFN'));
+    await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    Future<String> sell(String device) async => (await sales.settleCash(
+          lines: [_line(p.id, 1000, 1)], tenderedMinor: 1000, branchId: 'B1', actorId: 'u1', deviceId: device,
+        ))
+            .number;
+    final a1 = await sell('0190f0e0-aaaa-7000-8000-00000000a1b2');
+    final a2 = await sell('0190f0e0-aaaa-7000-8000-00000000a1b2');
+    final b1 = await sell('0190f0e0-bbbb-7000-8000-00000000c3d4');
+    expect({a1, a2, b1}, hasLength(3));
+    expect(a1, matches(RegExp(r'^INV-00A1B2-\d{8}-0001$')));
+    expect(a2, endsWith('-0002'));
+    expect(b1, matches(RegExp(r'^INV-00C3D4-\d{8}-0001$')));
+  });
 }
