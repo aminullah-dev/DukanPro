@@ -47,8 +47,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   Future<void> _charge(int total) async {
     final actor = ref.read(sessionActorProvider);
+    final shift = ref.read(currentShiftProvider).value;
     final l = AppLocalizations.of(context);
-    if (actor == null) return;
+    if (actor == null || shift == null) return;
     final result = await showDialog<_PayResult>(
       context: context,
       builder: (_) => _PaymentDialog(totalMinor: total),
@@ -57,16 +58,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     try {
       final lines = ref.read(posCartProvider.notifier).toSaleLines();
       final sales = ref.read(localSalesProvider);
-      final sale = result.credit
-          ? await sales.settle(
-              lines: lines, cashMinor: result.cashMinor, tenderedMinor: result.tenderedMinor,
-              customerId: result.customerId,
-              branchId: actor.branchId, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider),
-            )
-          : await sales.settleCash(
-              lines: lines, tenderedMinor: result.tenderedMinor, branchId: actor.branchId,
-              actorId: actor.user.id, deviceId: ref.read(deviceIdProvider),
-            );
+      final sale = await sales.settle(
+        lines: lines, tenders: result.tenders, customerId: result.customerId, shiftId: shift.id,
+        branchId: actor.branchId, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider),
+      );
       final saleLines = await sales.saleLinesFor(sale.id);
       ref.read(posCartProvider.notifier).clear();
       ref
@@ -82,6 +77,45 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(moneyErrorText(l, e))));
       }
+    }
+  }
+
+  /// Opens the seller's shift with the cash already in the drawer.
+  Future<void> _openShift(int openingFloatMinor) async {
+    final actor = ref.read(sessionActorProvider);
+    if (actor == null) return;
+    try {
+      await ref.read(localShiftsProvider).open(
+            branchId: actor.branchId, userId: actor.user.id, openingFloatMinor: openingFloatMinor,
+            deviceId: ref.read(deviceIdProvider),
+          );
+    } on AppError catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(moneyErrorText(AppLocalizations.of(context), e))));
+      }
+    }
+    ref.invalidate(currentShiftProvider);
+  }
+
+  /// The Z-report: what the shift took by tender and what the drawer should
+  /// hold; closing records the counted cash and the difference.
+  Future<void> _closeShift(ShiftRow shift) async {
+    final actor = ref.read(sessionActorProvider);
+    if (actor == null) return;
+    final shifts = ref.read(localShiftsProvider);
+    final summary = await shifts.summary(shift);
+    if (!mounted) return;
+    final counted = await showDialog<int>(context: context, builder: (_) => _ZReportDialog(summary: summary));
+    if (counted == null) return;
+    final closed = await shifts.close(
+      shift, countedCashMinor: counted, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider),
+    );
+    ref.invalidate(currentShiftProvider);
+    if (mounted) {
+      final l = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l.shiftClosed(_afn(closed.varianceMinor ?? 0)))));
     }
   }
 
@@ -103,10 +137,25 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final cart = ref.watch(posCartProvider);
     ref.watch(unitsByIdProvider); // loaded before the first tap
     final total = cart.fold<int>(0, (s, l) => s + l.lineTotal);
+    final shiftAsync = ref.watch(currentShiftProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l.pos), actions: const [LocaleToggle(), SizedBox(width: 8)]),
-      body: Row(
+      appBar: AppBar(title: Text(l.pos), actions: [
+        if (shiftAsync.value case final shift?)
+          IconButton(
+            icon: const Icon(Icons.lock_clock_outlined),
+            tooltip: l.closeShift,
+            onPressed: () => _closeShift(shift),
+          ),
+        const LocaleToggle(),
+        const SizedBox(width: 8),
+      ]),
+      // A seller opens a shift before the first sale (its cash needs a drawer).
+      body: !shiftAsync.hasValue
+          ? const Center(child: CircularProgressIndicator())
+          : canSell && shiftAsync.value == null
+              ? _OpenShiftPanel(onOpen: _openShift)
+              : Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
@@ -240,15 +289,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 }
 
 class _PayResult {
-  const _PayResult({
-    required this.credit,
-    required this.cashMinor,
-    required this.tenderedMinor,
-    this.customerId,
-  });
-  final bool credit;
-  final int cashMinor;
-  final int tenderedMinor;
+  const _PayResult({required this.tenders, this.customerId});
+  final List<Tender> tenders;
   final String? customerId;
 }
 
@@ -259,121 +301,337 @@ class _PaymentDialog extends ConsumerStatefulWidget {
   ConsumerState<_PaymentDialog> createState() => _PaymentDialogState();
 }
 
+/// One payment line in the dialog: a method and the amount given by it.
+class _TenderLine {
+  _TenderLine(this.method, String amount) : amount = TextEditingController(text: amount);
+  PaymentMethod method;
+  final TextEditingController amount;
+}
+
 class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
-  late final TextEditingController _tendered =
-      TextEditingController(text: _afn(widget.totalMinor));
+  late final List<_TenderLine> _lines = [_TenderLine(PaymentMethod.cash, _afn(widget.totalMinor))];
+  final List<_TenderLine> _removed = [];
   Customer? _customer;
 
   @override
   void dispose() {
-    _tendered.dispose();
+    for (final t in [..._lines, ..._removed]) {
+      t.amount.dispose();
+    }
     super.dispose();
   }
 
-  /// The cash received as typed, or null while it is not a valid amount.
-  int? get _tenderedMinor {
-    try {
-      return amountOrNull(_tendered.text) ?? 0;
-    } on AppError {
-      return null;
+  /// The payments as typed: cash toward the total, with what was handed over,
+  /// then card and transfer. Null while an amount is not valid, or card and
+  /// transfer come to more than the total (they give no change).
+  ({List<Tender> tenders, int change, int remaining})? get _split {
+    var cashGiven = 0;
+    final other = <Tender>[];
+    for (final t in _lines) {
+      final int amount;
+      try {
+        amount = amountOrNull(t.amount.text) ?? 0;
+      } on AppError {
+        return null;
+      }
+      if (amount == 0) continue;
+      if (t.method == PaymentMethod.cash) {
+        cashGiven += amount;
+      } else {
+        other.add(Tender(t.method, amount));
+      }
     }
+    final otherTotal = other.fold<int>(0, (s, t) => s + t.amountMinor);
+    if (otherTotal > widget.totalMinor) return null;
+    final due = widget.totalMinor - otherTotal;
+    final cash = cashGiven < due ? cashGiven : due;
+    return (
+      tenders: [if (cash > 0) Tender(PaymentMethod.cash, cash, tenderedMinor: cashGiven), ...other],
+      change: cashGiven - cash,
+      remaining: due - cash,
+    );
   }
 
-  /// With a customer, the field is the cash paid now and the rest goes on
-  /// credit: picking one starts it at 0 instead of the total (and back again).
+  /// With a customer, the payments are what is paid now and the rest goes on
+  /// credit: picking one clears the prefilled total (and back again).
   void _pick(Customer? c) {
-    final cash = _tenderedMinor;
-    if (c != null && _customer == null && cash == widget.totalMinor) _tendered.text = _afn(0);
-    if (c == null && _customer != null && cash == 0) _tendered.text = _afn(widget.totalMinor);
+    final first = _lines.first.amount;
+    if (c != null && _customer == null && first.text == _afn(widget.totalMinor)) first.text = _afn(0);
+    if (c == null && _customer != null && first.text == _afn(0)) first.text = _afn(widget.totalMinor);
     setState(() => _customer = c);
   }
+
+  String _methodName(AppLocalizations l, PaymentMethod m) => switch (m) {
+        PaymentMethod.cash => l.cash,
+        PaymentMethod.card => l.card,
+        PaymentMethod.transfer => l.transfer,
+        PaymentMethod.credit => l.credit,
+      };
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final tendered = _tenderedMinor;
-    final change = tendered == null ? -1 : tendered - widget.totalMinor;
-    // What goes on the customer's account: the total less the cash paid now.
-    final onCredit = _customer == null || tendered == null ? 0 : widget.totalMinor - tendered;
+    final split = _split;
     final customersAsync = ref.watch(customersProvider);
+    // What goes on the customer's account: the total less what is paid now.
+    final onCredit = _customer != null && split != null ? split.remaining : 0;
+    Widget amountRow(String label, int value, {Color? color}) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Text('${_afn(value)} AFN', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          ],
+        );
     return AlertDialog(
       title: Text(l.charge),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(l.total),
-            Text('${_afn(widget.totalMinor)} AFN', style: const TextStyle(fontWeight: FontWeight.bold)),
-          ]),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _tendered,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: _customer == null ? l.tendered : l.cashNow,
-              border: const OutlineInputBorder(),
-              suffixText: 'AFN',
-              errorText: tendered == null ? l.errAmountInvalid : null,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            amountRow(l.total, widget.totalMinor),
+            const SizedBox(height: 12),
+            for (final (i, t) in _lines.indexed) ...[
+              Row(children: [
+                DropdownButton<PaymentMethod>(
+                  value: t.method,
+                  items: [
+                    for (final m in const [PaymentMethod.cash, PaymentMethod.card, PaymentMethod.transfer])
+                      DropdownMenuItem(value: m, child: Text(_methodName(l, m))),
+                  ],
+                  onChanged: (m) => setState(() => t.method = m ?? t.method),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: t.amount,
+                    autofocus: i == 0,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: t.method != PaymentMethod.cash
+                          ? l.amount
+                          : _customer == null
+                              ? l.tendered
+                              : l.cashNow,
+                      suffixText: 'AFN',
+                      isDense: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                if (_lines.length > 1)
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => setState(() => _removed.add(_lines.removeAt(i))),
+                  ),
+              ]),
+              const SizedBox(height: 8),
+            ],
+            if (_lines.length < 3)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _lines.add(
+                        _TenderLine(PaymentMethod.card, split == null ? '' : _afn(split.remaining)),
+                      )),
+                  icon: const Icon(Icons.add),
+                  label: Text(l.addPayment),
+                ),
+              ),
+            if (split == null)
+              Text(l.errAmountInvalid, style: TextStyle(color: Theme.of(context).colorScheme.error))
+            else if (onCredit > 0)
+              amountRow(l.onCredit, onCredit, color: Theme.of(context).colorScheme.error)
+            else if (split.remaining > 0)
+              amountRow(l.remaining, split.remaining, color: Theme.of(context).colorScheme.error)
+            else
+              amountRow(l.change, split.change, color: Colors.green.shade700),
+            const SizedBox(height: 8),
+            customersAsync.maybeWhen(
+              data: (customers) => DropdownButtonFormField<String?>(
+                initialValue: _customer?.id,
+                decoration: InputDecoration(labelText: l.credit, isDense: true),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('—')),
+                  // Credit goes only to open accounts.
+                  for (final c in customers.where((c) => c.isActive))
+                    DropdownMenuItem(value: c.id, child: Text(c.name)),
+                ],
+                onChanged: (id) => _pick(id == null ? null : customers.firstWhere((c) => c.id == id)),
+              ),
+              orElse: () => const SizedBox.shrink(),
             ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 8),
-          if (onCredit > 0)
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(l.onCredit),
-              Text('${_afn(onCredit)} AFN',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
-            ])
-          else
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(l.change),
-              Text(change >= 0 ? '${_afn(change)} AFN' : '—',
-                  style: TextStyle(color: change >= 0 ? Colors.green.shade700 : Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
-            ]),
-          const SizedBox(height: 8),
-          customersAsync.maybeWhen(
-            data: (customers) => DropdownButtonFormField<String?>(
-              initialValue: _customer?.id,
-              decoration: InputDecoration(labelText: l.credit, isDense: true),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('—')),
-                // Credit goes only to open accounts.
-                for (final c in customers.where((c) => c.isActive))
-                  DropdownMenuItem(value: c.id, child: Text(c.name)),
-              ],
-              onChanged: (id) => _pick(id == null ? null : customers.firstWhere((c) => c.id == id)),
-            ),
-            orElse: () => const SizedBox.shrink(),
-          ),
-        ],
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
         if (_customer != null)
           FilledButton.tonal(
-            // Credit is for what is left after the cash paid now.
-            onPressed: onCredit > 0
-                ? () => Navigator.pop(
-                      context,
-                      _PayResult(
-                        credit: true,
-                        cashMinor: tendered ?? 0,
-                        tenderedMinor: tendered ?? 0,
-                        customerId: _customer!.id,
-                      ),
-                    )
+            // Credit is for what is left after what is paid now.
+            onPressed: split != null && onCredit > 0
+                ? () => Navigator.pop(context, _PayResult(tenders: split.tenders, customerId: _customer!.id))
                 : null,
             child: Text(l.credit),
           ),
         FilledButton(
-          onPressed: tendered != null && tendered >= widget.totalMinor
-              ? () => Navigator.pop(
-                    context,
-                    _PayResult(credit: false, cashMinor: widget.totalMinor, tenderedMinor: tendered),
-                  )
+          onPressed: split != null && split.remaining == 0
+              ? () => Navigator.pop(context, _PayResult(tenders: split.tenders))
               : null,
-          child: Text(l.cash),
+          child: Text(l.charge),
+        ),
+      ],
+    );
+  }
+}
+
+/// Before the first sale: the seller opens their shift with the cash already in
+/// the drawer (the float), so the close can say what should be there.
+class _OpenShiftPanel extends StatefulWidget {
+  const _OpenShiftPanel({required this.onOpen});
+  final Future<void> Function(int openingFloatMinor) onOpen;
+  @override
+  State<_OpenShiftPanel> createState() => _OpenShiftPanelState();
+}
+
+class _OpenShiftPanelState extends State<_OpenShiftPanel> {
+  final _float = TextEditingController(text: _afn(0));
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _float.dispose();
+    super.dispose();
+  }
+
+  Future<void> _open(AppLocalizations l) async {
+    final int amount;
+    try {
+      amount = amountOrNull(_float.text) ?? 0;
+    } on AppError catch (e) {
+      setState(() => _error = numberErrorText(l, e));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.onOpen(amount);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Card(
+          margin: const EdgeInsets.all(16),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(Icons.point_of_sale, size: 40, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 12),
+                Text(l.openShiftPrompt, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _float,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: l.openingFloat, suffixText: 'AFN', errorText: _error,
+                    border: const OutlineInputBorder(),
+                  ),
+                  onSubmitted: (_) => _open(l),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(onPressed: _busy ? null : () => _open(l), child: Text(l.openShift)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The shift report at the close: what the shift took by tender, what the
+/// drawer should hold, and the difference from the cash counted.
+class _ZReportDialog extends StatefulWidget {
+  const _ZReportDialog({required this.summary});
+  final ShiftSummary summary;
+  @override
+  State<_ZReportDialog> createState() => _ZReportDialogState();
+}
+
+class _ZReportDialogState extends State<_ZReportDialog> {
+  final _counted = TextEditingController();
+
+  @override
+  void dispose() {
+    _counted.dispose();
+    super.dispose();
+  }
+
+  int? get _countedMinor {
+    try {
+      return amountOrNull(_counted.text);
+    } on AppError {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final s = widget.summary;
+    final counted = _countedMinor;
+    final difference = counted == null ? null : counted - s.expectedCashMinor;
+    Widget row(String label, int value, {bool bold = false, Color? color}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Flexible(child: Text(label)),
+            Text('${_afn(value)} AFN',
+                style: TextStyle(fontWeight: bold ? FontWeight.bold : null, color: color)),
+          ]),
+        );
+    return AlertDialog(
+      title: Text(l.zReport),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          row(l.openingFloat, s.openingFloatMinor),
+          row(l.cashSales, s.cashSalesMinor),
+          row(l.debtCollected, s.cashCollectedMinor),
+          row(l.cardSales, s.cardSalesMinor),
+          row(l.transferSales, s.transferSalesMinor),
+          const Divider(),
+          row(l.expectedCash, s.expectedCashMinor, bold: true),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _counted,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: l.countedCash, suffixText: 'AFN', border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          if (difference != null) ...[
+            const SizedBox(height: 8),
+            row(l.variance, difference,
+                bold: true,
+                color: difference < 0 ? Theme.of(context).colorScheme.error : Colors.green.shade700),
+          ],
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
+        FilledButton(
+          onPressed: counted == null ? null : () => Navigator.pop(context, counted),
+          child: Text(l.closeShift),
         ),
       ],
     );

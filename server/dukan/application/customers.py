@@ -38,7 +38,8 @@ class CustomerService(Protocol):
     ) -> CustomerView: ...
 
     def record_payment(
-        self, *, actor: User, branch_id: str, customer_id: str, amount_minor: int
+        self, *, actor: User, branch_id: str, customer_id: str, amount_minor: int,
+        method: str = "cash", shift_id: str | None = None,
     ) -> CustomerView: ...
 
     def set_active(

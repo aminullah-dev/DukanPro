@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from dukan.application.customers import CustomerService
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_current_actor, get_customer_service
-from dukan.ui.fields import Int32, Money, Str32, Str128
+from dukan.ui.fields import Id, Int32, Money, Str8, Str32, Str128
 from dukan.ui.serializers import customer_view_dict
 
 router = APIRouter(tags=["customers"])
@@ -28,6 +28,8 @@ class CreateCustomerRequest(BaseModel):
 
 class PaymentRequest(BaseModel):
     amount_minor: Money
+    method: Str8 = "cash"  # cash, card or transfer
+    shift_id: Id | None = None  # the till's open shift: cash counts in its drawer
 
 
 class CreditLimitRequest(BaseModel):
@@ -104,7 +106,8 @@ def record_payment(
     return customer_view_dict(
         svc.record_payment(
             actor=actor, branch_id=active_branch(actor, x_branch_id),
-            customer_id=customer_id, amount_minor=body.amount_minor,
+            customer_id=customer_id, amount_minor=body.amount_minor, method=body.method,
+            shift_id=body.shift_id,
         )
     )
 

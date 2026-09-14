@@ -7,11 +7,14 @@ import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import '../auth/providers.dart';
+import '../pos/pos_providers.dart';
 import 'customers_providers.dart';
 
 String _afn(int minor) => formatQuantity(minor, 2);
 
 enum _CustomerAction { creditLimit, toggleActive, writeOff }
+
+typedef _Amount = ({int amount, PaymentMethod method});
 
 Widget? _subtitle(AppLocalizations l, Customer c) {
   final parts = [if (c.phone != null) c.phone!, if (!c.isActive) l.customerInactive];
@@ -49,11 +52,14 @@ class CustomersScreen extends ConsumerWidget {
   Future<void> _pay(BuildContext context, WidgetRef ref, Customer c) async {
     final actor = ref.read(sessionActorProvider);
     if (actor == null) return;
-    final amount = await showDialog<int>(context: context, builder: (_) => _PaymentDialog(customer: c));
-    if (amount == null) return;
+    final paid = await showDialog<_Amount>(context: context, builder: (_) => _PaymentDialog(customer: c));
+    if (paid == null) return;
     try {
+      // Cash collected at the till counts in the seller's open shift.
       await ref.read(localCustomersProvider).recordPayment(
-            customerId: c.id, amountMinor: amount, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
+            customerId: c.id, amountMinor: paid.amount, method: paid.method,
+            shiftId: ref.read(currentShiftProvider).value?.id,
+            actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
       ref
         ..invalidate(customersProvider)
         ..invalidate(customerBalanceProvider(c.id));
@@ -79,14 +85,15 @@ class CustomersScreen extends ConsumerWidget {
   Future<void> _writeOff(BuildContext context, WidgetRef ref, Customer c) async {
     final actor = ref.read(sessionActorProvider);
     if (actor == null) return;
-    final amount = await showDialog<int>(
+    final forgiven = await showDialog<_Amount>(
       context: context,
       builder: (_) => _PaymentDialog(customer: c, writeOff: true),
     );
-    if (amount == null) return;
+    if (forgiven == null) return;
     try {
       await ref.read(localCustomersProvider).writeOff(
-            customer: c, amountMinor: amount, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
+            customer: c, amountMinor: forgiven.amount, actorId: actor.user.id,
+            deviceId: ref.read(deviceIdProvider));
       ref
         ..invalidate(customersProvider)
         ..invalidate(customerBalanceProvider(c.id));
@@ -310,6 +317,7 @@ class _PaymentDialog extends ConsumerStatefulWidget {
 
 class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   final _amount = TextEditingController();
+  PaymentMethod _method = PaymentMethod.cash;
   String? _error;
   @override
   void dispose() {
@@ -335,6 +343,18 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(labelText: l.amount, suffixText: 'AFN', errorText: _error),
         ),
+        if (!widget.writeOff) ...[
+          const SizedBox(height: 12),
+          SegmentedButton<PaymentMethod>(
+            segments: [
+              ButtonSegment(value: PaymentMethod.cash, label: Text(l.cash)),
+              ButtonSegment(value: PaymentMethod.card, label: Text(l.card)),
+              ButtonSegment(value: PaymentMethod.transfer, label: Text(l.transfer)),
+            ],
+            selected: {_method},
+            onSelectionChanged: (s) => setState(() => _method = s.first),
+          ),
+        ],
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
@@ -346,7 +366,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                 setState(() => _error = l.errMustBePositive);
                 return;
               }
-              Navigator.pop(context, amount);
+              Navigator.pop<_Amount>(context, (amount: amount, method: _method));
             } on AppError catch (e) {
               setState(() => _error = numberErrorText(l, e));
             }

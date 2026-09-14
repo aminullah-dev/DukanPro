@@ -389,6 +389,67 @@ class AppLocalizationsFa extends AppLocalizations {
       'حداکثر به اندازهٔ بدهی مشتری می‌توان بخشید.';
 
   @override
+  String get openShift => 'شروع شیفت';
+
+  @override
+  String get closeShift => 'بستن شیفت';
+
+  @override
+  String get openingFloat => 'پول نقد اول صندوق';
+
+  @override
+  String get openShiftPrompt =>
+      'برای شروع فروش، شیفت خود را باز کنید. پول نقدی را که اکنون در صندوق است بشمارید.';
+
+  @override
+  String get zReport => 'گزارش شیفت';
+
+  @override
+  String get cashSales => 'فروش نقدی';
+
+  @override
+  String get cardSales => 'فروش با کارت';
+
+  @override
+  String get transferSales => 'پول موبایلی و انتقال';
+
+  @override
+  String get debtCollected => 'قرض وصول‌شده به نقد';
+
+  @override
+  String get expectedCash => 'پول نقدی که باید در صندوق باشد';
+
+  @override
+  String get countedCash => 'پول نقد شمرده‌شده';
+
+  @override
+  String get variance => 'تفاوت';
+
+  @override
+  String get card => 'کارت';
+
+  @override
+  String get transfer => 'انتقال';
+
+  @override
+  String get addPayment => 'افزودن پرداخت';
+
+  @override
+  String get remaining => 'باقی‌مانده';
+
+  @override
+  String shiftClosed(String variance) {
+    return 'شیفت بسته شد. تفاوت: $variance افغانی';
+  }
+
+  @override
+  String get errShiftNotOpen =>
+      'اول شیفت خود را باز کنید؛ فروش در شیفت باز شما ثبت می‌شود.';
+
+  @override
+  String get errShiftAlreadyOpen => 'شما همین حالا یک شیفت باز در اینجا دارید.';
+
+  @override
   String get errSessionEnded =>
       'دسترسی شما تغییر کرده یا پایان یافته است. دوباره وارد شوید.';
 
@@ -1002,6 +1063,67 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String get errWriteOffTooMuch =>
       'حداکثر به اندازهٔ بدهی مشتری می‌توان بخشید.';
+
+  @override
+  String get openShift => 'آغاز شیفت';
+
+  @override
+  String get closeShift => 'ختم شیفت';
+
+  @override
+  String get openingFloat => 'پول نقد آغاز صندوق';
+
+  @override
+  String get openShiftPrompt =>
+      'برای آغاز فروش، شیفت خود را باز کنید. پول نقدی را که اکنون در صندوق است بشمارید.';
+
+  @override
+  String get zReport => 'گزارش شیفت';
+
+  @override
+  String get cashSales => 'فروش نقدی';
+
+  @override
+  String get cardSales => 'فروش با کارت';
+
+  @override
+  String get transferSales => 'پول موبایلی و حواله';
+
+  @override
+  String get debtCollected => 'قرض وصول‌شده به نقد';
+
+  @override
+  String get expectedCash => 'پول نقدی که باید در صندوق باشد';
+
+  @override
+  String get countedCash => 'پول نقد شمرده‌شده';
+
+  @override
+  String get variance => 'تفاوت';
+
+  @override
+  String get card => 'کارت';
+
+  @override
+  String get transfer => 'حواله';
+
+  @override
+  String get addPayment => 'افزودن پرداخت';
+
+  @override
+  String get remaining => 'باقی‌مانده';
+
+  @override
+  String shiftClosed(String variance) {
+    return 'شیفت ختم شد. تفاوت: $variance افغانی';
+  }
+
+  @override
+  String get errShiftNotOpen =>
+      'اول شیفت خود را باز کنید؛ فروش در شیفت باز شما ثبت می‌شود.';
+
+  @override
+  String get errShiftAlreadyOpen => 'شما همین حالا یک شیفت باز در اینجا دارید.';
 
   @override
   String get errSessionEnded =>

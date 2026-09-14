@@ -33,7 +33,7 @@ void main() {
           unitPriceMinor: 52000, unitCostMinor: 0, currency: 'AFN',
         ),
       ],
-      cashMinor: 0, customerId: customer.id,
+      tenders: const [], customerId: customer.id,
       branchId: 'B1', actorId: 'u1', deviceId: 'app',
     );
     expect(await c.read(customerBalanceProvider(customer.id).future), 104000);

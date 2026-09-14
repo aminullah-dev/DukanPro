@@ -13,5 +13,7 @@ String moneyErrorText(AppLocalizations l, AppError e) =>
       'DEBT_CURRENCY_MISMATCH' => l.errDebtCurrency,
       'DEBT_OVERPAYMENT' => l.errDebtOverpayment,
       'DEBT_WRITE_OFF_EXCEEDS_BALANCE' => l.errWriteOffTooMuch,
+      'SHIFT_NOT_OPEN' => l.errShiftNotOpen,
+      'SHIFT_ALREADY_OPEN' => l.errShiftAlreadyOpen,
       final code => code,
     };

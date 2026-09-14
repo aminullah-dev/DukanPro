@@ -9,6 +9,16 @@ import '../auth/session.dart';
 
 final localSalesProvider = Provider<LocalSales>((ref) => LocalSales(ref.watch(databaseProvider)));
 
+final localShiftsProvider = Provider<LocalShifts>((ref) => LocalShifts(ref.watch(databaseProvider)));
+
+/// The signed-in seller's open shift in their branch, or null: the POS sells
+/// only into an open shift, so every sale's cash is in some drawer's count.
+final currentShiftProvider = FutureProvider<ShiftRow?>((ref) async {
+  final actor = ref.watch(sessionActorProvider);
+  if (actor == null) return null;
+  return ref.watch(localShiftsProvider).current(branchId: actor.branchId, userId: actor.user.id);
+});
+
 /// Hardware barcode scans (keyboard-wedge). POS listens and adds the matching
 /// product to the cart hands-free.
 final posScanProvider = StreamProvider<ScanEvent>((ref) => ref.watch(scannerProvider).scans());

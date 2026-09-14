@@ -731,6 +731,120 @@ abstract class AppLocalizations {
   /// **'You can write off at most what the customer owes.'**
   String get errWriteOffTooMuch;
 
+  /// No description provided for @openShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Open shift'**
+  String get openShift;
+
+  /// No description provided for @closeShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Close shift'**
+  String get closeShift;
+
+  /// No description provided for @openingFloat.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash in the drawer to start'**
+  String get openingFloat;
+
+  /// No description provided for @openShiftPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Open your shift to start selling. Count the cash already in the drawer.'**
+  String get openShiftPrompt;
+
+  /// No description provided for @zReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift report'**
+  String get zReport;
+
+  /// No description provided for @cashSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash sales'**
+  String get cashSales;
+
+  /// No description provided for @cardSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Card sales'**
+  String get cardSales;
+
+  /// No description provided for @transferSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile money and transfers'**
+  String get transferSales;
+
+  /// No description provided for @debtCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Debt collected in cash'**
+  String get debtCollected;
+
+  /// No description provided for @expectedCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash that should be in the drawer'**
+  String get expectedCash;
+
+  /// No description provided for @countedCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash counted'**
+  String get countedCash;
+
+  /// No description provided for @variance.
+  ///
+  /// In en, this message translates to:
+  /// **'Difference'**
+  String get variance;
+
+  /// No description provided for @card.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get card;
+
+  /// No description provided for @transfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get transfer;
+
+  /// No description provided for @addPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add payment'**
+  String get addPayment;
+
+  /// No description provided for @remaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Still to pay'**
+  String get remaining;
+
+  /// No description provided for @shiftClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift closed. Difference: {variance} AFN'**
+  String shiftClosed(String variance);
+
+  /// No description provided for @errShiftNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a shift first: sales go into an open shift of yours.'**
+  String get errShiftNotOpen;
+
+  /// No description provided for @errShiftAlreadyOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have an open shift here.'**
+  String get errShiftAlreadyOpen;
+
   /// No description provided for @errSessionEnded.
   ///
   /// In en, this message translates to:

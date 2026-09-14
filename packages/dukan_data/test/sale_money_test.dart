@@ -44,7 +44,7 @@ void main() {
   }
 
   Future<SaleRow> onCredit(Customer c, {int qty = 1}) => sales.settle(
-        lines: [_line(soap, qty: qty)], cashMinor: 0, customerId: c.id,
+        lines: [_line(soap, qty: qty)], tenders: const [], customerId: c.id,
         branchId: 'B1', actorId: 'u1', deviceId: 'd1',
       );
 
@@ -88,7 +88,7 @@ void main() {
     // 2 soaps at a 400.00 cost and a tea with no cost, less a 100.00 discount.
     await sales.settle(
       lines: [_line(soap, qty: 2, cost: 40000), _line(tea)],
-      discountMinor: 10000, cashMinor: 146000, tenderedMinor: 146000,
+      discountMinor: 10000, tenders: [const Tender(PaymentMethod.cash, 146000, tenderedMinor: 146000)],
       branchId: 'B1', actorId: 'u1', deviceId: 'd1',
     );
     final d = await LocalReports(db).dashboard('B1');

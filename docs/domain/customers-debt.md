@@ -7,7 +7,7 @@
 - **Customer** — `{ id, name, phone?, branch_id?, credit_limit(Money|none), is_active }`.
 - **CustomerLedgerEntry** (append-only) — `{ id, customer_id, entry_type(charge|payment|adjustment|opening), amount(Money, signed by convention), ref_type(sale|manual|write_off|void), ref_id, occurred_at, note? }`.
 - **Balance** (derived) — `balance = Σ charges − Σ payments` over the ledger. Positive = customer owes the shop.
-- **DebtPayment** — `{ id, customer_id, amount(Money), method, allocated_to:[sale_id]?, occurred_at }`. Emits a `payment` ledger entry.
+- **DebtPayment** — `{ id, customer_id, amount(Money), method, allocated_to:[sale_id]?, occurred_at }`. Emits a `payment` ledger entry that keeps its method (cash, card, transfer) and the shift it went into; cash collected in a shift counts in that shift's expected cash.
 
 ## Invariants
 

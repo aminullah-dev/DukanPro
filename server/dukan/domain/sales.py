@@ -20,6 +20,7 @@ class SaleStatus(StrEnum):
 class PaymentMethod(StrEnum):
     CASH = "cash"
     CARD = "card"
+    TRANSFER = "transfer"  # mobile money or a bank transfer (M-Paisa, HesabPay)
     CREDIT = "credit"
 
 
@@ -116,13 +117,13 @@ def assert_settleable(
         raise ConflictError("SALE_UNDERPAID", total=total_minor, paid=paid_minor)
 
 
-_TENDERS = frozenset({PaymentMethod.CASH, PaymentMethod.CARD})
+_TENDERS = frozenset({PaymentMethod.CASH, PaymentMethod.CARD, PaymentMethod.TRANSFER})
 
 
 def assert_payment_valid(
     *, method: str, amount_minor: int, tendered_minor: int | None = None
 ) -> None:
-    """A payment is a positive amount by cash or card: credit is the unpaid
+    """A payment is a positive amount by cash, card or transfer: credit is the unpaid
     remainder, never a payment. Cash handed over is at least the amount, and only
     cash is handed over. Raises ValidationError SALE_PAYMENT_INVALID."""
     if method not in _TENDERS:

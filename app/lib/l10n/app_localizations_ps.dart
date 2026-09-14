@@ -387,6 +387,67 @@ class AppLocalizationsPs extends AppLocalizations {
       'تر ټولو زیات د پېرودونکي د پور په اندازه بښل کېدای شي.';
 
   @override
+  String get openShift => 'شفټ پیلول';
+
+  @override
+  String get closeShift => 'شفټ بندول';
+
+  @override
+  String get openingFloat => 'د صندوق د پیل نغدې پیسې';
+
+  @override
+  String get openShiftPrompt =>
+      'د پلور د پیل لپاره خپل شفټ پیل کړئ. هغه نغدې پیسې وشمېرئ چې اوس په صندوق کې دي.';
+
+  @override
+  String get zReport => 'د شفټ راپور';
+
+  @override
+  String get cashSales => 'نغدي پلور';
+
+  @override
+  String get cardSales => 'د کارت پلور';
+
+  @override
+  String get transferSales => 'موبایلي پیسې او لېږد';
+
+  @override
+  String get debtCollected => 'په نغدو راټول شوی پور';
+
+  @override
+  String get expectedCash => 'هغه نغدې پیسې چې باید په صندوق کې وي';
+
+  @override
+  String get countedCash => 'شمېرل شوې نغدې پیسې';
+
+  @override
+  String get variance => 'توپیر';
+
+  @override
+  String get card => 'کارت';
+
+  @override
+  String get transfer => 'لېږد';
+
+  @override
+  String get addPayment => 'تادیه زیاته کړئ';
+
+  @override
+  String get remaining => 'پاتې';
+
+  @override
+  String shiftClosed(String variance) {
+    return 'شفټ بند شو. توپیر: $variance افغانۍ';
+  }
+
+  @override
+  String get errShiftNotOpen =>
+      'لومړی خپل شفټ پیل کړئ؛ پلور ستاسو په پرانیستي شفټ کې ثبتېږي.';
+
+  @override
+  String get errShiftAlreadyOpen => 'تاسو دلته دمخه یو پرانیستی شفټ لرئ.';
+
+  @override
   String get errSessionEnded =>
       'ستاسو لاسرسی بدل شوی یا پای ته رسېدلی دی. بیا ننوځئ.';
 

@@ -185,6 +185,9 @@ class Customers extends Table with RecordColumns {
 @DataClassName('CustomerLedgerRow')
 class CustomerLedger extends Table with RecordColumns {
   TextColumn get customerId => text()();
+  /// A debt payment: how it was paid, and the shift whose drawer it went into.
+  TextColumn get method => text().nullable()();
+  TextColumn get shiftId => text().nullable()();
   TextColumn get type => text()();
   IntColumn get amountMinor => integer()();
   TextColumn get currency => text().withDefault(const Constant('AFN'))();
@@ -248,7 +251,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -288,6 +291,13 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 9) {
             await _mergeUnitCopies();
+          }
+          if (from < 10) {
+            for (final column in [customerLedger.method, customerLedger.shiftId]) {
+              if (!await _hasColumn('customer_ledger', column.$name)) {
+                await m.addColumn(customerLedger, column);
+              }
+            }
           }
         },
       );

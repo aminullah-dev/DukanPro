@@ -29,6 +29,7 @@ from dukan.application.sync_policy import (
     PullScope,
     RowSnapshot,
     SaleRef,
+    ShiftRef,
     SupplierRef,
     SyncConflict,
     check_envelope,
@@ -54,11 +55,13 @@ from dukan.infrastructure.db.models import (
     ProductModel,
     SaleLineModel,
     SaleModel,
+    ShiftModel,
     StockMovementModel,
     SupplierLedgerModel,
     SupplierModel,
     UnitModel,
 )
+from dukan.infrastructure.shift_cash import expected_cash
 from dukan.shared.errors import AppError, InfrastructureError, PermissionDeniedError
 from dukan.shared.ids import new_id
 
@@ -77,6 +80,7 @@ _MODELS: dict[str, type[Any]] = {
     "sales": SaleModel,
     "customer_ledger": CustomerLedgerModel,
     "supplier_ledger": SupplierLedgerModel,
+    "shifts": ShiftModel,
 }
 
 
@@ -110,6 +114,15 @@ class _SqlSyncReader:
             sell_price_minor=p.sell_price_minor, cost_minor=p.cost_minor,
             decimal_places=unit.decimal_places if unit is not None else None,
         )
+
+    def shift(self, shift_id: str) -> ShiftRef | None:
+        s = self._s.get(ShiftModel, shift_id)
+        if s is None or s.deleted_at is not None:
+            return None
+        return ShiftRef(id=s.id, branch_id=s.branch_id, user_id=s.user_id, status=s.status)
+
+    def shift_expected_cash(self, shift_id: str) -> int:
+        return expected_cash(self._s, shift_id)
 
     def shop_currencies(self) -> frozenset[str]:
         return frozenset(

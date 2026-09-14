@@ -7,7 +7,19 @@ import 'numbers.dart' show moneyMax;
 
 enum SaleStatus { open, settled, voided }
 
-enum PaymentMethod { cash, card, credit }
+/// How a sale or a debt is paid. `transfer` is mobile money or a bank transfer
+/// (M-Paisa, HesabPay); `credit` is the unpaid rest on the customer's account,
+/// never a payment.
+enum PaymentMethod { cash, card, transfer, credit }
+
+/// One payment taken for a sale: [amountMinor] toward the total and, for cash,
+/// what was handed over ([tenderedMinor]; the difference is change).
+final class Tender {
+  const Tender(this.method, this.amountMinor, {this.tenderedMinor});
+  final PaymentMethod method;
+  final int amountMinor;
+  final int? tenderedMinor;
+}
 
 int _scale(int decimalPlaces) {
   var r = 1;
@@ -117,7 +129,7 @@ void assertSettleable({
   }
 }
 
-/// A payment is a positive amount by cash or card: credit is the unpaid
+/// A payment is a positive amount by cash, card or transfer: credit is the unpaid
 /// remainder, never a payment. Cash handed over is at least the amount, and
 /// only cash is handed over. Raises [ValidationError] `SALE_PAYMENT_INVALID`.
 void assertPaymentValid({required PaymentMethod method, required int amountMinor, int? tenderedMinor}) {

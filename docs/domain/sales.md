@@ -23,6 +23,8 @@
 9. A **void** needs `sale.void` (owner, manager) in the **sale's** branch and a reason, recorded in the audit entry. A sale whose shift is already closed cannot be voided (`SALE_SHIFT_CLOSED`): its cash was counted. A void of a credit sale also takes its charge back off the customer's ledger. Two voids of one sale, or a void and its shift's close, take turns (row locks).
 10. A discount lies between 0 and the subtotal (`SALE_DISCOUNT_INVALID`); any discount needs `sale.discount` and writes `discount.applied`.
 11. A shift closes once (`SHIFT_ALREADY_CLOSED`), by its own cashier or by someone with `report.view` in its branch. Reading a sale needs `sale.create` or `report.view` in the sale's branch.
+12. **Payments** are cash, card or transfer (mobile money such as M-Paisa or HesabPay, or a bank transfer), one or several per sale. Change comes only from cash, and only cash counts toward a drawer.
+13. **Shifts.** A seller opens their own shift with the cash already in the drawer, one open shift per seller and branch (`SHIFT_ALREADY_OPEN`), and the POS sells only into it. A sale or a debt collection that names a shift must name the seller's own open shift in that branch (`SHIFT_NOT_OPEN`, `SHIFT_NOT_FOUND`). At the close the expected cash is the float, plus the cash of the shift's settled sales, plus the debts collected in it in cash; the variance is counted − expected (a shortage is negative). The till shows this as a shift report (Z-report). A till's shift syncs (insert to open, update to close), and the server works out its own expected cash from the rows that reached it.
 
 ## Error codes
 
@@ -33,7 +35,8 @@
 | `SALE_CREDIT_NO_CUSTOMER` | credit remainder with no customer |
 | `SALE_OVER_CREDIT_LIMIT` | credit remainder exceeds customer limit → (see `customers-debt.md`) |
 | `SALE_CURRENCY_MISMATCH` | payment currency ≠ sale currency (no implicit conversion) |
-| `SHIFT_NOT_OPEN` | ringing a sale with no open shift (when shifts required) |
+| `SHIFT_NOT_OPEN` / `SHIFT_NOT_FOUND` | a sale or debt collection naming a shift that is closed, another seller's or another branch's / that does not exist |
+| `SHIFT_ALREADY_OPEN` | opening a second shift while one is open (same seller and branch) |
 | `SALE_DISCOUNT_INVALID` | discount below 0 or above the subtotal |
 | `SALE_LINE_INVALID_QTY` / `SALE_LINE_INVALID_PRICE` | a line with a quantity of zero or less, or a negative price |
 | `SALE_PAYMENT_INVALID` | a payment that is not a positive cash or card amount; cash tendered below its amount; tendered on a card payment |

@@ -34,6 +34,7 @@ from dukan.domain.sales import (
     assert_discount_valid,
     assert_payment_valid,
     assert_sale_not_overpaid,
+    assert_shift_cash_valid,
     line_total_minor,
 )
 from dukan.shared.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
@@ -51,7 +52,9 @@ PRICE_DRIFT_WINDOW = timedelta(days=45)
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 _CURRENCY = re.compile(r"[A-Z]{3}")
 
-MASTER_TABLES = frozenset({"products", "barcodes", "customers", "suppliers", "units", "categories"})
+MASTER_TABLES = frozenset(
+    {"products", "barcodes", "customers", "suppliers", "units", "categories", "shifts"}
+)
 LEDGER_TABLES = frozenset(
     {"stock_movements", "sales", "sale_lines", "payments", "customer_ledger", "supplier_ledger"}
 )
@@ -91,9 +94,14 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
     ),
     "customer_ledger": (
         "customer_id", "type", "amount_minor", "currency", "ref_type", "ref_id", "occurred_at",
+        "shift_id", "method",
     ),
     "supplier_ledger": (
         "supplier_id", "type", "amount_minor", "currency", "ref_type", "ref_id", "occurred_at",
+    ),
+    "shifts": (
+        "branch_id", "user_id", "opened_at", "opening_float_minor", "closed_at",
+        "counted_cash_minor", "expected_cash_minor", "variance_minor", "status", "version",
     ),
 }
 
@@ -191,7 +199,7 @@ _INSERT: dict[str, dict[str, _Field]] = {
     "sales": {
         "number": _str(32, required=True),
         "branch_id": _uuid(required=True),
-        "shift_id": _MUST_BE_NULL,
+        "shift_id": _uuid(nullable=True),  # the seller's own shift
         "customer_id": _uuid(nullable=True),
         "status": _enum(["settled"]),
         "currency": _CURRENCY_F,
@@ -230,6 +238,11 @@ _INSERT: dict[str, dict[str, _Field]] = {
         "currency": _CURRENCY_F,
         "ref_type": _enum(["sale", "manual", "write_off"], nullable=True),
         "ref_id": _uuid(nullable=True),
+        # A payment's: the drawer it went into, and how it was paid.
+        "shift_id": _uuid(nullable=True),
+        "method": _enum(
+            [m.value for m in PaymentMethod if m is not PaymentMethod.CREDIT], nullable=True
+        ),
     },
     "supplier_ledger": {
         "supplier_id": _uuid(required=True),
@@ -238,6 +251,12 @@ _INSERT: dict[str, dict[str, _Field]] = {
         "currency": _CURRENCY_F,
         "ref_type": _MUST_BE_NULL,
         "ref_id": _MUST_BE_NULL,
+    },
+    "shifts": {
+        "branch_id": _uuid(required=True),
+        "user_id": _uuid(required=True),
+        "opening_float_minor": _int(lo=0, hi=MONEY_MAX),
+        "status": _enum(["open"]),
     },
 }
 
@@ -254,6 +273,10 @@ _UPDATE: dict[str, dict[str, _Field]] = {
         "phone": _str(32, nullable=True),
         "credit_limit_minor": _int(lo=0, hi=MONEY_MAX, nullable=True),
         "is_active": _BOOL,
+    },
+    "shifts": {
+        "status": _enum(["closed"]),
+        "counted_cash_minor": _int(lo=0, hi=MONEY_MAX),
     },
 }
 
@@ -416,6 +439,14 @@ class SaleRef:
     occurred_at: datetime  # the sale's time, as its header recorded it
 
 
+@dataclass(frozen=True, slots=True)
+class ShiftRef:
+    id: str
+    branch_id: str
+    user_id: str
+    status: str
+
+
 class SyncReader(Protocol):
     """Lookups the policy needs (implemented in infrastructure, same session)."""
 
@@ -424,6 +455,10 @@ class SyncReader(Protocol):
     def unit_exists(self, unit_id: str) -> bool: ...
 
     def shop_currencies(self) -> frozenset[str]: ...  # the live branches' currencies
+
+    def shift(self, shift_id: str) -> ShiftRef | None: ...
+
+    def shift_expected_cash(self, shift_id: str) -> int: ...  # float + its drawer cash
 
     def customer(self, customer_id: str) -> CustomerRef | None: ...
 
@@ -741,6 +776,10 @@ def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     branch: str = v["branch_id"]
     _need(ctx, Permission.SALE_CREATE, branch)
     _guard_insert(ctx)
+    shift_id = v.get("shift_id")
+    # The drawer the sale's cash went into: the seller's own shift in this branch.
+    # A sale the till rang before its close reached the server is kept, flagged.
+    after_close = shift_id is not None and _own_shift(ctx, shift_id, branch).status != "open"
     discount: int = v.get("discount_minor", 0)
     assert_discount_valid(discount_minor=discount, subtotal_minor=v["subtotal_minor"])
     if discount > 0:
@@ -764,6 +803,8 @@ def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     if ctx.reader.sale_number_taken(branch, v["number"]):
         # Two devices numbered a sale alike: kept (the sale happened), flagged.
         after = {**after, "number_taken": True}
+    if after_close:
+        after = {**after, "after_shift_close": True}
     return ApplyPlan(v, branch, branch, AuditIntent("sale.settled", "sale", after))
 
 
@@ -841,6 +882,13 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     entry = LedgerEntryType(v["type"])
     amount: int = v["amount_minor"]
     currency = v.get("currency", DEFAULT_CURRENCY)
+    if entry is not LedgerEntryType.PAYMENT and (
+        v.get("shift_id") is not None or v.get("method") is not None
+    ):
+        # How money was paid, and into which drawer, belongs to a payment only.
+        raise ValidationError(
+            "SYNC_FIELD_NOT_ALLOWED", table="customer_ledger", field="shift_id", reason=entry.value
+        )
     if entry is LedgerEntryType.ADJUSTMENT:
         return _write_off(ctx, v, amount, currency)
     if entry is not LedgerEntryType.CHARGE and entry is not LedgerEntryType.PAYMENT:
@@ -899,13 +947,18 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     customer = _customer(ctx, v["customer_id"])
     if currency != customer.currency:
         raise ConflictError("DEBT_CURRENCY_MISMATCH", expected=customer.currency, got=currency)
+    if v.get("shift_id") is not None:
+        _own_shift(ctx, v["shift_id"], branch)  # the drawer a collection went into
     # Append-only ledger: concurrent offline payments both apply (customers-debt.md),
     # so an overpayment is flagged in the audit entry, not rejected.
     balance = ctx.reader.customer_balance(customer.id)
     overpaid = _violates(
         lambda: assert_not_overpaid(balance_minor=balance, payment_minor=amount)
     )
-    after = {**_pick(v, "customer_id", "amount_minor", "currency"), "overpaid": overpaid}
+    after = {
+        **_pick(v, "customer_id", "amount_minor", "currency", "method", "shift_id"),
+        "overpaid": overpaid,
+    }
     return ApplyPlan(
         v, branch, None, AuditIntent("debt.payment_recorded", "customer_ledger", after)
     )
@@ -956,6 +1009,56 @@ def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     )
 
 
+def _own_shift(ctx: _Ctx, shift_id: str, branch_id: str) -> ShiftRef:
+    """A sale or a debt collection names the pushing user's own shift in the same
+    branch: the drawer its cash went into. One not arrived yet is a retry."""
+    shift = ctx.reader.shift(shift_id)
+    if shift is None:
+        raise NotFoundError("SHIFT_NOT_FOUND", shift_id=shift_id)
+    if shift.branch_id != branch_id:
+        raise ValidationError("SYNC_REF_MISMATCH", field="shift_id", reason="shift_branch")
+    if shift.user_id != ctx.actor.id:
+        raise ValidationError("SYNC_REF_MISMATCH", field="shift_id", reason="shift_user")
+    return shift
+
+
+def _shifts_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    """A till opens its seller's own shift, in a branch where they sell."""
+    branch: str = v["branch_id"]
+    _need(ctx, Permission.SALE_CREATE, branch)
+    _guard_insert(ctx)
+    if v["user_id"] != ctx.actor.id:
+        raise ValidationError("SYNC_REF_MISMATCH", field="user_id", reason="own_shift")
+    assert_shift_cash_valid(amount_minor=v.get("opening_float_minor", 0))
+    values = {**v, "status": "open", "opened_at": event_time(ctx.op.created_at, ctx.now)}
+    after = _pick(v, "branch_id", "opening_float_minor")
+    return ApplyPlan(values, branch, branch, AuditIntent("shift.opened", "shift", after))
+
+
+def _shifts_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    """Closing a shift, by its own cashier or someone with report.view in its
+    branch. The server counts what the drawer should hold from its own rows: the
+    float, the cash of the shift's settled sales, and cash debt collections."""
+    current = _guard_update(ctx, "SHIFT_NOT_FOUND")
+    branch: str = current.values["branch_id"]
+    own = current.values["user_id"] == ctx.actor.id
+    _need(ctx, Permission.SALE_CREATE if own else Permission.REPORT_VIEW, branch)
+    if current.values["status"] != "open":
+        raise ConflictError("SHIFT_ALREADY_CLOSED", shift_id=ctx.op.row_id)
+    if v.get("status") != "closed" or "counted_cash_minor" not in v:
+        raise ValidationError("SYNC_OP_INVALID", field="data", reason="shift_close")
+    counted: int = v["counted_cash_minor"]
+    assert_shift_cash_valid(amount_minor=counted)
+    expected = ctx.reader.shift_expected_cash(ctx.op.row_id)
+    values = {
+        "status": "closed", "counted_cash_minor": counted, "expected_cash_minor": expected,
+        "variance_minor": counted - expected,
+        "closed_at": event_time(ctx.op.created_at, ctx.now),
+    }
+    after = {"counted": counted, "expected": expected, "variance": counted - expected}
+    return ApplyPlan(values, branch, branch, AuditIntent("shift.closed", "shift", after))
+
+
 _HANDLERS: dict[tuple[str, str], Callable[[_Ctx, dict[str, Any]], ApplyPlan]] = {
     ("products", "insert"): _products_insert,
     ("products", "update"): _products_update,
@@ -968,6 +1071,8 @@ _HANDLERS: dict[tuple[str, str], Callable[[_Ctx, dict[str, Any]], ApplyPlan]] = 
     ("sales", "insert"): _sales_insert,
     ("sale_lines", "insert"): _sale_lines_insert,
     ("payments", "insert"): _payments_insert,
+    ("shifts", "insert"): _shifts_insert,
+    ("shifts", "update"): _shifts_update,
     ("customer_ledger", "insert"): _customer_ledger_insert,
     ("supplier_ledger", "insert"): _supplier_ledger_insert,
 }
@@ -1042,8 +1147,11 @@ _READ: dict[str, frozenset[Permission]] = {
     "sales": _SALE_READERS,
     "sale_lines": _SALE_READERS,
     "payments": _SALE_READERS,
+    "shifts": _SALE_READERS,
 }
-_BRANCH_SCOPED_READ = frozenset({"stock_movements", "sales", "sale_lines", "payments"})
+_BRANCH_SCOPED_READ = frozenset(
+    {"stock_movements", "sales", "sale_lines", "payments", "shifts"}
+)
 _COST_READERS = frozenset({Permission.PRODUCT_MANAGE, Permission.REPORT_VIEW})
 _COST_FIELDS: dict[str, tuple[str, ...]] = {
     "products": ("cost_minor", "cost_currency"),

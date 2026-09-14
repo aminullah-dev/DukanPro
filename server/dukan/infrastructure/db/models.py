@@ -145,7 +145,7 @@ class SaleModel(RecordMixin, Base):
     __table_args__ = (Index("ix_sales_branch_occurred", "branch_id", "occurred_at"),)
     number: Mapped[str] = mapped_column(String(32), index=True)
     branch_id: Mapped[str] = mapped_column(String(36), index=True)
-    shift_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    shift_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
     customer_id: Mapped[str | None] = mapped_column(String(36), default=None)  # Phase 4
     status: Mapped[str] = mapped_column(String(8), default="settled")
     currency: Mapped[str] = mapped_column(String(3), default="AFN")
@@ -199,6 +199,9 @@ class CustomerLedgerModel(RecordMixin, Base):
 
     __tablename__ = "customer_ledger"
     customer_id: Mapped[str] = mapped_column(String(36), index=True)
+    # A debt payment: how it was paid, and the shift whose drawer it went into.
+    shift_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    method: Mapped[str | None] = mapped_column(String(8), default=None)
     type: Mapped[str] = mapped_column(String(12))
     amount_minor: Mapped[int] = mapped_column(BigInteger, )
     currency: Mapped[str] = mapped_column(String(3), default="AFN")

@@ -33,7 +33,7 @@ void main() {
     final c = Customer(id: newId(), name: 'Karim', creditLimitMinor: 200000);
     await customers.createCustomer(c, actorId: 'u1', deviceId: 'app');
     await sales.settle(
-      lines: [_line(p.id)], cashMinor: 0, customerId: c.id,
+      lines: [_line(p.id)], tenders: const [], customerId: c.id,
       branchId: 'B1', actorId: 'u1', deviceId: 'app',
     );
 

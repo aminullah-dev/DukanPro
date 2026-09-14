@@ -15,6 +15,7 @@ String _s(Object? v) => v as String? ?? '';
 String? _sN(Object? v) => v as String?;
 bool _b(Object? v) => v as bool? ?? true;
 DateTime _t(Object? v) => DateTime.parse(v! as String).toUtc();
+DateTime? _tN(Object? v) => v == null ? null : _t(v);
 
 /// A pulled value, or absent when the server omitted the key (a field hidden
 /// from the pulling user, e.g. cost): the write then keeps the local value.
@@ -36,7 +37,7 @@ const _retryableCodes = {
 /// The synced tables this app version keeps.
 const _tables = {
   'products', 'barcodes', 'units', 'categories', 'customers', 'suppliers', 'stock_movements',
-  'sales', 'sale_lines', 'payments', 'customer_ledger', 'supplier_ledger',
+  'sales', 'sale_lines', 'payments', 'customer_ledger', 'supplier_ledger', 'shifts',
 };
 
 /// Outbox ops by state, for the sync badge and card.
@@ -375,7 +376,17 @@ final class SyncEngine {
           id: Value(id), customerId: _opt(d, 'customer_id', _s), type: _opt(d, 'type', _s),
           amountMinor: _opt(d, 'amount_minor', _i), currency: _opt(d, 'currency', _s),
           refType: _opt(d, 'ref_type', _sN), refId: _opt(d, 'ref_id', _sN),
-          occurredAt: _opt(d, 'occurred_at', _t),
+          occurredAt: _opt(d, 'occurred_at', _t), shiftId: _opt(d, 'shift_id', _sN),
+          method: _opt(d, 'method', _sN),
+        ));
+      case 'shifts':
+        await _write(_db.shifts, id, exists, ShiftsCompanion(
+          id: Value(id), branchId: _opt(d, 'branch_id', _s), userId: _opt(d, 'user_id', _s),
+          openedAt: _opt(d, 'opened_at', _t), openingFloatMinor: _opt(d, 'opening_float_minor', _i),
+          closedAt: _opt(d, 'closed_at', _tN), countedCashMinor: _opt(d, 'counted_cash_minor', _iN),
+          expectedCashMinor: _opt(d, 'expected_cash_minor', _iN),
+          varianceMinor: _opt(d, 'variance_minor', _iN), status: _opt(d, 'status', _s),
+          version: _opt(d, 'version', _i),
         ));
       case 'supplier_ledger':
         await _write(_db.supplierLedger, id, exists, SupplierLedgerCompanion(

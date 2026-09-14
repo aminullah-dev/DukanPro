@@ -32,7 +32,7 @@ void main() {
     await customers.createCustomer(c, actorId: 'u1', deviceId: 'app');
 
     await sales.settle(
-      lines: [_line(p.id, 52000, 2)], cashMinor: 0, customerId: c.id,
+      lines: [_line(p.id, 52000, 2)], tenders: const [], customerId: c.id,
       branchId: 'B1', actorId: 'u1', deviceId: 'app',
     );
     expect(await customers.balance(c.id), 104000);
@@ -49,7 +49,7 @@ void main() {
     await customers.createCustomer(c, actorId: 'u1', deviceId: 'app');
     expect(
       () => sales.settle(
-        lines: [_line(p.id, 52000, 2)], cashMinor: 0, customerId: c.id,
+        lines: [_line(p.id, 52000, 2)], tenders: const [], customerId: c.id,
         branchId: 'B1', actorId: 'u1', deviceId: 'app',
       ),
       throwsA(isA<ConflictError>().having((e) => e.code, 'code', 'SALE_OVER_CREDIT_LIMIT')),
@@ -126,7 +126,7 @@ void main() {
     Matcher code(String c) => throwsA(isA<AppError>().having((e) => e.code, 'code', c));
 
     Future<SaleRow> credit(int qty, int cash) => sales.settle(
-          lines: [_line(p.id, 5000, qty)], cashMinor: cash, customerId: c.id,
+          lines: [_line(p.id, 5000, qty)], tenders: [if (cash != 0) Tender(PaymentMethod.cash, cash)], customerId: c.id,
           branchId: 'B1', actorId: 'u1', deviceId: 'app',
         );
     await expectLater(credit(1, -100), code('SALE_PAYMENT_INVALID'));

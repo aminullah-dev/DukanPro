@@ -131,24 +131,30 @@ final class LocalCustomers {
 
   Future<int> balance(String customerId) async => ledgerBalance(await entries(customerId));
 
+  /// A debt payment, by [method]. With a [shiftId] (the till's open shift),
+  /// cash collected counts in that shift's drawer.
   Future<void> recordPayment({
     required String customerId,
     required int amountMinor,
     String currency = 'AFN',
+    PaymentMethod method = PaymentMethod.cash,
+    String? shiftId,
     required String actorId,
     required String deviceId,
   }) async {
     assertDebtPaymentValid(amountMinor: amountMinor);
+    assertPaymentValid(method: method, amountMinor: amountMinor);
     assertNotOverpaid(balanceMinor: await balance(customerId), paymentMinor: amountMinor);
     final ledgerId = newId();
     await _db.transaction(() async {
       await _db.into(_db.customerLedger).insert(CustomerLedgerCompanion.insert(
             id: ledgerId, customerId: customerId, type: 'payment', amountMinor: amountMinor,
-            currency: Value(currency), refType: const Value('manual'), createdBy: Value(actorId),
+            currency: Value(currency), refType: const Value('manual'), method: Value(method.name),
+            shiftId: Value(shiftId), createdBy: Value(actorId),
           ));
       await _rec.record(table: 'customer_ledger', rowId: ledgerId, op: 'insert', data: {
         'customer_id': customerId, 'type': 'payment', 'amount_minor': amountMinor,
-        'currency': currency, 'ref_type': 'manual',
+        'currency': currency, 'ref_type': 'manual', 'method': method.name, 'shift_id': shiftId,
       }, actorId: actorId, deviceId: deviceId);
     });
   }

@@ -390,6 +390,67 @@ class AppLocalizationsEn extends AppLocalizations {
       'You can write off at most what the customer owes.';
 
   @override
+  String get openShift => 'Open shift';
+
+  @override
+  String get closeShift => 'Close shift';
+
+  @override
+  String get openingFloat => 'Cash in the drawer to start';
+
+  @override
+  String get openShiftPrompt =>
+      'Open your shift to start selling. Count the cash already in the drawer.';
+
+  @override
+  String get zReport => 'Shift report';
+
+  @override
+  String get cashSales => 'Cash sales';
+
+  @override
+  String get cardSales => 'Card sales';
+
+  @override
+  String get transferSales => 'Mobile money and transfers';
+
+  @override
+  String get debtCollected => 'Debt collected in cash';
+
+  @override
+  String get expectedCash => 'Cash that should be in the drawer';
+
+  @override
+  String get countedCash => 'Cash counted';
+
+  @override
+  String get variance => 'Difference';
+
+  @override
+  String get card => 'Card';
+
+  @override
+  String get transfer => 'Transfer';
+
+  @override
+  String get addPayment => 'Add payment';
+
+  @override
+  String get remaining => 'Still to pay';
+
+  @override
+  String shiftClosed(String variance) {
+    return 'Shift closed. Difference: $variance AFN';
+  }
+
+  @override
+  String get errShiftNotOpen =>
+      'Open a shift first: sales go into an open shift of yours.';
+
+  @override
+  String get errShiftAlreadyOpen => 'You already have an open shift here.';
+
+  @override
   String get errSessionEnded =>
       'Your access has changed or ended. Sign in again.';
 

@@ -49,6 +49,7 @@ from dukan.infrastructure.db.models import (
     UnitModel,
 )
 from dukan.infrastructure.scope import require_active_branch
+from dukan.infrastructure.shift_cash import expected_cash, require_open_shift
 from dukan.shared.errors import ConflictError, NotFoundError, ValidationError
 from dukan.shared.ids import new_id
 
@@ -142,6 +143,8 @@ class SqlSalesService(SalesService):
         require_active_branch(self._s, branch_id)
         if not lines:
             raise ValidationError("SALE_EMPTY")
+        if shift_id is not None:
+            require_open_shift(self._s, shift_id=shift_id, user_id=actor.id, branch_id=branch_id)
 
         currency = "AFN"
         domain_lines: list[SaleLine] = []
@@ -357,11 +360,22 @@ class SqlSalesService(SalesService):
         require_permission(_POLICY, actor, Permission.SALE_CREATE, branch_id)
         require_active_branch(self._s, branch_id)
         assert_shift_cash_valid(amount_minor=opening_float_minor)
+        already = self._s.scalar(
+            select(ShiftModel.id).where(
+                ShiftModel.branch_id == branch_id, ShiftModel.user_id == actor.id,
+                ShiftModel.status == "open", ShiftModel.deleted_at.is_(None),
+            ).limit(1)
+        )
+        if already is not None:
+            # One drawer per seller per branch: sales would split between two counts.
+            raise ConflictError("SHIFT_ALREADY_OPEN", shift_id=already)
         shift = ShiftModel(
             id=new_id(), branch_id=branch_id, user_id=actor.id,
             opening_float_minor=opening_float_minor, status="open", created_by=actor.id,
         )
         self._s.add(shift)
+        record_change(self._s, "shifts", shift, op="insert", branch_id=branch_id)
+        self._audit("shift.opened", actor.id, shift.id, {"opening_float": opening_float_minor})
         self._s.commit()
         return ShiftView(
             id=shift.id, status=shift.status, opening_float_minor=shift.opening_float_minor,
@@ -381,21 +395,15 @@ class SqlSalesService(SalesService):
         if shift.status != "open":
             raise ConflictError("SHIFT_ALREADY_CLOSED", shift_id=shift.id)
         assert_shift_cash_valid(amount_minor=counted_cash_minor)
-        cash_sales = self._s.scalar(
-            select(func.coalesce(func.sum(PaymentModel.amount_minor), 0))
-            .select_from(PaymentModel)
-            .join(SaleModel, SaleModel.id == PaymentModel.sale_id)
-            .where(
-                SaleModel.shift_id == shift.id, SaleModel.status == "settled",
-                PaymentModel.method == "cash",
-            )
-        ) or 0
-        expected = shift.opening_float_minor + int(cash_sales)
+        # The float, its sales' cash and the debts it collected in cash.
+        expected = expected_cash(self._s, shift.id)
         shift.expected_cash_minor = expected
         shift.counted_cash_minor = counted_cash_minor
         shift.variance_minor = counted_cash_minor - expected
         shift.closed_at = datetime.now(UTC)
         shift.status = "closed"
+        shift.version += 1  # devices take the closed image over their open one
+        record_change(self._s, "shifts", shift, op="update", branch_id=shift.branch_id)
         self._audit("shift.closed", actor.id, shift.id, {"variance": shift.variance_minor})
         self._s.commit()
         return ShiftView(

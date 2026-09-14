@@ -78,11 +78,13 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | stock_movements insert, `adjustment` | stock.adjust (row) | qty ≠ 0; the product tracks stock |
 | stock_movements insert, `purchase` | stock.adjust (row) | qty > 0 |
 | stock_movements insert, `sale` | sale.create (row) | qty < 0; `ref_type` `sale` and `ref_id` of the pusher's own sale in the same branch; never more out than that sale's lines hold for the product; a movement beyond the lines that have arrived, while some are still missing, is a retry (`SALE_LINES_NOT_FOUND`) |
-| sales insert | sale.create (row), plus sale.discount for a discount above 0 | 0 ≤ discount ≤ subtotal; total = subtotal − discount + tax; paid ≥ total unless on credit, and never above the total (`SALE_OVERPAID`); the customer exists; `shift_id` null |
+| sales insert | sale.create (row), plus sale.discount for a discount above 0 | 0 ≤ discount ≤ subtotal; total = subtotal − discount + tax; paid ≥ total unless on credit, and never above the total (`SALE_OVERPAID`); the customer exists; a `shift_id` names the pusher's own shift in the branch (not arrived yet: `SHIFT_NOT_FOUND`, a retry; closed: **flagged** `after_shift_close`) |
+| shifts insert | sale.create (row) | the pusher's own shift (`user_id`); a float of 0 or more; opened at the device's time |
+| shifts update | sale.create for the shift's own seller, else report.view | `base_version` required; only an open shift closes (`SHIFT_ALREADY_CLOSED`); `status` closed and `counted_cash_minor`; the server sets the expected cash and the variance from its own rows |
 | sale_lines insert | sale.create (sale's) | the pusher's own sale; line total = price × qty (half-up) at the decimal places of the product's unit (a pushed `decimal_places` that differs is refused, `SYNC_FIELD_INVALID`; a missing one is filled in); lines ≤ subtotal; the sale's currency; a pushed `unit_cost_minor` is ignored and set by the server from the product's cost; a unit price under the catalog price needs sale.discount or price.change, unless the product had that price within the 45 days before the sale (the time its header recorded) (a till that had not pulled a price change yet) |
-| payments insert | sale.create (sale's) | the pusher's own sale, whose lines add up to its subtotal; payments ≤ paid and ≤ total; cash or card, a positive amount, and tendered (cash only) ≥ amount (`SALE_PAYMENT_INVALID`) |
+| payments insert | sale.create (sale's) | the pusher's own sale, whose lines add up to its subtotal; payments ≤ paid and ≤ total; cash or card, a positive amount, and tendered (cash only) ≥ amount (`SALE_PAYMENT_INVALID`); cash, card or transfer |
 | customer_ledger insert, `charge` | sale.create (sale's) | `ref_type` `sale` and `ref_id` of the pusher's own sale for that customer, whose lines add up to its subtotal; charges ≤ total − paid; over the credit limit is **flagged** in the audit, not refused; the customer's currency (`DEBT_CURRENCY_MISMATCH`); a customer whose account is closed is **flagged** (`customer_inactive`), not refused |
-| customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused |
+| customer_ledger insert, `payment` | sale.create (active) | no `ref_id`; the customer's currency; an overpayment is **flagged** in the audit, not refused; `method` (cash, card, transfer) and a `shift_id` naming the pusher's own shift in the branch |
 | customer_ledger insert, `adjustment` | debt.write_off (active) | a write-off: a negative amount, `ref_type` `write_off`, no `ref_id`; the customer's currency; one past the balance is **flagged** (`exceeds_balance`), not refused |
 | supplier_ledger insert, `bill` | purchase.cost (active) | the supplier exists; the supplier's currency |
 
@@ -140,7 +142,7 @@ Each change is the row's **post-image**: its allow-listed business columns, plus
 | suppliers | stock.adjust, product.manage or report.view | shop-wide |
 | supplier_ledger | report.view or debt.write_off | shop-wide |
 | stock_movements | any permission | branches where the user holds a role |
-| sales, sale_lines, payments | sale.create or report.view | branches where the user holds a role with one of them |
+| sales, sale_lines, payments, shifts | sale.create or report.view | branches where the user holds a role with one of them |
 
 Cost fields (`products.cost_minor`, `products.cost_currency`, `sale_lines.unit_cost_minor`) are **omitted** unless the user has product.manage or report.view. They are omitted, not nulled, because the client writes only the keys that are present. One user's pull therefore never wipes a value another user of the same device can see.
 

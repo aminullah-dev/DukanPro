@@ -13,7 +13,8 @@ final class LocalSales {
   final AppDatabase _db;
   final SyncRecorder _rec;
 
-  /// Cash-only settle (no customer).
+  /// Cash-only settle (no customer): one cash tender with what was handed over,
+  /// toward the total (less than the total is `SALE_UNDERPAID`).
   Future<SaleRow> settleCash({
     required List<SaleLine> lines,
     int discountMinor = 0,
@@ -24,19 +25,24 @@ final class LocalSales {
     String? shiftId,
   }) {
     final total = computeTotals(lines, discountMinor: discountMinor).totalMinor;
+    final paid = tenderedMinor < total ? tenderedMinor : total;
     return settle(
-      lines: lines, discountMinor: discountMinor, cashMinor: total, tenderedMinor: tenderedMinor,
+      lines: lines, discountMinor: discountMinor,
+      tenders: [if (paid > 0) Tender(PaymentMethod.cash, paid, tenderedMinor: tenderedMinor)],
       branchId: branchId, actorId: actorId, deviceId: deviceId, shiftId: shiftId,
     );
   }
 
-  /// General settle. When [customerId] is set, the remainder (total − cashMinor)
-  /// posts to the customer ledger: the customer must be active, owe in the sale's currency and stay within their credit limit.
+  /// General settle. [tenders] are the payments taken now: cash (with what was
+  /// handed over), card or transfer, one or several. With a [customerId] the
+  /// rest of the total posts to the customer ledger: the customer must be
+  /// active, owe in the sale's currency and stay within their credit limit.
+  /// With a [shiftId] the sale goes into that shift's drawer: the seller's own
+  /// open shift in this branch (`SHIFT_NOT_OPEN`).
   Future<SaleRow> settle({
     required List<SaleLine> lines,
     int discountMinor = 0,
-    required int cashMinor,
-    int? tenderedMinor,
+    required List<Tender> tenders,
     String? customerId,
     required String branchId,
     required String actorId,
@@ -47,20 +53,18 @@ final class LocalSales {
     assertSaleLinesValid(lines, currency: currency);
     final totals = computeTotals(lines, discountMinor: discountMinor);
     assertDiscountValid(discountMinor: discountMinor, subtotalMinor: totals.subtotalMinor);
-    final tendered = tenderedMinor ?? cashMinor;
-    final onCredit = customerId != null;
-    assertSettleable(
-      lines: lines, totalMinor: totals.totalMinor,
-      paidMinor: onCredit ? cashMinor : tendered, currency: currency, allowCredit: onCredit,
-    );
-    // Cash toward a credit sale is at most its total: the rest is the debt.
-    final paid = onCredit ? cashMinor : totals.totalMinor;
-    assertSaleNotOverpaid(paidMinor: paid, totalMinor: totals.totalMinor);
-    if (paid > 0) {
-      assertPaymentValid(
-          method: PaymentMethod.cash, amountMinor: paid, tenderedMinor: onCredit ? null : tendered);
+    for (final t in tenders) {
+      assertPaymentValid(method: t.method, amountMinor: t.amountMinor, tenderedMinor: t.tenderedMinor);
     }
-    final remainder = onCredit ? (totals.totalMinor - cashMinor) : 0;
+    final paid = tenders.fold<int>(0, (sum, t) => sum + t.amountMinor);
+    assertSettleable(
+      lines: lines, totalMinor: totals.totalMinor, paidMinor: paid, currency: currency,
+      allowCredit: customerId != null,
+    );
+    assertSaleNotOverpaid(paidMinor: paid, totalMinor: totals.totalMinor);
+    // Change is cash handed back over a cash tender.
+    final change = tenders.fold<int>(0, (sum, t) => sum + (t.tenderedMinor ?? t.amountMinor) - t.amountMinor);
+    final remainder = totals.totalMinor - paid;
     final creditId = customerId;
     if (creditId != null && remainder > 0) {
       // The customer's own row decides, not what the screen showed.
@@ -76,7 +80,7 @@ final class LocalSales {
         chargeMinor: remainder, creditLimitMinor: customer.creditLimitMinor,
       );
     }
-    final change = onCredit ? 0 : (tendered - totals.totalMinor);
+    if (shiftId != null) await _requireOpenShift(shiftId, branchId: branchId, userId: actorId);
     final saleId = newId();
     late SaleRow saved;
 
@@ -121,22 +125,23 @@ final class LocalSales {
           'ref_type': 'sale', 'ref_id': saleId,
         }, actorId: actorId, deviceId: deviceId);
       }
-      if (paid > 0) {
+      for (final t in tenders) {
         final paymentId = newId();
+        final tenderChange = t.tenderedMinor == null ? null : t.tenderedMinor! - t.amountMinor;
         await _db.into(_db.payments).insert(PaymentsCompanion.insert(
-              id: paymentId, saleId: saleId, method: 'cash', amountMinor: paid, currency: Value(currency),
-              tenderedMinor: Value(onCredit ? null : tendered), changeMinor: Value(change),
-              createdBy: Value(actorId),
+              id: paymentId, saleId: saleId, method: t.method.name, amountMinor: t.amountMinor,
+              currency: Value(currency), tenderedMinor: Value(t.tenderedMinor),
+              changeMinor: Value(tenderChange), createdBy: Value(actorId),
             ));
         await _rec.record(table: 'payments', rowId: paymentId, op: 'insert', data: {
-          'sale_id': saleId, 'method': 'cash', 'amount_minor': paid, 'currency': currency,
-          'tendered_minor': onCredit ? null : tendered, 'change_minor': change,
+          'sale_id': saleId, 'method': t.method.name, 'amount_minor': t.amountMinor,
+          'currency': currency, 'tendered_minor': t.tenderedMinor, 'change_minor': tenderChange,
         }, actorId: actorId, deviceId: deviceId);
       }
-      if (onCredit && remainder > 0) {
+      if (creditId != null && remainder > 0) {
         final ledgerId = newId();
         await _db.into(_db.customerLedger).insert(CustomerLedgerCompanion.insert(
-              id: ledgerId, customerId: customerId, type: 'charge', amountMinor: remainder,
+              id: ledgerId, customerId: creditId, type: 'charge', amountMinor: remainder,
               currency: Value(currency), refType: const Value('sale'), refId: Value(saleId),
               createdBy: Value(actorId),
             ));
@@ -149,6 +154,13 @@ final class LocalSales {
       saved = await (_db.select(_db.sales)..where((t) => t.id.equals(saleId))).getSingle();
     });
     return saved;
+  }
+
+  Future<void> _requireOpenShift(String shiftId, {required String branchId, required String userId}) async {
+    final shift = await (_db.select(_db.shifts)..where((t) => t.id.equals(shiftId))).getSingleOrNull();
+    if (shift == null || shift.status != 'open' || shift.branchId != branchId || shift.userId != userId) {
+      throw ConflictError('SHIFT_NOT_OPEN', {'shift_id': shiftId});
+    }
   }
 
   Future<List<SaleLineRow>> saleLinesFor(String saleId) =>

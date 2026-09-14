@@ -20,9 +20,11 @@ from dukan.domain.customers import (
     ledger_balance,
 )
 from dukan.domain.identity import Permission, PermissionPolicy, User
+from dukan.domain.sales import assert_payment_valid
 from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import AuditEntryModel, CustomerLedgerModel, CustomerModel
 from dukan.infrastructure.scope import require_active_branch
+from dukan.infrastructure.shift_cash import require_open_shift
 from dukan.shared.errors import ConflictError, NotFoundError
 from dukan.shared.ids import new_id
 
@@ -148,20 +150,29 @@ class SqlCustomerService(CustomerService):
         return self._view(customer)
 
     def record_payment(
-        self, *, actor: User, branch_id: str, customer_id: str, amount_minor: int
+        self, *, actor: User, branch_id: str, customer_id: str, amount_minor: int,
+        method: str = "cash", shift_id: str | None = None,
     ) -> CustomerView:
         require_permission(_POLICY, actor, Permission.SALE_CREATE, branch_id)
         require_active_branch(self._s, branch_id)
         assert_debt_payment_valid(amount_minor=amount_minor)
+        assert_payment_valid(method=method, amount_minor=amount_minor)  # cash, card or transfer
+        if shift_id is not None:
+            # Cash collected at the till counts in that shift's drawer.
+            require_open_shift(self._s, shift_id=shift_id, user_id=actor.id, branch_id=branch_id)
         customer = self._get(customer_id, lock=True)
         assert_not_overpaid(balance_minor=self._balance(customer_id), payment_minor=amount_minor)
         entry = CustomerLedgerModel(
             id=new_id(), customer_id=customer_id, type="payment", amount_minor=amount_minor,
-            currency=customer.currency, ref_type="manual", created_by=actor.id,
+            currency=customer.currency, ref_type="manual", method=method, shift_id=shift_id,
+            created_by=actor.id,
         )
         self._s.add(entry)
         record_change(self._s, "customer_ledger", entry, op="insert", branch_id=None)
-        self._audit("debt.payment_recorded", actor.id, customer_id, {"amount": amount_minor})
+        self._audit(
+            "debt.payment_recorded", actor.id, customer_id,
+            {"amount": amount_minor, "method": method},
+        )
         self._s.commit()
         return self._view(customer)
 
