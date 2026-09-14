@@ -266,10 +266,10 @@ void main() {
     await controller.loginOnline(username: 'owner', password: 'correct');
     controller.lock();
 
-    expect(await controller.unlockWithBiometric(), isFalse); // not opted in
+    expect(await controller.unlockWithBiometric('Unlock'), isFalse); // not opted in
     expect(await controller.enableBiometric('wrong'), isFalse);
     expect(await controller.enableBiometric('correct'), isTrue);
-    expect(await controller.unlockWithBiometric(), isTrue);
+    expect(await controller.unlockWithBiometric('Unlock'), isTrue);
     expect(c.read(authControllerProvider), isA<AuthLoggedIn>());
 
     // Another user signing in on the device does not inherit it.

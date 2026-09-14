@@ -56,7 +56,8 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
 
   Future<void> _unlockWithBiometric() async {
     final controller = ref.read(authControllerProvider.notifier);
-    if (await controller.unlockWithBiometric()) unawaited(controller.revalidate());
+    final reason = AppLocalizations.of(context).biometricReason;
+    if (await controller.unlockWithBiometric(reason)) unawaited(controller.revalidate());
   }
 
   @override

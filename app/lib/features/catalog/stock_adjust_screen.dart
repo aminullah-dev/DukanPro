@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
 import '../auth/providers.dart';
@@ -82,7 +84,7 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
       appBar: AppBar(title: Text('${l.adjustStock} · ${widget.product.name}')),
       body: units.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (unitRows) {
           final unit = _unitOf(unitRows);
           if (unit == null) return Center(child: Text(l.errUnitUnknown));
@@ -94,7 +96,7 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
                 leading: const Icon(Icons.inventory_2_outlined),
                 title: Text(l.onHand),
                 trailing: Text(
-                  onHand.maybeWhen(data: (n) => '${formatQuantity(n, decimalPlaces)} ${unit.name}', orElse: () => '…'),
+                  onHand.maybeWhen(data: (n) => '${formatQuantity(n, decimalPlaces)} ${unitLabel(AppLocalizations.of(context), unit.id, unit.name)}', orElse: () => '…'),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),

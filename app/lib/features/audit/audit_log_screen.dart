@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
 import 'audit_providers.dart';
 
@@ -30,7 +32,7 @@ class AuditLogScreen extends ConsumerWidget {
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (entries) => entries.isEmpty
             ? Center(child: Text(l.noAuditEntries))
             : ListView.separated(
@@ -38,15 +40,12 @@ class AuditLogScreen extends ConsumerWidget {
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, i) {
                   final e = entries[i];
-                  final subtitle = [
-                    if (e.entityType != null) e.entityType!,
-                    DateFormat.yMd().add_Hm().format(e.occurredAt),
-                  ].join(' · ');
+                  final time = DateFormat.yMd().add_Hm().format(e.occurredAt);
                   return ListTile(
                     dense: true,
                     leading: const Icon(Icons.history, size: 20),
-                    title: Text(e.action, style: const TextStyle(fontFamily: 'monospace')),
-                    subtitle: Text(subtitle),
+                    title: Text(auditActionLabel(l, e.action)),
+                    subtitle: Text(l.auditBy(e.actorName ?? l.auditSystem, time)),
                   );
                 },
               ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
 import '../auth/session.dart';
@@ -118,7 +119,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
       }
       if (mounted) Navigator.of(context).pop();
     } on AppError catch (e) {
-      if (mounted) setState(() => _error = moneyErrorText(l, e));
+      if (mounted) setState(() => _error = appErrorText(l, e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -132,7 +133,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
       appBar: AppBar(title: Text(_isNew ? l.addProduct : l.editProduct)),
       body: units.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (unitRows) {
           _unitId ??= unitRows.isNotEmpty ? unitRows.first.id : null;
           return Form(
@@ -159,7 +160,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                   decoration: InputDecoration(labelText: l.unit, border: const OutlineInputBorder()),
                   items: [
                     for (final u in unitRows)
-                      DropdownMenuItem(value: u.id, child: Text(u.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: u.id, child: Text(unitLabel(l, u.id, u.name), maxLines: 1, overflow: TextOverflow.ellipsis)),
                   ],
                   onChanged: _isNew ? (v) => setState(() => _unitId = v) : null,
                 ),
@@ -257,7 +258,7 @@ class _BarcodesState extends ConsumerState<_Barcodes> {
       if (mounted) setState(() => _error = null);
       _code.clear();
     } on AppError catch (e) {
-      if (mounted) setState(() => _error = moneyErrorText(AppLocalizations.of(context), e));
+      if (mounted) setState(() => _error = appErrorText(AppLocalizations.of(context), e));
     }
     await _load();
   }

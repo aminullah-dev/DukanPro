@@ -152,7 +152,7 @@ abstract class AppLocalizations {
   /// No description provided for @itemsInCart.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =0{No items} =1{1 item} other{{count} items}}'**
+  /// **'{count, plural, =0{No items} =1{{count} item} other{{count} items}}'**
   String itemsInCart(int count);
 
   /// No description provided for @signIn.
@@ -560,7 +560,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncPending.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =0{All changes synced} =1{1 change to sync} other{{count} changes to sync}}'**
+  /// **'{count, plural, =0{All changes synced} =1{{count} change to sync} other{{count} changes to sync}}'**
   String syncPending(int count);
 
   /// No description provided for @syncFailed.
@@ -572,13 +572,13 @@ abstract class AppLocalizations {
   /// No description provided for @syncConflicts.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 item needs review} other{{count} items need review}}'**
+  /// **'{count, plural, =1{{count} item needs review} other{{count} items need review}}'**
   String syncConflicts(int count);
 
   /// No description provided for @syncRejected.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 change was rejected by the server} other{{count} changes were rejected by the server}}'**
+  /// **'{count, plural, =1{{count} change was rejected by the server} other{{count} changes were rejected by the server}}'**
   String syncRejected(int count);
 
   /// No description provided for @setupCode.
@@ -620,7 +620,7 @@ abstract class AppLocalizations {
   /// No description provided for @logoutPendingWarning.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 change is not synced yet.} other{{count} changes are not synced yet.}}'**
+  /// **'{count, plural, =1{{count} change is not synced yet.} other{{count} changes are not synced yet.}}'**
   String logoutPendingWarning(int count);
 
   /// No description provided for @useAnotherAccount.
@@ -698,7 +698,7 @@ abstract class AppLocalizations {
   /// No description provided for @profitMissingCost.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 item sold without a cost} other{{count} items sold without a cost}}'**
+  /// **'{count, plural, =1{{count} item sold without a cost} other{{count} items sold without a cost}}'**
   String profitMissingCost(int count);
 
   /// No description provided for @errCustomerInactive.
@@ -1370,8 +1370,8 @@ abstract class AppLocalizations {
   /// No description provided for @insightDeadStock.
   ///
   /// In en, this message translates to:
-  /// **'{product} hasn\'t sold in {days} days'**
-  String insightDeadStock(String product, String days);
+  /// **'{days, plural, =1{{product} hasn\'t sold in {days} day} other{{product} hasn\'t sold in {days} days}}'**
+  String insightDeadStock(String product, int days);
 
   /// No description provided for @insightDebtRisk.
   ///
@@ -1382,8 +1382,8 @@ abstract class AppLocalizations {
   /// No description provided for @insightDigest.
   ///
   /// In en, this message translates to:
-  /// **'{count} sales today'**
-  String insightDigest(String count);
+  /// **'{count, plural, =1{{count} sale today} other{{count} sales today}}'**
+  String insightDigest(int count);
 
   /// No description provided for @insightUnknown.
   ///
@@ -1402,6 +1402,468 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No activity recorded yet'**
   String get noAuditEntries;
+
+  /// No description provided for @errSaleEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an item first.'**
+  String get errSaleEmpty;
+
+  /// No description provided for @errUnderpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment is less than the total.'**
+  String get errUnderpaid;
+
+  /// No description provided for @errOverpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment is more than the total.'**
+  String get errOverpaid;
+
+  /// No description provided for @errDiscountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The discount can\'t be below zero or more than the total.'**
+  String get errDiscountInvalid;
+
+  /// No description provided for @errSaleNotVoidable.
+  ///
+  /// In en, this message translates to:
+  /// **'This sale can\'t be voided.'**
+  String get errSaleNotVoidable;
+
+  /// No description provided for @errStockInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough stock for this sale.'**
+  String get errStockInsufficient;
+
+  /// No description provided for @errShiftAlreadyClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'This shift is already closed.'**
+  String get errShiftAlreadyClosed;
+
+  /// No description provided for @errCurrencyMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The currencies don\'t match.'**
+  String get errCurrencyMismatch;
+
+  /// No description provided for @errBranchInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'This branch is closed.'**
+  String get errBranchInactive;
+
+  /// No description provided for @errUserLastAssignment.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the employee\'s only branch.'**
+  String get errUserLastAssignment;
+
+  /// No description provided for @errWeakPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'This password is too short or too simple.'**
+  String get errWeakPassword;
+
+  /// No description provided for @errNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This no longer exists. Refresh and try again.'**
+  String get errNotFound;
+
+  /// No description provided for @errConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else changed this meanwhile. Refresh and try again.'**
+  String get errConflict;
+
+  /// No description provided for @errInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Some values weren\'t accepted. Check them and try again.'**
+  String get errInvalid;
+
+  /// No description provided for @biometricReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm it\'s you to unlock DukanPro'**
+  String get biometricReason;
+
+  /// No description provided for @unitPiece.
+  ///
+  /// In en, this message translates to:
+  /// **'piece'**
+  String get unitPiece;
+
+  /// No description provided for @unitKg.
+  ///
+  /// In en, this message translates to:
+  /// **'kg'**
+  String get unitKg;
+
+  /// No description provided for @unitLitre.
+  ///
+  /// In en, this message translates to:
+  /// **'litre'**
+  String get unitLitre;
+
+  /// No description provided for @unitDozen.
+  ///
+  /// In en, this message translates to:
+  /// **'dozen'**
+  String get unitDozen;
+
+  /// No description provided for @unitMeter.
+  ///
+  /// In en, this message translates to:
+  /// **'meter'**
+  String get unitMeter;
+
+  /// No description provided for @timeZoneKabul.
+  ///
+  /// In en, this message translates to:
+  /// **'Kabul time'**
+  String get timeZoneKabul;
+
+  /// No description provided for @currencyAfn.
+  ///
+  /// In en, this message translates to:
+  /// **'Afghani'**
+  String get currencyAfn;
+
+  /// No description provided for @currencyUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'US dollar'**
+  String get currencyUsd;
+
+  /// No description provided for @currencyPkr.
+  ///
+  /// In en, this message translates to:
+  /// **'Pakistani rupee'**
+  String get currencyPkr;
+
+  /// No description provided for @currencyEur.
+  ///
+  /// In en, this message translates to:
+  /// **'Euro'**
+  String get currencyEur;
+
+  /// No description provided for @auditSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get auditSystem;
+
+  /// No description provided for @auditOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other activity'**
+  String get auditOther;
+
+  /// No description provided for @branchRole.
+  ///
+  /// In en, this message translates to:
+  /// **'{branch} · {role}'**
+  String branchRole(String branch, String role);
+
+  /// No description provided for @branchZoneCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'{zone} · {currency}'**
+  String branchZoneCurrency(String zone, String currency);
+
+  /// No description provided for @auditBy.
+  ///
+  /// In en, this message translates to:
+  /// **'{actor} · {time}'**
+  String auditBy(String actor, String time);
+
+  /// No description provided for @auditBarcodeAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode added'**
+  String get auditBarcodeAdded;
+
+  /// No description provided for @auditBarcodeRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode removed'**
+  String get auditBarcodeRemoved;
+
+  /// No description provided for @auditBranchActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch reopened'**
+  String get auditBranchActivated;
+
+  /// No description provided for @auditBranchCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch opened'**
+  String get auditBranchCreated;
+
+  /// No description provided for @auditBranchDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch closed'**
+  String get auditBranchDeactivated;
+
+  /// No description provided for @auditBranchUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch changed'**
+  String get auditBranchUpdated;
+
+  /// No description provided for @auditCostValuationChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock cost updated'**
+  String get auditCostValuationChanged;
+
+  /// No description provided for @auditCustomerCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer added'**
+  String get auditCustomerCreated;
+
+  /// No description provided for @auditCustomerCreditLimitChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit limit changed'**
+  String get auditCustomerCreditLimitChanged;
+
+  /// No description provided for @auditCustomerDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer account closed'**
+  String get auditCustomerDeactivated;
+
+  /// No description provided for @auditCustomerReactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer account reopened'**
+  String get auditCustomerReactivated;
+
+  /// No description provided for @auditCustomerUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer changed'**
+  String get auditCustomerUpdated;
+
+  /// No description provided for @auditDebtChargePosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale on credit'**
+  String get auditDebtChargePosted;
+
+  /// No description provided for @auditDebtPaymentRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Debt payment received'**
+  String get auditDebtPaymentRecorded;
+
+  /// No description provided for @auditDebtWrittenOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Debt written off'**
+  String get auditDebtWrittenOff;
+
+  /// No description provided for @auditDiscountApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount given'**
+  String get auditDiscountApplied;
+
+  /// No description provided for @auditNotificationsRefreshed.
+  ///
+  /// In en, this message translates to:
+  /// **'Insights refreshed'**
+  String get auditNotificationsRefreshed;
+
+  /// No description provided for @auditOwnerBootstrapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop set up'**
+  String get auditOwnerBootstrapped;
+
+  /// No description provided for @auditPasswordReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset'**
+  String get auditPasswordReset;
+
+  /// No description provided for @auditPaymentRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment recorded'**
+  String get auditPaymentRecorded;
+
+  /// No description provided for @auditProductCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Product added'**
+  String get auditProductCreated;
+
+  /// No description provided for @auditProductDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Product deactivated'**
+  String get auditProductDeactivated;
+
+  /// No description provided for @auditProductPriceChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Price changed'**
+  String get auditProductPriceChanged;
+
+  /// No description provided for @auditProductUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Product changed'**
+  String get auditProductUpdated;
+
+  /// No description provided for @auditPurchaseReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods received'**
+  String get auditPurchaseReceived;
+
+  /// No description provided for @auditRoleAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Role granted'**
+  String get auditRoleAssigned;
+
+  /// No description provided for @auditRoleRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Role removed'**
+  String get auditRoleRevoked;
+
+  /// No description provided for @auditSaleLineAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Item added to a sale'**
+  String get auditSaleLineAdded;
+
+  /// No description provided for @auditSaleSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale completed'**
+  String get auditSaleSettled;
+
+  /// No description provided for @auditSaleVoided.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale voided'**
+  String get auditSaleVoided;
+
+  /// No description provided for @auditSessionReuseDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspicious sign-in blocked'**
+  String get auditSessionReuseDetected;
+
+  /// No description provided for @auditShiftClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift closed'**
+  String get auditShiftClosed;
+
+  /// No description provided for @auditShiftOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift opened'**
+  String get auditShiftOpened;
+
+  /// No description provided for @auditStockAdjusted.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock adjusted'**
+  String get auditStockAdjusted;
+
+  /// No description provided for @auditStockReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock received'**
+  String get auditStockReceived;
+
+  /// No description provided for @auditStockSold.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock sold'**
+  String get auditStockSold;
+
+  /// No description provided for @auditSupplierBillPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier bill recorded'**
+  String get auditSupplierBillPosted;
+
+  /// No description provided for @auditSupplierCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier added'**
+  String get auditSupplierCreated;
+
+  /// No description provided for @auditSupplierPaymentRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier paid'**
+  String get auditSupplierPaymentRecorded;
+
+  /// No description provided for @auditSyncPull.
+  ///
+  /// In en, this message translates to:
+  /// **'Device synced'**
+  String get auditSyncPull;
+
+  /// No description provided for @auditUnitCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit added'**
+  String get auditUnitCreated;
+
+  /// No description provided for @auditUserAuthenticated.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get auditUserAuthenticated;
+
+  /// No description provided for @auditUserCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee added'**
+  String get auditUserCreated;
+
+  /// No description provided for @auditUserDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee disabled'**
+  String get auditUserDisabled;
+
+  /// No description provided for @auditUserEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee enabled'**
+  String get auditUserEnabled;
+
+  /// No description provided for @auditUserLoginFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed sign-in'**
+  String get auditUserLoginFailed;
+
+  /// No description provided for @auditUserLogout.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out'**
+  String get auditUserLogout;
 }
 
 class _AppLocalizationsDelegate

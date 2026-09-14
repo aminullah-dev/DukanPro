@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
 import '../auth/auth_controller.dart';
 import '../auth/providers.dart';
@@ -82,7 +83,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
       appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.printerSettings)),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (config) {
           _hydrate(config);
           return ListView(

@@ -12,6 +12,7 @@ class AuditEntryDto {
     required this.occurredAt,
     required this.action,
     this.actorId,
+    this.actorName,
     this.entityType,
     this.entityId,
   });
@@ -19,6 +20,9 @@ class AuditEntryDto {
   final DateTime occurredAt;
   final String action;
   final String? actorId;
+
+  /// Who did it (their display name), when someone did.
+  final String? actorName;
   final String? entityType;
   final String? entityId;
 
@@ -27,6 +31,7 @@ class AuditEntryDto {
         occurredAt: DateTime.tryParse(j['occurred_at'] as String? ?? '')?.toLocal() ?? DateTime.now(),
         action: j['action'] as String,
         actorId: j['actor_id'] as String?,
+        actorName: j['actor_name'] as String?,
         entityType: j['entity_type'] as String?,
         entityId: j['entity_id'] as String?,
       );

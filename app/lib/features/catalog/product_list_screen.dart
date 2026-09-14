@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
 import '../auth/session.dart';
 import 'catalog_providers.dart';
@@ -62,7 +64,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
           Expanded(
             child: async.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) => ErrorMessage(e),
               data: (products) {
                 final q = _query.toLowerCase();
                 final items = q.isEmpty
@@ -124,7 +126,7 @@ class _OnHandBadge extends ConsumerWidget {
       // In the product's unit: 2.500 kg, not 2500.
       data: (n) => Chip(
         visualDensity: VisualDensity.compact,
-        label: Text('${l.onHand}: ${unit == null ? '…' : '${formatQuantity(n, unit.decimalPlaces)} ${unit.name}'}'),
+        label: Text('${l.onHand}: ${unit == null ? '…' : '${formatQuantity(n, unit.decimalPlaces)} ${unitLabel(l, unit.id, unit.name)}'}'),
       ),
       orElse: () => const SizedBox.shrink(),
     );

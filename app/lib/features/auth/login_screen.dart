@@ -31,7 +31,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  String? _shopError; // the shop name heads every receipt: setup asks for one
+
   Future<void> _submit() async {
+    if (_setup && _shopName.text.trim().isEmpty) {
+      setState(() => _shopError = AppLocalizations.of(context).errRequired);
+      return;
+    }
     setState(() => _busy = true);
     final controller = ref.read(authControllerProvider.notifier);
     final username = _username.text.trim();
@@ -41,7 +47,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           username: username,
           password: _password.text,
           displayName: _displayName.text.trim().isEmpty ? username : _displayName.text.trim(),
-          shopName: _shopName.text.trim().isEmpty ? 'My Shop' : _shopName.text.trim(),
+          shopName: _shopName.text.trim(),
           setupCode: _setupCode.text.trim(),
         );
       } else {
@@ -106,7 +112,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _shopName,
-                  decoration: InputDecoration(labelText: l.shopName, border: const OutlineInputBorder()),
+                  onChanged: (_) {
+                    if (_shopError != null) setState(() => _shopError = null);
+                  },
+                  decoration: InputDecoration(
+                    labelText: l.shopName, errorText: _shopError, border: const OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(

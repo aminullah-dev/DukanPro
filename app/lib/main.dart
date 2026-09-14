@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:dukan_data/dukan_data.dart' show SettingsStore;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,11 +24,15 @@ import 'infrastructure/secure_store.dart';
 import 'infrastructure/sync_api.dart';
 import 'l10n/app_localizations.dart';
 import 'router.dart';
+import 'widgets/localization_delegates.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final db = await openAppDatabase();
   final deviceId = await loadDeviceId(db);
+  // The language chosen last on this device, from the first frame on.
+  final settings = SettingsStore(db);
+  final savedLocale = localeFromTag(await settings.get(localeSettingKey), AppLocalizations.supportedLocales);
   const apiBase = String.fromEnvironment('DUKAN_API', defaultValue: 'http://localhost:8088');
   final secureStore = FlutterSecureStore();
   final authApi = DioAuthApi(baseUrl: apiBase);
@@ -40,6 +45,9 @@ Future<void> main() async {
     overrides: [
       databaseProvider.overrideWithValue(db),
       deviceIdProvider.overrideWithValue(deviceId),
+      savedLocaleProvider.overrideWithValue(savedLocale),
+      saveLocaleProvider.overrideWithValue(
+          (locale) => unawaited(settings.set(localeSettingKey, localeTag(locale)).catchError((Object _) {}))),
       secureStoreProvider.overrideWithValue(secureStore),
       authApiProvider.overrideWithValue(authApi),
       tokenRefresherProvider.overrideWithValue(refresher),
@@ -71,7 +79,7 @@ class DukanProApp extends ConsumerWidget {
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
       locale: locale,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFF0F6B5C)),
       routerConfig: router,

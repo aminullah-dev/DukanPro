@@ -179,11 +179,11 @@ class AuthController extends Notifier<AuthState> {
   }
 
   /// Biometric unlock, only for the user who opted in on this device: never on
-  /// by default, so another fingerprint enrolled on a shared till opens nothing.
-  Future<bool> unlockWithBiometric() async {
+  /// by default, so another fingerprint enrolled on a shared till opens nothing. [reason] is the system prompt's text, in the app's language.
+  Future<bool> unlockWithBiometric(String reason) async {
     final profile = await _profiles.current();
     if (profile == null || !await biometricEnabled()) return false;
-    if (!await ref.read(biometricProvider).authenticate('Unlock DukanPro')) return false;
+    if (!await ref.read(biometricProvider).authenticate(reason)) return false;
     if (!await _offlineAllowed()) {
       state = const AuthLoggedOut(error: 'OFFLINE_EXPIRED');
       return false;

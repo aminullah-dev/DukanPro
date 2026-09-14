@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/locale_toggle.dart';
 import '../auth/providers.dart';
@@ -39,7 +40,7 @@ class DashboardScreen extends ConsumerWidget {
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (d) => ListView(
           padding: const EdgeInsets.all(16),
           children: [

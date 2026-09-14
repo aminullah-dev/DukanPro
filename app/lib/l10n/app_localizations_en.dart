@@ -35,11 +35,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String itemsInCart(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items',
-      one: '1 item',
+      other: '$countString items',
+      one: '$countString item',
       zero: 'No items',
     );
     return '$_temp0';
@@ -252,11 +256,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String syncPending(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count changes to sync',
-      one: '1 change to sync',
+      other: '$countString changes to sync',
+      one: '$countString change to sync',
       zero: 'All changes synced',
     );
     return '$_temp0';
@@ -268,22 +276,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String syncConflicts(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items need review',
-      one: '1 item needs review',
+      other: '$countString items need review',
+      one: '$countString item needs review',
     );
     return '$_temp0';
   }
 
   @override
   String syncRejected(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count changes were rejected by the server',
-      one: '1 change was rejected by the server',
+      other: '$countString changes were rejected by the server',
+      one: '$countString change was rejected by the server',
     );
     return '$_temp0';
   }
@@ -310,11 +326,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String logoutPendingWarning(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count changes are not synced yet.',
-      one: '1 change is not synced yet.',
+      other: '$countString changes are not synced yet.',
+      one: '$countString change is not synced yet.',
     );
     return '$_temp0';
   }
@@ -361,11 +381,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String profitMissingCost(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items sold without a cost',
-      one: '1 item sold without a cost',
+      other: '$countString items sold without a cost',
+      one: '$countString item sold without a cost',
     );
     return '$_temp0';
   }
@@ -725,8 +749,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String insightDeadStock(String product, String days) {
-    return '$product hasn\'t sold in $days days';
+  String insightDeadStock(String product, int days) {
+    final intl.NumberFormat daysNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String daysString = daysNumberFormat.format(days);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$product hasn\'t sold in $daysString days',
+      one: '$product hasn\'t sold in $daysString day',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -735,8 +770,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String insightDigest(String count) {
-    return '$count sales today';
+  String insightDigest(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString sales today',
+      one: '$countString sale today',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -747,4 +792,244 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noAuditEntries => 'No activity recorded yet';
+
+  @override
+  String get errSaleEmpty => 'Add an item first.';
+
+  @override
+  String get errUnderpaid => 'The payment is less than the total.';
+
+  @override
+  String get errOverpaid => 'The payment is more than the total.';
+
+  @override
+  String get errDiscountInvalid =>
+      'The discount can\'t be below zero or more than the total.';
+
+  @override
+  String get errSaleNotVoidable => 'This sale can\'t be voided.';
+
+  @override
+  String get errStockInsufficient => 'Not enough stock for this sale.';
+
+  @override
+  String get errShiftAlreadyClosed => 'This shift is already closed.';
+
+  @override
+  String get errCurrencyMismatch => 'The currencies don\'t match.';
+
+  @override
+  String get errBranchInactive => 'This branch is closed.';
+
+  @override
+  String get errUserLastAssignment => 'This is the employee\'s only branch.';
+
+  @override
+  String get errWeakPassword => 'This password is too short or too simple.';
+
+  @override
+  String get errNotFound => 'This no longer exists. Refresh and try again.';
+
+  @override
+  String get errConflict =>
+      'Someone else changed this meanwhile. Refresh and try again.';
+
+  @override
+  String get errInvalid =>
+      'Some values weren\'t accepted. Check them and try again.';
+
+  @override
+  String get biometricReason => 'Confirm it\'s you to unlock DukanPro';
+
+  @override
+  String get unitPiece => 'piece';
+
+  @override
+  String get unitKg => 'kg';
+
+  @override
+  String get unitLitre => 'litre';
+
+  @override
+  String get unitDozen => 'dozen';
+
+  @override
+  String get unitMeter => 'meter';
+
+  @override
+  String get timeZoneKabul => 'Kabul time';
+
+  @override
+  String get currencyAfn => 'Afghani';
+
+  @override
+  String get currencyUsd => 'US dollar';
+
+  @override
+  String get currencyPkr => 'Pakistani rupee';
+
+  @override
+  String get currencyEur => 'Euro';
+
+  @override
+  String get auditSystem => 'System';
+
+  @override
+  String get auditOther => 'Other activity';
+
+  @override
+  String branchRole(String branch, String role) {
+    return '$branch · $role';
+  }
+
+  @override
+  String branchZoneCurrency(String zone, String currency) {
+    return '$zone · $currency';
+  }
+
+  @override
+  String auditBy(String actor, String time) {
+    return '$actor · $time';
+  }
+
+  @override
+  String get auditBarcodeAdded => 'Barcode added';
+
+  @override
+  String get auditBarcodeRemoved => 'Barcode removed';
+
+  @override
+  String get auditBranchActivated => 'Branch reopened';
+
+  @override
+  String get auditBranchCreated => 'Branch opened';
+
+  @override
+  String get auditBranchDeactivated => 'Branch closed';
+
+  @override
+  String get auditBranchUpdated => 'Branch changed';
+
+  @override
+  String get auditCostValuationChanged => 'Stock cost updated';
+
+  @override
+  String get auditCustomerCreated => 'Customer added';
+
+  @override
+  String get auditCustomerCreditLimitChanged => 'Credit limit changed';
+
+  @override
+  String get auditCustomerDeactivated => 'Customer account closed';
+
+  @override
+  String get auditCustomerReactivated => 'Customer account reopened';
+
+  @override
+  String get auditCustomerUpdated => 'Customer changed';
+
+  @override
+  String get auditDebtChargePosted => 'Sale on credit';
+
+  @override
+  String get auditDebtPaymentRecorded => 'Debt payment received';
+
+  @override
+  String get auditDebtWrittenOff => 'Debt written off';
+
+  @override
+  String get auditDiscountApplied => 'Discount given';
+
+  @override
+  String get auditNotificationsRefreshed => 'Insights refreshed';
+
+  @override
+  String get auditOwnerBootstrapped => 'Shop set up';
+
+  @override
+  String get auditPasswordReset => 'Password reset';
+
+  @override
+  String get auditPaymentRecorded => 'Payment recorded';
+
+  @override
+  String get auditProductCreated => 'Product added';
+
+  @override
+  String get auditProductDeactivated => 'Product deactivated';
+
+  @override
+  String get auditProductPriceChanged => 'Price changed';
+
+  @override
+  String get auditProductUpdated => 'Product changed';
+
+  @override
+  String get auditPurchaseReceived => 'Goods received';
+
+  @override
+  String get auditRoleAssigned => 'Role granted';
+
+  @override
+  String get auditRoleRevoked => 'Role removed';
+
+  @override
+  String get auditSaleLineAdded => 'Item added to a sale';
+
+  @override
+  String get auditSaleSettled => 'Sale completed';
+
+  @override
+  String get auditSaleVoided => 'Sale voided';
+
+  @override
+  String get auditSessionReuseDetected => 'Suspicious sign-in blocked';
+
+  @override
+  String get auditShiftClosed => 'Shift closed';
+
+  @override
+  String get auditShiftOpened => 'Shift opened';
+
+  @override
+  String get auditStockAdjusted => 'Stock adjusted';
+
+  @override
+  String get auditStockReceived => 'Stock received';
+
+  @override
+  String get auditStockSold => 'Stock sold';
+
+  @override
+  String get auditSupplierBillPosted => 'Supplier bill recorded';
+
+  @override
+  String get auditSupplierCreated => 'Supplier added';
+
+  @override
+  String get auditSupplierPaymentRecorded => 'Supplier paid';
+
+  @override
+  String get auditSyncPull => 'Device synced';
+
+  @override
+  String get auditUnitCreated => 'Unit added';
+
+  @override
+  String get auditUserAuthenticated => 'Signed in';
+
+  @override
+  String get auditUserCreated => 'Employee added';
+
+  @override
+  String get auditUserDisabled => 'Employee disabled';
+
+  @override
+  String get auditUserEnabled => 'Employee enabled';
+
+  @override
+  String get auditUserLoginFailed => 'Failed sign-in';
+
+  @override
+  String get auditUserLogout => 'Signed out';
 }

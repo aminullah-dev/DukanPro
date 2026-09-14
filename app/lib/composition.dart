@@ -9,11 +9,37 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Dependencies point inward: the app wires implementations (dukan_data) to the
 /// ports declared in dukan_core, and to sync/hardware ports implemented later.
 
-/// Active UI locale. Defaults to Dari (fa-AF), switchable at runtime.
+/// The UI locale chosen last on this device (main reads it before the first
+/// frame), or null on a new install.
+final savedLocaleProvider = Provider<Locale?>((ref) => null);
+
+/// Saves a chosen UI locale on the device (main wires it to the settings).
+final saveLocaleProvider = Provider<void Function(Locale)>((ref) => (_) {});
+
+/// Active UI locale: the one chosen last on this device, else Dari (fa-AF).
+/// Switchable at any time, the sign-in screen included.
 final class LocaleNotifier extends Notifier<Locale> {
   @override
-  Locale build() => const Locale('fa', 'AF');
-  void set(Locale locale) => state = locale;
+  Locale build() => ref.watch(savedLocaleProvider) ?? const Locale('fa', 'AF');
+
+  void set(Locale locale) {
+    state = locale;
+    ref.read(saveLocaleProvider)(locale);
+  }
+}
+
+/// The device setting that holds the chosen locale, as a tag ('fa_AF', 'ps').
+const localeSettingKey = 'ui.locale';
+
+String localeTag(Locale locale) =>
+    locale.countryCode == null ? locale.languageCode : '${locale.languageCode}_${locale.countryCode}';
+
+/// The supported locale a saved tag names, or null (none saved, or no longer offered).
+Locale? localeFromTag(String? tag, List<Locale> supported) {
+  for (final locale in supported) {
+    if (localeTag(locale) == tag) return locale;
+  }
+  return null;
 }
 
 final localeProvider = NotifierProvider<LocaleNotifier, Locale>(LocaleNotifier.new);

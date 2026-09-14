@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
@@ -57,7 +58,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).errUnitUnknown)));
       return;
     }
-    ref.read(posCartProvider.notifier).add(p, unit.decimalPlaces, unitName: unit.name);
+    ref.read(posCartProvider.notifier).add(p, unit.decimalPlaces, unitName: unitLabel(AppLocalizations.of(context), unit.id, unit.name));
   }
 
   Future<void> _editQty(int i, CartLine line) async {
@@ -100,7 +101,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       }
     } on AppError catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(moneyErrorText(l, e))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appErrorText(l, e))));
       }
     } finally {
       if (mounted) setState(() => _charging = false);
@@ -119,7 +120,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     } on AppError catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(moneyErrorText(AppLocalizations.of(context), e))));
+            .showSnackBar(SnackBar(content: Text(appErrorText(AppLocalizations.of(context), e))));
       }
     }
     ref.invalidate(currentShiftProvider);
@@ -219,7 +220,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         Expanded(
           child: productsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('$e')),
+            error: (e, _) => ErrorMessage(e),
             data: (products) {
               final q = _query.toLowerCase();
               final items = q.isEmpty

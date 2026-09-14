@@ -40,7 +40,7 @@ def test_bootstrap_issues_tokens_and_is_idempotent_once(client: TestClient) -> N
 
     again = client.post(
         "/auth/bootstrap",
-        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
     )
     assert again.status_code == 409
     assert again.json()["error"]["code"] == "BOOTSTRAP_ALREADY_DONE"
@@ -128,7 +128,7 @@ def test_logout_revokes_the_session(client: TestClient) -> None:
 
 
 def test_bootstrap_needs_the_servers_setup_code(client: TestClient) -> None:
-    body = {"username": "owner", "password": "pw12345678", "display_name": "Owner"}
+    body = {"username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"}
     assert client.post("/auth/bootstrap", json=body).status_code == 422
     wrong = client.post("/auth/bootstrap", json={**body, "setup_token": "not-the-code-000"})
     assert wrong.status_code == 401 and wrong.json()["error"]["code"] == "SETUP_TOKEN_INVALID"

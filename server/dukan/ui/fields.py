@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic import Field
+from pydantic import Field, StringConstraints
 
 from dukan.shared.limits import INT32_MAX, INT32_MIN, MONEY_MAX
 
@@ -20,5 +20,7 @@ Str32 = Annotated[str, Field(max_length=32)]
 Str48 = Annotated[str, Field(max_length=48)]
 Str64 = Annotated[str, Field(max_length=64)]
 Str128 = Annotated[str, Field(max_length=128)]
+# A name that must be given (a shop's name heads its receipts): blank is refused.
+Name128 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
 Str200 = Annotated[str, Field(max_length=200)]
 Secret = Annotated[str, Field(max_length=256)]  # passwords, refresh tokens

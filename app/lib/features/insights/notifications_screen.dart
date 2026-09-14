@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/error_text.dart';
 import 'insights_providers.dart';
 import 'insights_ui.dart';
 
@@ -29,7 +30,7 @@ class NotificationsScreen extends ConsumerWidget {
       ),
       body: feed.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (items) => items.isEmpty
             ? Center(
                 child: Column(

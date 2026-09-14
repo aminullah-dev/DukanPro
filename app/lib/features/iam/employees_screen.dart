@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/iam_api.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
 import 'iam_providers.dart';
 import 'iam_ui.dart';
@@ -23,7 +24,7 @@ class EmployeesScreen extends ConsumerWidget {
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(iamErrorMessage(l, e))),
+        error: (e, _) => ErrorMessage(e),
         data: (employees) => employees.isEmpty
             ? Center(child: Text(l.noEmployees))
             : ListView.separated(

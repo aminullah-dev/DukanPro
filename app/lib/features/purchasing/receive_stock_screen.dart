@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
@@ -65,7 +66,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
       );
       assertReceivable(line);
     } on AppError catch (e) {
-      setState(() => _error = moneyErrorText(l, e));
+      setState(() => _error = appErrorText(l, e));
       return;
     }
     setState(() {
@@ -94,7 +95,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
         _form++;
       });
     } on AppError catch (e) {
-      if (mounted) setState(() => _error = moneyErrorText(l, e));
+      if (mounted) setState(() => _error = appErrorText(l, e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -107,12 +108,13 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
     final units = ref.watch(unitsByIdProvider).value; // loaded before the first receipt
     final suppliersAsync = ref.watch(suppliersProvider);
     final canCost = ref.watch(sessionActorProvider)?.can(Permission.purchaseCost) ?? false;
-    final unitName = _product == null ? null : units?[_product!.unitId]?.name;
+    final unit = _product == null ? null : units?[_product!.unitId];
+    final unitName = unit == null ? null : unitLabel(AppLocalizations.of(context), unit.id, unit.name);
     return Scaffold(
       appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.receiveStock)),
       body: productsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (products) => ListView(
           padding: const EdgeInsets.all(16),
           children: [

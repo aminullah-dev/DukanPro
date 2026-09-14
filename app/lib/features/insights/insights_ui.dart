@@ -5,11 +5,12 @@ import '../../l10n/app_localizations.dart';
 /// Renders a server insight/notification code + data into a localized message.
 String insightMessage(AppLocalizations l, String code, Map<String, Object?> data) {
   String s(Object? v) => (v ?? '').toString();
+  int n(Object? v) => v is int ? v : int.tryParse('$v') ?? 0;
   return switch (code) {
     'insight.reorder' => l.insightReorder(s(data['product'])),
-    'insight.dead_stock' => l.insightDeadStock(s(data['product']), s(data['days'])),
+    'insight.dead_stock' => l.insightDeadStock(s(data['product']), n(data['days'])),
     'insight.debt_risk' => l.insightDebtRisk(s(data['customer'])),
-    'insight.digest' => l.insightDigest(s(data['count'])),
+    'insight.digest' => l.insightDigest(n(data['count'])),
     _ => l.insightUnknown,
   };
 }

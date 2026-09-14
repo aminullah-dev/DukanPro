@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/iam_api.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
+import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
 import 'iam_providers.dart';
 import 'iam_ui.dart';
@@ -23,7 +25,7 @@ class BranchesScreen extends ConsumerWidget {
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(iamErrorMessage(l, e))),
+        error: (e, _) => ErrorMessage(e),
         data: (branches) => branches.isEmpty
             ? Center(child: Text(l.noBranches))
             : ListView.separated(
@@ -55,7 +57,7 @@ class _BranchTile extends ConsumerWidget {
     return ListTile(
       leading: const Icon(Icons.store_mall_directory_outlined),
       title: Text(branch.name),
-      subtitle: Text('${branch.timezone} · ${branch.currencyDefault}'),
+      subtitle: Text(l.branchZoneCurrency(timeZoneLabel(l, branch.timezone), currencyLabel(l, branch.currencyDefault))),
       trailing: Chip(
         label: Text(branch.isActive ? l.statusActive : l.statusDisabled),
         backgroundColor: branch.isActive ? null : Theme.of(context).colorScheme.errorContainer,

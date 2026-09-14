@@ -67,7 +67,7 @@ class CustomersScreen extends ConsumerWidget {
     } on AppError catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(moneyErrorText(AppLocalizations.of(context), e))));
+            .showSnackBar(SnackBar(content: Text(appErrorText(AppLocalizations.of(context), e))));
       }
     }
   }
@@ -101,7 +101,7 @@ class CustomersScreen extends ConsumerWidget {
     } on AppError catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(moneyErrorText(AppLocalizations.of(context), e))));
+            .showSnackBar(SnackBar(content: Text(appErrorText(AppLocalizations.of(context), e))));
       }
     }
   }
@@ -122,7 +122,7 @@ class CustomersScreen extends ConsumerWidget {
           : null,
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (customers) => customers.isEmpty
             ? Center(child: Text(l.noCustomers))
             : ListView.separated(

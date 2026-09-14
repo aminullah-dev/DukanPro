@@ -14,6 +14,7 @@ import 'features/customers/customers_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/iam/branches_screen.dart';
 import 'features/iam/employees_screen.dart';
+import 'features/iam/iam_ui.dart' show roleLabel;
 import 'features/insights/notifications_bell.dart';
 import 'features/pos/pos_screen.dart';
 import 'features/purchasing/receive_stock_screen.dart';
@@ -319,7 +320,7 @@ class _HomePane extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(l.signedInAs(profile.displayName), style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
-              Text(_branchLabel(profile.branches), style: Theme.of(context).textTheme.bodyMedium),
+              Text(_branchLabel(l, profile.branches), style: Theme.of(context).textTheme.bodyMedium),
               if (state.offline) ...[
                 const SizedBox(height: 12),
                 Chip(avatar: const Icon(Icons.cloud_off, size: 18), label: Text(l.offlineMode)),
@@ -349,10 +350,10 @@ class _HomePane extends ConsumerWidget {
     );
   }
 
-  String _branchLabel(String branchesJson) {
+  String _branchLabel(AppLocalizations l, String branchesJson) {
     try {
       final list = (jsonDecode(branchesJson) as List).cast<Map<String, dynamic>>();
-      return list.map((b) => '${b['branch_name']} · ${b['role_name']}').join('   ');
+      return list.map((b) => l.branchRole('${b['branch_name']}', roleLabel(l, '${b['role_name']}'))).join('   ');
     } on Object {
       return '';
     }

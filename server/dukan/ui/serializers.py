@@ -157,6 +157,7 @@ def audit_entry_dict(v: AuditEntryView) -> dict:
         "id": v.id,
         "occurred_at": v.occurred_at.isoformat(),
         "actor_id": v.actor_id,
+        "actor_name": v.actor_name,
         "action": v.action,
         "entity_type": v.entity_type,
         "entity_id": v.entity_id,

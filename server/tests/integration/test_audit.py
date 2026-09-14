@@ -57,7 +57,7 @@ def test_audit_requires_audit_view(client: TestClient) -> None:
 def test_weak_password_is_rejected(client: TestClient) -> None:
     r = client.post(
         "/auth/bootstrap",
-        json={"setup_token": "test-setup-token", "username": "owner", "password": "short", "display_name": "Owner"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "short", "display_name": "Owner", "shop_name": "Dukan"},
     )
     assert r.status_code == 422
     assert r.json()["error"]["code"] == "WEAK_PASSWORD"

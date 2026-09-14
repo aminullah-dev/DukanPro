@@ -54,3 +54,13 @@ See [`docs/glossary.md`](glossary.md) for the bilingual domain vocabulary that s
 Money and quantity fields accept Persian (۰-۹) and Arabic-Indic (٠-٩) digits as well as Latin ones, `٫` or `.` as the decimal separator, and `٬` or `,` between thousands (in groups of three).
 - The value becomes integer minor units without passing through a floating-point number: `numbers.dart` and `numbers.py`, checked against one shared table of examples.
 - Anything else is refused with a translated message, never read as 0 or as "no limit": `MONEY_AMOUNT_INVALID`, `CATALOG_QTY_INVALID`, or `CATALOG_UNIT_PRECISION` (more decimals than the unit allows).
+
+## In the app
+
+- **A failure reads as a sentence.** `appErrorText` (`app/lib/widgets/error_text.dart`) maps every error code from the device or the server to a sentence. A code with no sentence of its own reads as its family (gone, changed meanwhile, not accepted), and anything else as a generic failure. Screens show `ErrorMessage(e)`, never `'$e'` or a code, and `tools/check_ui_literals.py` fails the build on either.
+- **Codes stored as data get labels** (`app/lib/widgets/labels.dart`, roles in `iam_ui.dart`): roles, audit actions (with the actor's name), time zones and currencies. The built-in units are labelled by their fixed ids; a shop's own units keep the name the shop gave them.
+- **Numbers inside sentences are placeholders** formatted in the locale's digits (`"format": "decimalPattern"`), so one sentence never mixes ۱ and 2. Translations type no digits of their own, except the two input examples.
+- **`app_fa.arb` copies `app_fa_AF.arb`** (it serves a device set to Persian). `tools/check_l10n_parity.py` keeps the two identical. It also checks placeholders against the English template, `@@locale`, and that no English is left in a translation.
+- **The chosen language is saved** on the device and used from the next launch, the sign-in screen included.
+- **Pashto borrows the Persian Cupertino strings.** Flutter ships none for Pashto, so this is what keeps the copy and paste menu working on iOS and macOS.
+- **No English defaults:** first-run setup requires a shop name (the server refuses a blank one), and the biometric prompt is translated.

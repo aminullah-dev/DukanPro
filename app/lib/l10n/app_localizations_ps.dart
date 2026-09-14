@@ -35,11 +35,15 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String itemsInCart(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count توکي',
-      one: '۱ توکی',
+      other: '$countString توکي',
+      one: '$countString توکی',
       zero: 'هیڅ توکی نشته',
     );
     return '$_temp0';
@@ -201,7 +205,7 @@ class AppLocalizationsPs extends AppLocalizations {
   String get balance => 'بیلانس';
 
   @override
-  String get credit => 'اُدهار';
+  String get credit => 'پور';
 
   @override
   String get receiveStock => 'توکي ترلاسه کول';
@@ -252,11 +256,15 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String syncPending(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count بدلونونه د لیږلو لپاره',
-      one: '۱ بدلون د لیږلو لپاره',
+      other: '$countString بدلونونه د لیږلو لپاره',
+      one: '$countString بدلون د لیږلو لپاره',
       zero: 'ټول بدلونونه همغږي شوي',
     );
     return '$_temp0';
@@ -267,22 +275,30 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String syncConflicts(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count توکي بیاکتنې ته اړتیا لري',
-      one: '۱ توکی بیاکتنې ته اړتیا لري',
+      other: '$countString توکي بیاکتنې ته اړتیا لري',
+      one: '$countString توکی بیاکتنې ته اړتیا لري',
     );
     return '$_temp0';
   }
 
   @override
   String syncRejected(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count بدلونونه د سرور له خوا رد شول',
-      one: '۱ بدلون د سرور له خوا رد شو',
+      other: '$countString بدلونونه د سرور له خوا رد شول',
+      one: '$countString بدلون د سرور له خوا رد شو',
     );
     return '$_temp0';
   }
@@ -309,11 +325,15 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String logoutPendingWarning(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count بدلونونه لا نه دي همغږي شوي.',
-      one: '۱ بدلون لا نه دی همغږی شوی.',
+      other: '$countString بدلونونه لا نه دي همغږي شوي.',
+      one: '$countString بدلون لا نه دی همغږی شوی.',
     );
     return '$_temp0';
   }
@@ -343,7 +363,7 @@ class AppLocalizationsPs extends AppLocalizations {
   String get cashNow => 'همدا اوس نغدي';
 
   @override
-  String get onCredit => 'په اُدهار';
+  String get onCredit => 'په پور';
 
   @override
   String get deactivateCustomer => 'حساب بندول';
@@ -352,32 +372,36 @@ class AppLocalizationsPs extends AppLocalizations {
   String get reactivateCustomer => 'حساب بیا پرانیستل';
 
   @override
-  String get customerInactive => 'حساب بند: اُدهار نشته';
+  String get customerInactive => 'حساب بند: پور نشته';
 
   @override
   String get writeOffDebt => 'پور بښل';
 
   @override
   String profitMissingCost(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count توکي د پېر بیې پرته پلورل شوي',
+      other: '$countString توکي د پېر بیې پرته پلورل شوي',
     );
     return '$_temp0';
   }
 
   @override
   String get errCustomerInactive =>
-      'د دې پېرودونکي حساب بند دی: اُدهار نه ورکول کېږي.';
+      'د دې پېرودونکي حساب بند دی: پور نه ورکول کېږي.';
 
   @override
   String get errDebtCurrency =>
-      'د دې پېرودونکي پور په بله اسعارو دی؛ اُدهار یوازې د هغه په اسعارو ورکول کېږي.';
+      'د دې پېرودونکي پور په بله اسعارو دی؛ پور یوازې د هغه په اسعارو ورکول کېږي.';
 
   @override
   String get errOverCreditLimit =>
-      'دا پلور به د پېرودونکي د اُدهار له حد څخه واوړي.';
+      'دا پلور به د پېرودونکي د پور له حد څخه واوړي.';
 
   @override
   String get errDebtOverpayment => 'دا مبلغ د پېرودونکي له پور څخه زیات دی.';
@@ -719,8 +743,19 @@ class AppLocalizationsPs extends AppLocalizations {
   }
 
   @override
-  String insightDeadStock(String product, String days) {
-    return '$product په $days ورځو کې نه دی خرڅ شوی';
+  String insightDeadStock(String product, int days) {
+    final intl.NumberFormat daysNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String daysString = daysNumberFormat.format(days);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$product په $daysString ورځو کې نه دی خرڅ شوی',
+      one: '$product په $daysString ورځ کې نه دی خرڅ شوی',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -729,8 +764,18 @@ class AppLocalizationsPs extends AppLocalizations {
   }
 
   @override
-  String insightDigest(String count) {
-    return '$count نن پلورونه';
+  String insightDigest(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'نن $countString پلورونه',
+      one: 'نن $countString پلور',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -740,5 +785,246 @@ class AppLocalizationsPs extends AppLocalizations {
   String get auditLog => 'د پلټنې لاګ';
 
   @override
-  String get noAuditEntries => 'لا تر اوسه کومه فعالیت نه دی ثبت شوی';
+  String get noAuditEntries => 'لا تر اوسه کوم فعالیت نه دی ثبت شوی';
+
+  @override
+  String get errSaleEmpty => 'لومړی یو توکی ور زیات کړئ.';
+
+  @override
+  String get errUnderpaid => 'ورکړل شوې پیسې له ټولې بیې لږې دي.';
+
+  @override
+  String get errOverpaid => 'ورکړل شوې پیسې له ټولې بیې زیاتې دي.';
+
+  @override
+  String get errDiscountInvalid =>
+      'تخفیف نه شي کولای منفي یا له ټولې بیې زیات وي.';
+
+  @override
+  String get errSaleNotVoidable => 'دا پلور نه شي لغوه کېدای.';
+
+  @override
+  String get errStockInsufficient => 'د دې پلور لپاره کافي ذخیره نشته.';
+
+  @override
+  String get errShiftAlreadyClosed => 'دا شفټ مخکې تړل شوی دی.';
+
+  @override
+  String get errCurrencyMismatch => 'اسعار سره یو شان نه دي.';
+
+  @override
+  String get errBranchInactive => 'دا څانګه غیر فعاله ده.';
+
+  @override
+  String get errUserLastAssignment => 'دا د دې کارمند یوازینۍ څانګه ده.';
+
+  @override
+  String get errWeakPassword => 'دا پټنوم ډېر لنډ یا ساده دی.';
+
+  @override
+  String get errNotFound => 'دا نور شتون نه لري. تازه یې کړئ او بیا هڅه وکړئ.';
+
+  @override
+  String get errConflict =>
+      'په دې منځ کې بل چا بدل کړی دی. تازه یې کړئ او بیا هڅه وکړئ.';
+
+  @override
+  String get errInvalid =>
+      'ځینې ارزښتونه و نه منل شول. وې ګورئ او بیا هڅه وکړئ.';
+
+  @override
+  String get biometricReason =>
+      'د دوکان‌پرو د خلاصولو لپاره خپل هویت تایید کړئ';
+
+  @override
+  String get unitPiece => 'دانه';
+
+  @override
+  String get unitKg => 'کیلوګرام';
+
+  @override
+  String get unitLitre => 'لیتر';
+
+  @override
+  String get unitDozen => 'درجن';
+
+  @override
+  String get unitMeter => 'متر';
+
+  @override
+  String get timeZoneKabul => 'د کابل وخت';
+
+  @override
+  String get currencyAfn => 'افغانۍ';
+
+  @override
+  String get currencyUsd => 'امریکايي ډالر';
+
+  @override
+  String get currencyPkr => 'پاکستانۍ کلدار';
+
+  @override
+  String get currencyEur => 'یورو';
+
+  @override
+  String get auditSystem => 'سیسټم';
+
+  @override
+  String get auditOther => 'بل فعالیت';
+
+  @override
+  String branchRole(String branch, String role) {
+    return '$branch · $role';
+  }
+
+  @override
+  String branchZoneCurrency(String zone, String currency) {
+    return '$zone · $currency';
+  }
+
+  @override
+  String auditBy(String actor, String time) {
+    return '$actor · $time';
+  }
+
+  @override
+  String get auditBarcodeAdded => 'بارکوډ زیات شو';
+
+  @override
+  String get auditBarcodeRemoved => 'بارکوډ لرې شو';
+
+  @override
+  String get auditBranchActivated => 'څانګه بیا فعاله شوه';
+
+  @override
+  String get auditBranchCreated => 'څانګه جوړه شوه';
+
+  @override
+  String get auditBranchDeactivated => 'څانګه غیر فعاله شوه';
+
+  @override
+  String get auditBranchUpdated => 'څانګه بدله شوه';
+
+  @override
+  String get auditCostValuationChanged => 'د توکي د پېر بیه تازه شوه';
+
+  @override
+  String get auditCustomerCreated => 'پېرودونکی زیات شو';
+
+  @override
+  String get auditCustomerCreditLimitChanged => 'د پېرودونکي د پور حد بدل شو';
+
+  @override
+  String get auditCustomerDeactivated => 'د پېرودونکي حساب وتړل شو';
+
+  @override
+  String get auditCustomerReactivated => 'د پېرودونکي حساب بیا پرانیستل شو';
+
+  @override
+  String get auditCustomerUpdated => 'پېرودونکی بدل شو';
+
+  @override
+  String get auditDebtChargePosted => 'په پور پلور ثبت شو';
+
+  @override
+  String get auditDebtPaymentRecorded => 'د پېرودونکي پور ورکړل شو';
+
+  @override
+  String get auditDebtWrittenOff => 'پور وبښل شو';
+
+  @override
+  String get auditDiscountApplied => 'تخفیف ورکړل شو';
+
+  @override
+  String get auditNotificationsRefreshed => 'خبرتیاوې تازه شوې';
+
+  @override
+  String get auditOwnerBootstrapped => 'دوکان جوړ شو';
+
+  @override
+  String get auditPasswordReset => 'پټنوم بدل شو';
+
+  @override
+  String get auditPaymentRecorded => 'ورکړه ثبت شوه';
+
+  @override
+  String get auditProductCreated => 'توکی زیات شو';
+
+  @override
+  String get auditProductDeactivated => 'توکی غیر فعال شو';
+
+  @override
+  String get auditProductPriceChanged => 'د توکي بیه بدله شوه';
+
+  @override
+  String get auditProductUpdated => 'توکی بدل شو';
+
+  @override
+  String get auditPurchaseReceived => 'له عرضه‌کوونکي توکي ترلاسه شول';
+
+  @override
+  String get auditRoleAssigned => 'رول ورکړل شو';
+
+  @override
+  String get auditRoleRevoked => 'رول واخیستل شو';
+
+  @override
+  String get auditSaleLineAdded => 'پلور ته توکی زیات شو';
+
+  @override
+  String get auditSaleSettled => 'پلور بشپړ شو';
+
+  @override
+  String get auditSaleVoided => 'پلور لغوه شو';
+
+  @override
+  String get auditSessionReuseDetected => 'شکمنه ننوتنه بنده شوه';
+
+  @override
+  String get auditShiftClosed => 'شفټ وتړل شو';
+
+  @override
+  String get auditShiftOpened => 'شفټ پیل شو';
+
+  @override
+  String get auditStockAdjusted => 'ذخیره سمه شوه';
+
+  @override
+  String get auditStockReceived => 'ذخیره ترلاسه شوه';
+
+  @override
+  String get auditStockSold => 'ذخیره وپلورل شوه';
+
+  @override
+  String get auditSupplierBillPosted => 'د عرضه‌کوونکي بل ثبت شو';
+
+  @override
+  String get auditSupplierCreated => 'عرضه‌کوونکی زیات شو';
+
+  @override
+  String get auditSupplierPaymentRecorded => 'عرضه‌کوونکي ته پیسې ورکړل شوې';
+
+  @override
+  String get auditSyncPull => 'وسیله همغږې شوه';
+
+  @override
+  String get auditUnitCreated => 'واحد زیات شو';
+
+  @override
+  String get auditUserAuthenticated => 'ننوت';
+
+  @override
+  String get auditUserCreated => 'کارمند زیات شو';
+
+  @override
+  String get auditUserDisabled => 'کارمند غیر فعال شو';
+
+  @override
+  String get auditUserEnabled => 'کارمند فعال شو';
+
+  @override
+  String get auditUserLoginFailed => 'ناکامه ننوتنه';
+
+  @override
+  String get auditUserLogout => 'ووت';
 }

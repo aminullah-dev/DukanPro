@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/error_text.dart';
 import 'sync_providers.dart';
 
 String _what(AppLocalizations l, String table) => switch (table) {
@@ -50,7 +51,7 @@ class SyncIssuesScreen extends ConsumerWidget {
                     ),
                     subtitle: Text(
                       '${DateFormat.yMd().add_Hm().format(issue.createdAt.toLocal())}'
-                      '${issue.code == null ? '' : ' · ${issue.code}'}',
+                      '${issue.code == null ? '' : ' · ${errorCodeText(l, issue.code!)}'}',
                     ),
                     trailing: Wrap(spacing: 4, children: [
                       if (issue.canRetry)

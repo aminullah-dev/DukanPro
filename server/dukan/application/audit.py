@@ -20,6 +20,7 @@ class AuditEntryView:
     entity_type: str | None
     entity_id: str | None
     after: dict[str, Any] | None
+    actor_name: str | None = None  # the actor's display name, for the app to show
 
 
 class AuditService(Protocol):

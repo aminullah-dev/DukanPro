@@ -28,8 +28,9 @@ echo "▶ Flutter app"
   flutter analyze
   flutter test )
 
-echo "▶ l10n parity"
+echo "▶ l10n parity and UI literals"
 python3 "$ROOT/tools/check_l10n_parity.py"
+python3 "$ROOT/tools/check_ui_literals.py"
 
 echo "▶ Server"
 ( cd "$ROOT/server"
