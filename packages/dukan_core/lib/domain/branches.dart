@@ -56,8 +56,9 @@ const branchZoneOffsets = <String, Duration>{
 
 const defaultBranchZone = 'Asia/Kabul';
 
-/// The currencies a branch can keep its prices in (docs/localization.md, Money).
-const branchCurrencies = {'AFN', 'USD', 'PKR', 'EUR'};
+/// The currencies a branch can keep its prices in: AFN only for now (decided
+/// 2026-09-14). Amounts already in USD, PKR or EUR still display.
+const branchCurrencies = {'AFN'};
 
 /// A branch's time zone and currency are ones the shop supports. Raises
 /// [ValidationError] `BRANCH_TIMEZONE_INVALID` or `BRANCH_CURRENCY_INVALID`.

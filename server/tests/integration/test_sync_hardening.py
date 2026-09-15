@@ -405,7 +405,7 @@ def test_master_rows_use_compare_and_set(client: TestClient) -> None:
         upd(None, name="No base"),
         upd(1, name="Renamed"),
         upd(2, version=1),
-        upd(2, sku="X"),
+        upd(2, unit_id=shop.units["kg"]),  # a unit is set once; a SKU may be corrected
         upd(2),
         op("products", {"name": "Ghost"}, kind="update", base_version=1),
     )

@@ -33,6 +33,8 @@ void main() {
         Product(id: id, sku: sku, name: sku, unitId: 'piece', sellPrice: Money(52000, 'AFN')),
         actorId: 'u1', deviceId: 'd1',
       );
+      // On the shelf: a till sells no more than it holds.
+      await catalog.adjust(productId: id, branchId: 'B1', qtyDelta: 100, actorId: 'u1', deviceId: 'd1');
     }
   });
   tearDown(() async => db.close());

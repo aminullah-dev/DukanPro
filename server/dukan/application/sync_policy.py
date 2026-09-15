@@ -271,6 +271,7 @@ _INSERT: dict[str, dict[str, _Field]] = {
 
 _UPDATE: dict[str, dict[str, _Field]] = {
     "products": {
+        "sku": _str(64),  # a mistyped SKU is corrected
         "name": _str(200),
         "sell_price_minor": _int(lo=0, hi=MONEY_MAX),
         "sell_currency": _CURRENCY_F,
@@ -468,6 +469,8 @@ class SyncReader(Protocol):
     def shop_currencies(self) -> frozenset[str]: ...  # the live branches' currencies
 
     def shift(self, shift_id: str) -> ShiftRef | None: ...
+
+    def open_shifts(self, user_id: str, branch_id: str) -> list[str]: ...  # their open ones
 
     def shift_expected_cash(self, shift_id: str) -> int: ...  # float + its drawer cash
 
@@ -669,7 +672,11 @@ def _products_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     else:
         action = "product.updated"
     before = {k: current.values.get(k) for k in changed}
-    return ApplyPlan(v, branch, None, AuditIntent(action, "product", changed, before))
+    after = dict(changed)
+    if "sku" in changed and ctx.reader.sku_taken(v["sku"]):
+        # Like an insert: two tills can give one SKU offline. Kept, flagged.
+        after["sku_taken"] = True
+    return ApplyPlan(v, branch, None, AuditIntent(action, "product", after, before))
 
 
 def _barcodes_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
@@ -994,8 +1001,9 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     customer = _customer(ctx, v["customer_id"])
     if currency != customer.currency:
         raise ConflictError("DEBT_CURRENCY_MISMATCH", expected=customer.currency, got=currency)
-    if v.get("shift_id") is not None:
-        _own_shift(ctx, v["shift_id"], branch)  # the drawer a collection went into
+    shift_id = v.get("shift_id")
+    # The drawer a collection went into; one closed before it arrived is flagged.
+    late = shift_id is not None and _own_shift(ctx, shift_id, branch).status != "open"
     # Append-only ledger: concurrent offline payments both apply (customers-debt.md),
     # so an overpayment is flagged in the audit entry, not rejected.
     balance = ctx.reader.customer_balance(customer.id)
@@ -1005,6 +1013,7 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     after = {
         **_pick(v, "customer_id", "amount_minor", "currency", "method", "shift_id"),
         "overpaid": overpaid,
+        **({"after_shift_close": True} if late else {}),
     }
     return ApplyPlan(
         v, branch, None, AuditIntent("debt.payment_recorded", "customer_ledger", after)
@@ -1061,8 +1070,9 @@ def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
         return ApplyPlan(
             v, branch, None, AuditIntent("supplier.bill_posted", "supplier_ledger", after)
         )
-    if v.get("shift_id") is not None:
-        _own_shift(ctx, v["shift_id"], branch)  # the drawer the cash came out of
+    shift_id = v.get("shift_id")
+    # The drawer the cash came out of; one closed before it arrived is flagged.
+    late = shift_id is not None and _own_shift(ctx, shift_id, branch).status != "open"
     # Like a customer's payment: two tills' offline payments both apply, and one
     # past the balance is flagged, not refused.
     balance = ctx.reader.supplier_balance(supplier.id)
@@ -1072,6 +1082,7 @@ def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     after = {
         **_pick(v, "supplier_id", "amount_minor", "currency", "method", "shift_id"),
         "overpaid": overpaid,
+        **({"after_shift_close": True} if late else {}),
     }
     return ApplyPlan(
         v, branch, None, AuditIntent("supplier.payment_recorded", "supplier_ledger", after)
@@ -1101,17 +1112,22 @@ def _shifts_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     assert_shift_cash_valid(amount_minor=v.get("opening_float_minor", 0))
     values = {**v, "status": "open", "opened_at": event_time(ctx.op.created_at, ctx.now)}
     after = _pick(v, "branch_id", "opening_float_minor")
+    others = ctx.reader.open_shifts(ctx.actor.id, branch)
+    if others:
+        # A seller may have a drawer open on another till: kept (each till sells into
+        # its own), flagged for the owner.
+        after = {**after, "another_open_shift": others[0]}
     return ApplyPlan(values, branch, branch, AuditIntent("shift.opened", "shift", after))
 
 
 def _shifts_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
-    """Closing a shift, by its own cashier or someone with report.view in its
+    """Closing a shift, by its own cashier or a manager (sale.void) in its
     branch. The server counts what the drawer should hold from its own rows: the
     float, the cash of the shift's settled sales, and cash debt collections."""
     current = _guard_update(ctx, "SHIFT_NOT_FOUND")
     branch: str = current.values["branch_id"]
     own = current.values["user_id"] == ctx.actor.id
-    _need(ctx, Permission.SALE_CREATE if own else Permission.REPORT_VIEW, branch)
+    _need(ctx, Permission.SALE_CREATE if own else Permission.SALE_VOID, branch)
     if current.values["status"] != "open":
         raise ConflictError("SHIFT_ALREADY_CLOSED", shift_id=ctx.op.row_id)
     if v.get("status") != "closed" or "counted_cash_minor" not in v:

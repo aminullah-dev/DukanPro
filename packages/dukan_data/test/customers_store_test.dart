@@ -185,6 +185,7 @@ void main() {
   test('sale numbers carry the device, so two tills never issue the same one', () async {
     final p = Product(id: newId(), sku: 'N1', name: 'Pen', unitId: 'piece', sellPrice: Money(1000, 'AFN'));
     await catalog.createProduct(p, actorId: 'u1', deviceId: 'app');
+    await catalog.adjust(productId: p.id, branchId: 'B1', qtyDelta: 10, actorId: 'u1', deviceId: 'app');
     Future<String> sell(String device) async => (await sales.settleCash(
           lines: [_line(p.id, 1000, 1)], tenderedMinor: 1000, branchId: 'B1', actorId: 'u1', deviceId: device,
         ))

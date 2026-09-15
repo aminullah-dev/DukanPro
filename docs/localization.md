@@ -32,7 +32,7 @@ A first-class requirement, not a post-launch pass. Three locales, two directions
 
 ## Money
 
-- AFN, 2 minor digits, integer minor units. Also support USD/PKR/EUR (common in Afghan trade). Currency symbol/placement is locale-formatted, never hardcoded.
+- AFN, 2 minor digits, integer minor units. Every branch trades in AFN for now (decided 2026-09-14): another branch currency is refused with `BRANCH_CURRENCY_INVALID`. USD, PKR and EUR amounts that already exist still display with their own sign. Currency symbol and placement are locale-formatted, never hardcoded.
 
 ## Typography
 

@@ -304,43 +304,75 @@ class SqlSalesService(SalesService):
             )
             if sale.shift_id else None
         )
-        if shift is not None and shift.status != "open":
-            # Its cash was counted when the shift closed; the void would vanish from it.
-            raise ConflictError("SALE_SHIFT_CLOSED", shift_id=shift.id)
-        sale.status = "voided"
-        lines = self._s.scalars(select(SaleLineModel).where(SaleLineModel.sale_id == sale.id)).all()
-        record_change(self._s, "sales", sale, op="update", branch_id=sale.branch_id)
-        for l in lines:
-            back = StockMovementModel(
-                id=new_id(), product_id=l.product_id, branch_id=sale.branch_id,
-                qty_delta=l.qty_minor, reason="returned", ref_type="void", ref_id=sale.id,
-                created_by=actor.id,
+        # A sale whose shift closed keeps its cash in that shift's count: handing it
+        # back is a refund (not built yet), not a void. One that took no cash (on
+        # credit, by card or transfer) changes nothing in the counted drawer.
+        cash_taken = int(self._s.scalar(
+            select(func.coalesce(func.sum(PaymentModel.amount_minor), 0)).where(
+                PaymentModel.sale_id == sale.id, PaymentModel.method == "cash",
+                PaymentModel.deleted_at.is_(None),
             )
-            self._s.add(back)
-            record_change(self._s, "stock_movements", back, op="insert", branch_id=sale.branch_id)
-        # The debt the sale put on a customer goes too: a compensating entry per
-        # charge, since the ledger is append-only.
-        reversed_debt = 0
+        ) or 0)
+        if shift is not None and shift.status != "open" and cash_taken > 0:
+            raise ConflictError("SALE_SHIFT_CLOSED", shift_id=shift.id)
         charges = self._s.scalars(
             select(CustomerLedgerModel).where(
                 CustomerLedgerModel.type == "charge", CustomerLedgerModel.ref_type == "sale",
                 CustomerLedgerModel.ref_id == sale.id, CustomerLedgerModel.deleted_at.is_(None),
             )
         ).all()
+        # The customers whose debt it takes back: locked before the feed lock (row
+        # locks first, docs/sync-protocol.md) and their balances read once.
+        owed: dict[str, int] = {}
+        for customer_id in sorted({c.customer_id for c in charges}):
+            self._s.scalar(
+                select(CustomerModel.id).where(CustomerModel.id == customer_id).with_for_update()
+            )
+            owed[customer_id] = self._customer_balance(customer_id)
+        sale.status = "voided"
+        record_change(self._s, "sales", sale, op="update", branch_id=sale.branch_id)
+        # What the sale took from stock comes back: its own movements, so a product
+        # that was not stock-tracked when it sold (it never moved) gets none.
+        taken = self._s.scalars(
+            select(StockMovementModel).where(
+                StockMovementModel.ref_type == "sale", StockMovementModel.ref_id == sale.id,
+                StockMovementModel.deleted_at.is_(None),
+            )
+        ).all()
+        for m in taken:
+            back = StockMovementModel(
+                id=new_id(), product_id=m.product_id, branch_id=m.branch_id,
+                qty_delta=-m.qty_delta, reason="returned", ref_type="void", ref_id=sale.id,
+                created_by=actor.id,
+            )
+            self._s.add(back)
+            record_change(self._s, "stock_movements", back, op="insert", branch_id=m.branch_id)
+        # The debt the sale put on a customer goes too, as far as it is still owed: a
+        # write-off already forgave it, and money paid against it is a refund, so a
+        # void never leaves the shop owing the customer. The ledger is append-only: a
+        # compensating entry per charge.
+        reversed_debt = 0
+        not_reversed = 0
         for c in charges:
+            back_minor = min(c.amount_minor, max(owed[c.customer_id], 0))
+            owed[c.customer_id] -= back_minor
+            not_reversed += c.amount_minor - back_minor
+            if back_minor == 0:
+                continue
             undo = CustomerLedgerModel(
                 id=new_id(), customer_id=c.customer_id, type="adjustment",
-                amount_minor=-c.amount_minor, currency=c.currency, ref_type="void",
+                amount_minor=-back_minor, currency=c.currency, ref_type="void",
                 ref_id=sale.id, created_by=actor.id,
             )
             self._s.add(undo)
             record_change(self._s, "customer_ledger", undo, op="insert", branch_id=None)
-            reversed_debt += c.amount_minor
+            reversed_debt += back_minor
         self._audit(
             "sale.voided", actor.id, sale.id,
             {
                 "number": sale.number, "status": "voided", "reason": reason.strip(),
                 **({"debt_reversed": reversed_debt} if reversed_debt else {}),
+                **({"debt_not_reversed": not_reversed} if not_reversed else {}),
             },
             before={"status": "settled"},
         )
@@ -389,8 +421,8 @@ class SqlSalesService(SalesService):
         if shift is None:
             raise NotFoundError("SHIFT_NOT_FOUND", shift_id=shift_id)
         # Closing your own shift is a cashier's job; closing someone else's sets
-        # their variance, which is a manager's.
-        needed = Permission.SALE_CREATE if shift.user_id == actor.id else Permission.REPORT_VIEW
+        # their variance, which is a manager's (sale.void: owner, manager).
+        needed = Permission.SALE_CREATE if shift.user_id == actor.id else Permission.SALE_VOID
         require_permission(_POLICY, actor, needed, shift.branch_id)
         if shift.status != "open":
             raise ConflictError("SHIFT_ALREADY_CLOSED", shift_id=shift.id)

@@ -14,7 +14,7 @@
 3. A Transfer moves stock **between branches** (see `inventory.md`) and is the only way stock crosses a branch boundary.
 4. A branch's `timezone` defines its **business day** for reporting: from its local midnight to the next, as a UTC range (`business_day` / `businessDay`, the same on the server and the device). Times people read are on this clock too.
    - The zone is one of a fixed table with no daylight saving time: Asia/Kabul (the default), Asia/Karachi, Asia/Tashkent, Asia/Dushanbe, Asia/Dubai, Asia/Tehran, UTC. So the device needs no time zone database. A zone with daylight saving time would need one on the device.
-   - The currency is AFN, USD, PKR or EUR. The signed-in profile carries each branch's zone and currency.
+   - The currency is AFN, the only one for now (decided 2026-09-14). The signed-in profile carries each branch's zone and currency.
 5. Deactivating a branch blocks every new write there (sales, shifts, receipts, stock, staff; sync ops wait and retry) with `BRANCH_INACTIVE`, and preserves history: reads still work.
 6. Opening a branch is a shop-wide act: `branch.manage` in every branch. The shop's owners become owners of the new branch in the same transaction, so it can be administered.
 

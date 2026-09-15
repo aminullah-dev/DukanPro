@@ -44,6 +44,7 @@ Future<ProviderContainer> _shop(WidgetTester tester, _Scanner scanner) async {
   final container = ProviderContainer(overrides: [
     databaseProvider.overrideWithValue(db),
     sessionActorProvider.overrideWithValue(_owner()),
+    deviceIdProvider.overrideWithValue('d1'), // the till that opened the shift
     scannerProvider.overrideWithValue(scanner),
   ]);
   addTearDown(container.dispose);

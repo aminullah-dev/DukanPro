@@ -34,3 +34,5 @@ def test_branch_zone_and_currency_are_supported_ones() -> None:
     with pytest.raises(ValidationError) as money:
         assert_branch_settings_valid(timezone="Asia/Kabul", currency_default="ZZZ")
     assert money.value.code == "BRANCH_CURRENCY_INVALID"
+    with pytest.raises(ValidationError):
+        assert_branch_settings_valid(timezone="Asia/Kabul", currency_default="USD")  # AFN only

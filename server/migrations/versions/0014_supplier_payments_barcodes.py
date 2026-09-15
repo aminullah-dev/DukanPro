@@ -4,8 +4,10 @@ supplier_ledger gains shift_id and method, as customer_ledger did in 0013: cash
 paid to a supplier out of a till's drawer comes off that shift's expected cash.
 
 barcodes.code becomes unique among live barcodes, so a scan resolves to one
-item. Duplicates already there keep their oldest row; the others are
-soft-deleted and logged to change_log, so devices drop them on their next pull.
+item. Duplicates already there keep one row: one on a live, active product
+first (a code left on a removed product must not lock the code out), then the
+oldest. The others are soft-deleted and logged to change_log, so devices drop
+them on their next pull.
 
 Revision ID: 0014
 Revises: 0013
@@ -35,6 +37,12 @@ _barcodes = sa.table(
     sa.column("deleted_at", sa.DateTime(timezone=True)),
     sa.column("version", sa.Integer),
 )
+_products = sa.table(
+    "products",
+    sa.column("id", sa.String),
+    sa.column("is_active", sa.Boolean),
+    sa.column("deleted_at", sa.DateTime(timezone=True)),
+)
 _feed = sa.table(
     "change_log",
     sa.column("table_name", sa.String),
@@ -60,13 +68,18 @@ def _indexes(table: str) -> set[str]:
 
 def _drop_duplicate_barcodes(bind: sa.Connection) -> None:
     now = datetime.now(UTC)
+    on_live_product = sa.and_(_products.c.deleted_at.is_(None), _products.c.is_active == sa.true())
     rows = bind.execute(
         sa.select(
             _barcodes.c.id, _barcodes.c.product_id, _barcodes.c.code, _barcodes.c.symbology,
             _barcodes.c.version,
         )
+        .select_from(_barcodes.outerjoin(_products, _products.c.id == _barcodes.c.product_id))
         .where(_barcodes.c.deleted_at.is_(None))
-        .order_by(_barcodes.c.code, _barcodes.c.created_at, _barcodes.c.id)
+        .order_by(
+            _barcodes.c.code, sa.case((on_live_product, 0), else_=1), _barcodes.c.created_at,
+            _barcodes.c.id,
+        )
     ).all()
     seen: set[str] = set()
     for row in rows:

@@ -81,6 +81,7 @@ final class LocalSales {
       );
     }
     if (shiftId != null) await _requireOpenShift(shiftId, branchId: branchId, userId: actorId);
+    await _requireStock(lines, branchId: branchId);
     final saleId = newId();
     late SaleRow saved;
 
@@ -155,6 +156,30 @@ final class LocalSales {
       saved = await (_db.select(_db.sales)..where((t) => t.id.equals(saleId))).getSingle();
     });
     return saved;
+  }
+
+  /// A single till sells no more of a stock-tracked product than it holds, as
+  /// far as it knows (docs/sync-protocol.md: two offline tills can still oversell
+  /// together, which the server flags). `STOCK_INSUFFICIENT` names the SKU.
+  Future<void> _requireStock(List<SaleLine> lines, {required String branchId}) async {
+    final wanted = <String, int>{};
+    for (final l in lines) {
+      if (l.trackStock) wanted[l.productId] = (wanted[l.productId] ?? 0) + l.qtyMinor;
+    }
+    for (final MapEntry(key: productId, value: qty) in wanted.entries) {
+      final sum = _db.stockMovements.qtyDelta.sum();
+      final row = await (_db.selectOnly(_db.stockMovements)
+            ..addColumns([sum])
+            ..where(_db.stockMovements.productId.equals(productId) &
+                _db.stockMovements.branchId.equals(branchId) &
+                _db.stockMovements.deletedAt.isNull()))
+          .getSingle();
+      final available = row.read(sum) ?? 0;
+      if (qty > available) {
+        final product = await (_db.select(_db.products)..where((t) => t.id.equals(productId))).getSingleOrNull();
+        throw ConflictError('STOCK_INSUFFICIENT', {'sku': product?.sku, 'requested': qty, 'available': available});
+      }
+    }
   }
 
   Future<void> _requireOpenShift(String shiftId, {required String branchId, required String userId}) async {

@@ -59,7 +59,9 @@ def test_a_new_branch_needs_a_supported_zone_and_currency(client: TestClient) ->
     assert zone.json()["error"]["code"] == "BRANCH_TIMEZONE_INVALID"
     money = client.post("/branches", headers=h, json={"name": "B2", "currency_default": "ZZZ"})
     assert money.json()["error"]["code"] == "BRANCH_CURRENCY_INVALID"
-    ok = client.post("/branches", headers=h, json={"name": "B3", "timezone": "Asia/Karachi", "currency_default": "PKR"})
+    usd = client.post("/branches", headers=h, json={"name": "B3", "currency_default": "USD"})
+    assert usd.json()["error"]["code"] == "BRANCH_CURRENCY_INVALID"  # AFN only, for now
+    ok = client.post("/branches", headers=h, json={"name": "B4", "timezone": "Asia/Karachi", "currency_default": "AFN"})
     assert ok.status_code < 300, ok.text
 
 

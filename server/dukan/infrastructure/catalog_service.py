@@ -168,6 +168,7 @@ class SqlCatalogService(CatalogService):
         is_active: bool | None,
         version: int | None = None,
         track_stock: bool | None = None,
+        sku: str | None = None,
     ) -> ProductView:
         require_permission(_POLICY, actor, Permission.PRODUCT_MANAGE, branch_id)
         require_active_branch(self._s, branch_id)
@@ -177,6 +178,17 @@ class SqlCatalogService(CatalogService):
             raise ConflictError(
                 "PRODUCT_VERSION_CONFLICT", base_version=version, current_version=product.version
             )
+        if sku is not None and sku.strip() and sku.strip() != product.sku:
+            new_sku = sku.strip()
+            taken = self._s.scalar(
+                select(ProductModel.id).where(
+                    ProductModel.sku == new_sku, ProductModel.deleted_at.is_(None),
+                    ProductModel.id != product.id,
+                ).limit(1)
+            )
+            if taken is not None:
+                raise ConflictError("PRODUCT_DUPLICATE_SKU", sku=new_sku)
+            product.sku = new_sku
         if name is not None:
             product.name = name
         if is_active is not None:

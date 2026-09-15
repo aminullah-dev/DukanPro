@@ -82,8 +82,11 @@ void main() {
       assertBranchSettingsValid(timezone: 'Asia/Kabul', currencyDefault: 'AFN');
       expect(() => assertBranchSettingsValid(timezone: 'Mars/Olympus', currencyDefault: 'AFN'),
           throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'BRANCH_TIMEZONE_INVALID')));
-      expect(() => assertBranchSettingsValid(timezone: 'Asia/Kabul', currencyDefault: 'zz'),
-          throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'BRANCH_CURRENCY_INVALID')));
+      for (final currency in ['zz', 'USD']) {
+        // AFN only, for now.
+        expect(() => assertBranchSettingsValid(timezone: 'Asia/Kabul', currencyDefault: currency),
+            throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'BRANCH_CURRENCY_INVALID')));
+      }
     });
   });
 }

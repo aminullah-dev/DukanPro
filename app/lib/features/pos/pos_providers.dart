@@ -16,7 +16,10 @@ final localShiftsProvider = Provider<LocalShifts>((ref) => LocalShifts(ref.watch
 final currentShiftProvider = FutureProvider<ShiftRow?>((ref) async {
   final actor = ref.watch(sessionActorProvider);
   if (actor == null) return null;
-  return ref.watch(localShiftsProvider).current(branchId: actor.branchId, userId: actor.user.id);
+  // This till's own drawer: the seller may have another shift open on another till.
+  return ref
+      .watch(localShiftsProvider)
+      .current(branchId: actor.branchId, userId: actor.user.id, deviceId: ref.watch(deviceIdProvider));
 });
 
 /// Hardware barcode scans (keyboard-wedge). POS listens and adds the matching

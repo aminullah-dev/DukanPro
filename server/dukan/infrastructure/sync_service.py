@@ -146,6 +146,14 @@ class _SqlSyncReader:
             return None
         return ShiftRef(id=s.id, branch_id=s.branch_id, user_id=s.user_id, status=s.status)
 
+    def open_shifts(self, user_id: str, branch_id: str) -> list[str]:
+        return list(self._s.scalars(
+            select(ShiftModel.id).where(
+                ShiftModel.user_id == user_id, ShiftModel.branch_id == branch_id,
+                ShiftModel.status == "open", ShiftModel.deleted_at.is_(None),
+            )
+        ).all())
+
     def shift_expected_cash(self, shift_id: str) -> int:
         return expected_cash(self._s, shift_id)
 

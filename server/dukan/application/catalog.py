@@ -53,6 +53,7 @@ class CatalogService(Protocol):
         is_active: bool | None,
         version: int | None = None,
         track_stock: bool | None = None,
+        sku: str | None = None,
     ) -> ProductView: ...
 
     def add_barcode(

@@ -21,6 +21,7 @@ void main() {
 
     final product = Product(id: newId(), sku: 'P1', name: 'Soap', unitId: 'piece', sellPrice: Money(52000, 'AFN'));
     await catalog.createProduct(product, actorId: 'u1', deviceId: 'app');
+    await catalog.adjust(productId: product.id, branchId: 'B1', qtyDelta: 10, actorId: 'u1', deviceId: 'app');
     final customer = Customer(id: newId(), name: 'Karim', creditLimitMinor: 200000);
     await customers.createCustomer(customer, actorId: 'u1', deviceId: 'app');
 

@@ -20,7 +20,17 @@
 6. A settled sale is **immutable**; corrections are a **void** (reverses stock + payments + ledger) or a **refund** (new negative sale referencing the original). No in-place edits.
 7. Change is computed for cash tender; over-tender yields `change`, never a negative payment. Payments are cash or card: credit is the unpaid remainder (it needs a customer), never a payment. The payments never add up to more than the total.
 8. Payments are append-only; you cannot delete a payment, only void the sale or record a refund.
-9. A **void** needs `sale.void` (owner, manager) in the **sale's** branch and a reason, recorded in the audit entry. A sale whose shift is already closed cannot be voided (`SALE_SHIFT_CLOSED`): its cash was counted. A void of a credit sale also takes its charge back off the customer's ledger. Two voids of one sale, or a void and its shift's close, take turns (row locks).
+9. A **void** needs `sale.void` (owner, manager) in the **sale's** branch and a reason, recorded in the audit entry.
+   - It returns the stock the sale took: its own movements, so a product that was not stock-tracked when it sold gets none.
+   - It takes the sale's charge back off the customer's ledger, but only as far as the customer still owes it. A write-off already forgave the debt, and money they paid against it is a refund to make by hand (`debt_not_reversed` in the audit entry). A void never leaves the shop owing the customer.
+   - A sale whose shift is closed cannot be voided if it took cash (`SALE_SHIFT_CLOSED`: that cash was counted). One that took none (on credit, by card or transfer) can.
+   - Two voids of one sale, or a void and its shift's close, take turns (row locks).
+10. **Shifts and drawers.**
+    - A till sells into the shift it opened itself.
+    - The same seller may have a shift open on each of two tills (two drawers). The server keeps both and flags the second one's `shift.opened` entry (`another_open_shift`).
+    - Closing someone else's shift sets their variance, so it needs `sale.void` (owner, manager).
+    - Money synced into a shift that has already closed is kept and flagged `after_shift_close`: sales, debt collections and supplier payouts alike.
+11. **Stock on one till.** A single till sells no more of a stock-tracked product than it holds (`STOCK_INSUFFICIENT`, naming the SKU). Two offline tills can still oversell together; see docs/sync-protocol.md.
 10. A discount lies between 0 and the subtotal (`SALE_DISCOUNT_INVALID`); any discount needs `sale.discount` and writes `discount.applied`.
 11. A shift closes once (`SHIFT_ALREADY_CLOSED`), by its own cashier or by someone with `report.view` in its branch. Reading a sale needs `sale.create` or `report.view` in the sale's branch.
 12. **Payments** are cash, card or transfer (mobile money such as M-Paisa or HesabPay, or a bank transfer), one or several per sale. Change comes only from cash, and only cash counts toward a drawer.
@@ -55,6 +65,10 @@
 | credit no customer | total=500, cash=300, no customer | settle | `SALE_CREDIT_NO_CUSTOMER` |
 | price snapshot | line at price 50 | later catalog price→60; reread sale | line still 50 |
 | void reverses | settled sale with stock + payment | void | stock movements reversed, payments reversed, audited |
+| void after a write-off | credit sale of 100, debt written off | void | balance stays 0, not −100 |
+| void after a payment | credit sale of 100, 40 paid | void | 60 taken back, balance 0; 40 recorded as not reversed |
+| closed shift, no cash | credit sale in a shift since closed | void | allowed; a cash sale there: `SALE_SHIFT_CLOSED` |
+| someone else's drawer | accountant | close a cashier's shift | `ACCESS_DENIED` |
 | settle decrements once | stock-tracked sale | settle, then replay settle op | stock −qty exactly once |
 | currency mismatch | sale AFN | pay USD | `SALE_CURRENCY_MISMATCH` |
 | cashier voids | settled cash sale | cashier voids it | `ACCESS_DENIED` |

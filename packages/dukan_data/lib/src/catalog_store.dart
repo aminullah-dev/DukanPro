@@ -53,6 +53,7 @@ final class ProductDao implements ProductRepository {
   Future<void> update(Product product) async {
     await (_db.update(_db.products)..where((t) => t.id.equals(product.id))).write(
       ProductsCompanion(
+        sku: Value(product.sku),
         name: Value(product.name),
         sellPriceMinor: Value(product.sellPrice.amountMinor),
         sellCurrency: Value(product.sellPrice.currency),
@@ -260,7 +261,11 @@ final class LocalCatalog {
     assertPriceValid(sellPriceMinor: product.sellPrice.amountMinor);
     await _db.transaction(() async {
       final before = await (_db.select(_db.products)..where((t) => t.id.equals(product.id))).getSingle();
+      if (before.sku != product.sku && await products.skuTaken(product.sku)) {
+        throw ConflictError('PRODUCT_DUPLICATE_SKU', {'sku': product.sku}); // a mistyped SKU is corrected
+      }
       final changed = <String, Object?>{
+        if (before.sku != product.sku) 'sku': product.sku,
         if (before.name != product.name) 'name': product.name,
         if (before.sellPriceMinor != product.sellPrice.amountMinor)
           'sell_price_minor': product.sellPrice.amountMinor,

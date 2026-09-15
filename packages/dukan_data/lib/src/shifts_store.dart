@@ -39,16 +39,34 @@ final class LocalShifts {
   final AppDatabase _db;
   final SyncRecorder _rec;
 
-  /// The open shift of [userId] in [branchId], if any.
-  Future<ShiftRow?> current({required String branchId, required String userId}) => (_db.select(_db.shifts)
-        ..where((t) =>
-            t.branchId.equals(branchId) & t.userId.equals(userId) & t.status.equals('open') & t.deletedAt.isNull())
-        ..orderBy([(t) => OrderingTerm.desc(t.openedAt)])
-        ..limit(1))
-      .getSingleOrNull();
+  /// The open shift of [userId] in [branchId] that this till opened, if any. A
+  /// seller may have another drawer open on another till (the server flags it);
+  /// this till's sales go into its own. Without [deviceId], the newest of them.
+  Future<ShiftRow?> current({required String branchId, required String userId, String? deviceId}) async {
+    final open = await (_db.select(_db.shifts)
+          ..where((t) =>
+              t.branchId.equals(branchId) & t.userId.equals(userId) & t.status.equals('open') & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.openedAt)]))
+        .get();
+    for (final shift in open) {
+      if (deviceId == null || await _openedHere(shift.id, deviceId)) return shift;
+    }
+    return null;
+  }
+
+  /// Whether this till opened [shiftId]: its insert is in this device's outbox.
+  Future<bool> _openedHere(String shiftId, String deviceId) async => (await (_db.select(_db.outboxEntries)
+            ..where((t) =>
+                t.aggregateType.equals('shifts') &
+                t.aggregateId.equals(shiftId) &
+                t.opType.equals('insert') &
+                t.deviceId.equals(deviceId))
+            ..limit(1))
+          .get())
+      .isNotEmpty;
 
   /// Opens [userId]'s shift in [branchId] with [openingFloatMinor] in the
-  /// drawer. One at a time per seller and branch (`SHIFT_ALREADY_OPEN`).
+  /// drawer. One at a time per seller on this till (`SHIFT_ALREADY_OPEN`).
   Future<ShiftRow> open({
     required String branchId,
     required String userId,
@@ -58,7 +76,7 @@ final class LocalShifts {
     assertShiftCashValid(amountMinor: openingFloatMinor);
     final id = newId();
     await _db.transaction(() async {
-      if (await current(branchId: branchId, userId: userId) != null) {
+      if (await current(branchId: branchId, userId: userId, deviceId: deviceId) != null) {
         throw ConflictError('SHIFT_ALREADY_OPEN', const {});
       }
       await _db.into(_db.shifts).insert(ShiftsCompanion.insert(

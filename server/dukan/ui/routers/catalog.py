@@ -32,6 +32,7 @@ class CreateProductRequest(BaseModel):
 
 
 class UpdateProductRequest(BaseModel):
+    sku: Str64 | None = None  # a mistyped SKU is corrected (unique among live products)
     name: Str200 | None = None
     sell_price_minor: Money | None = None
     is_active: bool | None = None
@@ -111,6 +112,7 @@ def update_product(
             is_active=body.is_active,
             version=body.version,
             track_stock=body.track_stock,
+            sku=body.sku,
         )
     )
 

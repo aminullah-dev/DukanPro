@@ -112,7 +112,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
       } else {
         final p = widget.product!;
         final product = Product(
-          id: p.id, sku: p.sku, name: _name.text.trim(), unitId: p.unitId,
+          id: p.id, sku: _sku.text.trim(), name: _name.text.trim(), unitId: p.unitId,
           sellPrice: Money(priceMinor, p.sellPrice.currency), categoryId: p.categoryId, cost: p.cost, // keeps its currency
           trackStock: _track, isActive: _active, version: p.version,
         );
@@ -149,8 +149,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
-                  controller: _sku,
-                  readOnly: !_isNew,
+                  controller: _sku, // a mistyped SKU can be corrected
                   decoration: InputDecoration(labelText: l.sku, border: const OutlineInputBorder()),
                   validator: (v) => _requiredText(l, v, 64),
                 ),

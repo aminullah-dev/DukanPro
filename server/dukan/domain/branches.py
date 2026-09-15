@@ -54,8 +54,9 @@ BRANCH_ZONE_OFFSETS: dict[str, timedelta] = {
 }
 DEFAULT_BRANCH_ZONE = "Asia/Kabul"
 
-# The currencies a branch can keep its prices in (docs/localization.md, Money).
-BRANCH_CURRENCIES = frozenset({"AFN", "USD", "PKR", "EUR"})
+# The currencies a branch can keep its prices in: AFN only for now (decided
+# 2026-09-14). Amounts already in USD, PKR or EUR still display.
+BRANCH_CURRENCIES = frozenset({"AFN"})
 
 
 def assert_branch_settings_valid(*, timezone: str, currency_default: str) -> None:

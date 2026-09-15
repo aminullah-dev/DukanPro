@@ -219,3 +219,28 @@ def test_0014_keeps_one_live_barcode_per_code(empty_database_url: str) -> None:
     assert len(live) == 1
     assert len(dropped) == 1 and dropped[0]["deleted_at"] is not None and dropped[0]["code"] == "999"
 
+
+def test_0014_keeps_the_barcode_of_a_live_product(empty_database_url: str) -> None:
+    engine = sa.create_engine(empty_database_url)
+    _migrate(engine, "0013")
+    meta = sa.MetaData()
+    products = sa.Table("products", meta, autoload_with=engine)
+    barcodes = sa.Table("barcodes", meta, autoload_with=engine)
+    removed, live = str(uuid.uuid4()), str(uuid.uuid4())
+    older, newer = datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 2, 1, tzinfo=UTC)
+    with engine.begin() as conn:
+        conn.execute(products.insert().values(**_row(products, id=removed, deleted_at=older)))
+        conn.execute(products.insert().values(**_row(products, id=live)))
+        # The removed product's copy of the code is the older one.
+        conn.execute(barcodes.insert().values(
+            **_row(barcodes, product_id=removed, code="777", created_at=older)))
+        conn.execute(barcodes.insert().values(
+            **_row(barcodes, product_id=live, code="777", created_at=newer)))
+    _migrate(engine, "0014")
+    with engine.connect() as conn:
+        kept = conn.execute(
+            sa.select(barcodes.c.product_id).where(barcodes.c.deleted_at.is_(None))
+        ).scalars().all()
+    engine.dispose()
+    assert kept == [live]  # the code stays with the product that is still sold
+
