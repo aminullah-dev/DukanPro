@@ -188,3 +188,10 @@ void assertPasswordStrong({required String password, int minLength = 8}) {
     throw ValidationError('WEAK_PASSWORD', {'min_length': minLength});
   }
 }
+
+/// Online sign-in closes after [loginAttempts] wrong passwords in a row (since
+/// the last good one, within [loginLockMinutes]), for [loginLockMinutes].
+/// Mirrors LOGIN_ATTEMPTS and LOGIN_LOCK_MINUTES on the server.
+const loginAttempts = 5;
+const loginLockMinutes = 15;
+

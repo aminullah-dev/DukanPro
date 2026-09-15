@@ -233,6 +233,12 @@ abstract class AppLocalizations {
   /// **'Sign-in failed. Check your username and password.'**
   String get loginFailed;
 
+  /// No description provided for @errLoginLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong passwords. Wait {minutes} minutes, then try again.'**
+  String errLoginLocked(int minutes);
+
   /// No description provided for @wrongSecret.
   ///
   /// In en, this message translates to:

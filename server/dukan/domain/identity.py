@@ -135,3 +135,16 @@ def assert_password_strong(*, password: str, min_length: int = 8) -> None:
     Raises ValidationError WEAK_PASSWORD."""
     if len(password) < min_length:
         raise ValidationError("WEAK_PASSWORD", min_length=min_length)
+
+
+# Online sign-in closes after LOGIN_ATTEMPTS wrong passwords in a row (since the
+# last good one, within LOGIN_LOCK_MINUTES), for LOGIN_LOCK_MINUTES. Mirrors
+# packages/dukan_core/lib/domain/identity.dart.
+LOGIN_ATTEMPTS = 5
+LOGIN_LOCK_MINUTES = 15
+
+
+def login_locked(*, failures_since_success: int) -> bool:
+    """Whether an account's online sign-in is closed for now."""
+    return failures_since_success >= LOGIN_ATTEMPTS
+

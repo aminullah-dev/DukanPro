@@ -1,3 +1,4 @@
+import 'package:dukan_core/dukan_core.dart' show loginLockMinutes;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -67,6 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String _errorText(AppLocalizations l, String code) => switch (code) {
         'NETWORK' => l.errNetwork,
         'INVALID_CREDENTIALS' => l.loginFailed,
+        'LOGIN_LOCKED' => l.errLoginLocked(loginLockMinutes),
         'BOOTSTRAP_ALREADY_DONE' => l.errBootstrapDone,
         'SETUP_TOKEN_INVALID' => l.errSetupCode,
         'OFFLINE_EXPIRED' => l.errOfflineExpired,

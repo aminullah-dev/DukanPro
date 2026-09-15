@@ -89,6 +89,15 @@ class AppLocalizationsPs extends AppLocalizations {
   String get loginFailed => 'ننوتل ناکام شول. کارن نوم او پټنوم وګورئ.';
 
   @override
+  String errLoginLocked(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'پټنوم څو ځله غلط ولیکل شو. $minutesString دقیقې صبر وکړئ او بیا هڅه وکړئ.';
+  }
+
+  @override
   String get wrongSecret => 'سم نه دی — بیا هڅه وکړئ.';
 
   @override

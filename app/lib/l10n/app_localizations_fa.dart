@@ -90,6 +90,15 @@ class AppLocalizationsFa extends AppLocalizations {
       'ورود ناکام شد. نام کاربری و رمز عبور را بررسی کنید.';
 
   @override
+  String errLoginLocked(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'رمز عبور چند بار اشتباه وارد شد. $minutesString دقیقه صبر کنید و دوباره تلاش کنید.';
+  }
+
+  @override
   String get wrongSecret => 'نادرست است — دوباره تلاش کنید.';
 
   @override
@@ -1326,6 +1335,15 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String get loginFailed =>
       'ورود ناکام شد. نام کاربری و رمز عبور را بررسی کنید.';
+
+  @override
+  String errLoginLocked(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'رمز عبور چند بار اشتباه وارد شد. $minutesString دقیقه صبر کنید و دوباره تلاش کنید.';
+  }
 
   @override
   String get wrongSecret => 'نادرست است — دوباره تلاش کنید.';

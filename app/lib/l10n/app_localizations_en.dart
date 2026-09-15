@@ -89,6 +89,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginFailed => 'Sign-in failed. Check your username and password.';
 
   @override
+  String errLoginLocked(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'Too many wrong passwords. Wait $minutesString minutes, then try again.';
+  }
+
+  @override
   String get wrongSecret => 'Incorrect — try again.';
 
   @override

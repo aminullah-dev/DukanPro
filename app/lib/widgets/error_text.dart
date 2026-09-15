@@ -52,6 +52,7 @@ String errorCodeText(AppLocalizations l, String code) =>
       'USER_DUPLICATE_USERNAME' => l.errUsernameTaken,
       'WEAK_PASSWORD' => l.errWeakPassword,
       'INVALID_CREDENTIALS' => l.loginFailed,
+      'LOGIN_LOCKED' => l.errLoginLocked(loginLockMinutes),
       'OFFLINE_EXPIRED' => l.errOfflineExpired,
       'STORAGE_UNAVAILABLE' => l.errStorage,
       'SETUP_TOKEN_INVALID' => l.errSetupCode,

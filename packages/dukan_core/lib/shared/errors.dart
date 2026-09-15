@@ -45,6 +45,13 @@ final class PermissionDeniedError extends AppError {
   int get httpStatus => 403;
 }
 
+/// Too many attempts; try again later (the sign-in lockout).
+final class RateLimitedError extends AppError {
+  RateLimitedError(super.code, [super.context]);
+  @override
+  int get httpStatus => 429;
+}
+
 final class LicenseError extends AppError {
   LicenseError(super.code, [super.context]);
   @override
