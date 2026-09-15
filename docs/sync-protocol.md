@@ -94,6 +94,12 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | customer_ledger insert, `adjustment` | debt.write_off (active) | a write-off: a negative amount, `ref_type` `write_off`, no `ref_id`; the customer's currency; one past the balance is **flagged** (`exceeds_balance`), not refused |
 | supplier_ledger insert, `bill` | purchase.cost (active) | the supplier exists; the supplier's currency |
 | supplier_ledger insert, `payment` | purchase.cost (active) | the supplier exists; the supplier's currency; `method` (cash, card, transfer) and a `shift_id` naming the pusher's own shift in the branch; one past the balance is **flagged** (`overpaid`), not refused |
+| sales update (a void) | sale.void (active) in the sale's branch | the only edit a sale takes: settled → voided, with `void_reason`. One-way, so no compare-and-set; a sale voided already is a no-op, and a return, or a sale with returns, is refused `SALE_NOT_VOIDABLE` |
+| sales insert with `refund_of` (a return) | sale.void (active) in the sale's branch | the sale it names is settled and not itself a return; negative amounts; the same customer and currency; no more than the sale's total less earlier returns; `refund_reason` |
+| sale_lines insert on a return | sale.void (active) | a negative quantity of something the sale sold, no more than is left of it (`REFUND_QTY_INVALID`), worth its share of what the sale's lines of it came to |
+| payments insert on a return | sale.void (active) | negative, no more than the return says was handed back; cash only out of the drawer the return names |
+| stock_movements insert, `returned` | sale.void (active) | `ref_type` void (a voided sale) or refund (a return), a positive quantity, and no more than the sale took from stock |
+| customer_ledger insert, `adjustment` with `ref_type` void or refund | sale.void (active) | negative, no more than the sale charged less what earlier voids and returns took back; one that outruns the balance is kept and flagged `exceeds_balance` |
 
 Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories, updates of anything but products and customers, stock transfers, counts and returns, customer opening balances and adjustments, supplier payments. Offline ledger entries that break a limit online would enforce still apply, because two tills can both act while offline; the audit flag is what the owner reviews.
 

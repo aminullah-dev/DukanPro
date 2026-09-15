@@ -25,7 +25,9 @@
    - It takes the sale's charge back off the customer's ledger, but only as far as the customer still owes it. A write-off already forgave the debt, and money they paid against it is a refund to make by hand (`debt_not_reversed` in the audit entry). A void never leaves the shop owing the customer.
    - A sale whose shift is closed cannot be voided if it took cash (`SALE_SHIFT_CLOSED`: that cash was counted). One that took none (on credit, by card or transfer) can.
    - Two voids of one sale, or a void and its shift's close, take turns (row locks).
-   - The till voids online, from the sale's receipt (also under recent sales). It syncs first, so the server has the sale (`SALE_NOT_FOUND` otherwise), asks for the void with the reason, then pulls the reversal back. Offline, it says it needs the server.
+   - The till voids from the sale's receipt (also under recent sales), with or without a connection. It writes the void, the stock coming back and the debt coming off as one device transaction, which reaches the server together or not at all (docs/sync-protocol.md).
+   - The server checks it when the rows arrive: a sale another till voided already is a no-op, and one with returns is past voiding. A debt reversal that outran what the customer owed by then (another till took a payment meanwhile) is kept and flagged `exceeds_balance`, as a payment is.
+   - A cash sale whose shift the till has already closed is not voided: the till says to take the goods back as a return instead. A shift closed elsewhere in the meantime leaves the void flagged `after_shift_close`.
 10. **Shifts and drawers.**
     - A till sells into the shift it opened itself.
     - The same seller may have a shift open on each of two tills (two drawers). The server keeps both and flags the second one's `shift.opened` entry (`another_open_shift`).
@@ -39,7 +41,7 @@
 
 ## Returns
 
-A return (refund) takes goods back from a settled sale. It is a new sale with negative lines and totals that names the original in `refund_of`; the original stays as it was. The till asks for it online (`POST /sales/{id}/refunds`), like a void.
+A return (refund) takes goods back from a settled sale. It is a new sale with negative lines and totals that names the original in `refund_of`; the original stays as it was. The till records it with or without a connection, as one device transaction, and the server checks it when the rows arrive. `POST /sales/{id}/refunds` does the same in one request.
 
 - It needs `sale.void` (owner, manager) in the sale's branch and a reason (`REFUND_REASON_REQUIRED`), recorded in the `sale.refunded` audit entry.
 - Of each product it takes back something, and no more than the sale sold less what earlier returns took back (`REFUND_EMPTY`, `REFUND_QTY_INVALID`).

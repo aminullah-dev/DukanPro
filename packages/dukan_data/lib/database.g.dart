@@ -3536,6 +3536,17 @@ class $StockMovementsTable extends StockMovements
   late final GeneratedColumn<String> reason = GeneratedColumn<String>(
       'reason', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _refTypeMeta =
+      const VerificationMeta('refType');
+  @override
+  late final GeneratedColumn<String> refType = GeneratedColumn<String>(
+      'ref_type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _refIdMeta = const VerificationMeta('refId');
+  @override
+  late final GeneratedColumn<String> refId = GeneratedColumn<String>(
+      'ref_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _occurredAtMeta =
       const VerificationMeta('occurredAt');
   @override
@@ -3557,6 +3568,8 @@ class $StockMovementsTable extends StockMovements
         branchId,
         qtyDelta,
         reason,
+        refType,
+        refId,
         occurredAt
       ];
   @override
@@ -3622,6 +3635,14 @@ class $StockMovementsTable extends StockMovements
     } else if (isInserting) {
       context.missing(_reasonMeta);
     }
+    if (data.containsKey('ref_type')) {
+      context.handle(_refTypeMeta,
+          refType.isAcceptableOrUnknown(data['ref_type']!, _refTypeMeta));
+    }
+    if (data.containsKey('ref_id')) {
+      context.handle(
+          _refIdMeta, refId.isAcceptableOrUnknown(data['ref_id']!, _refIdMeta));
+    }
     if (data.containsKey('occurred_at')) {
       context.handle(
           _occurredAtMeta,
@@ -3659,6 +3680,10 @@ class $StockMovementsTable extends StockMovements
           .read(DriftSqlType.int, data['${effectivePrefix}qty_delta'])!,
       reason: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}reason'])!,
+      refType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}ref_type']),
+      refId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}ref_id']),
       occurredAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}occurred_at'])!,
     );
@@ -3683,6 +3708,10 @@ class StockMovementRow extends DataClass
   final String branchId;
   final int qtyDelta;
   final String reason;
+
+  /// What moved the stock: a sale, or the void or return that brings it back.
+  final String? refType;
+  final String? refId;
   final DateTime occurredAt;
   const StockMovementRow(
       {required this.id,
@@ -3696,6 +3725,8 @@ class StockMovementRow extends DataClass
       required this.branchId,
       required this.qtyDelta,
       required this.reason,
+      this.refType,
+      this.refId,
       required this.occurredAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3717,6 +3748,12 @@ class StockMovementRow extends DataClass
     map['branch_id'] = Variable<String>(branchId);
     map['qty_delta'] = Variable<int>(qtyDelta);
     map['reason'] = Variable<String>(reason);
+    if (!nullToAbsent || refType != null) {
+      map['ref_type'] = Variable<String>(refType);
+    }
+    if (!nullToAbsent || refId != null) {
+      map['ref_id'] = Variable<String>(refId);
+    }
     map['occurred_at'] = Variable<DateTime>(occurredAt);
     return map;
   }
@@ -3740,6 +3777,11 @@ class StockMovementRow extends DataClass
       branchId: Value(branchId),
       qtyDelta: Value(qtyDelta),
       reason: Value(reason),
+      refType: refType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(refType),
+      refId:
+          refId == null && nullToAbsent ? const Value.absent() : Value(refId),
       occurredAt: Value(occurredAt),
     );
   }
@@ -3759,6 +3801,8 @@ class StockMovementRow extends DataClass
       branchId: serializer.fromJson<String>(json['branchId']),
       qtyDelta: serializer.fromJson<int>(json['qtyDelta']),
       reason: serializer.fromJson<String>(json['reason']),
+      refType: serializer.fromJson<String?>(json['refType']),
+      refId: serializer.fromJson<String?>(json['refId']),
       occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
     );
   }
@@ -3777,6 +3821,8 @@ class StockMovementRow extends DataClass
       'branchId': serializer.toJson<String>(branchId),
       'qtyDelta': serializer.toJson<int>(qtyDelta),
       'reason': serializer.toJson<String>(reason),
+      'refType': serializer.toJson<String?>(refType),
+      'refId': serializer.toJson<String?>(refId),
       'occurredAt': serializer.toJson<DateTime>(occurredAt),
     };
   }
@@ -3793,6 +3839,8 @@ class StockMovementRow extends DataClass
           String? branchId,
           int? qtyDelta,
           String? reason,
+          Value<String?> refType = const Value.absent(),
+          Value<String?> refId = const Value.absent(),
           DateTime? occurredAt}) =>
       StockMovementRow(
         id: id ?? this.id,
@@ -3806,6 +3854,8 @@ class StockMovementRow extends DataClass
         branchId: branchId ?? this.branchId,
         qtyDelta: qtyDelta ?? this.qtyDelta,
         reason: reason ?? this.reason,
+        refType: refType.present ? refType.value : this.refType,
+        refId: refId.present ? refId.value : this.refId,
         occurredAt: occurredAt ?? this.occurredAt,
       );
   StockMovementRow copyWithCompanion(StockMovementsCompanion data) {
@@ -3821,6 +3871,8 @@ class StockMovementRow extends DataClass
       branchId: data.branchId.present ? data.branchId.value : this.branchId,
       qtyDelta: data.qtyDelta.present ? data.qtyDelta.value : this.qtyDelta,
       reason: data.reason.present ? data.reason.value : this.reason,
+      refType: data.refType.present ? data.refType.value : this.refType,
+      refId: data.refId.present ? data.refId.value : this.refId,
       occurredAt:
           data.occurredAt.present ? data.occurredAt.value : this.occurredAt,
     );
@@ -3840,6 +3892,8 @@ class StockMovementRow extends DataClass
           ..write('branchId: $branchId, ')
           ..write('qtyDelta: $qtyDelta, ')
           ..write('reason: $reason, ')
+          ..write('refType: $refType, ')
+          ..write('refId: $refId, ')
           ..write('occurredAt: $occurredAt')
           ..write(')'))
         .toString();
@@ -3858,6 +3912,8 @@ class StockMovementRow extends DataClass
       branchId,
       qtyDelta,
       reason,
+      refType,
+      refId,
       occurredAt);
   @override
   bool operator ==(Object other) =>
@@ -3874,6 +3930,8 @@ class StockMovementRow extends DataClass
           other.branchId == this.branchId &&
           other.qtyDelta == this.qtyDelta &&
           other.reason == this.reason &&
+          other.refType == this.refType &&
+          other.refId == this.refId &&
           other.occurredAt == this.occurredAt);
 }
 
@@ -3889,6 +3947,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
   final Value<String> branchId;
   final Value<int> qtyDelta;
   final Value<String> reason;
+  final Value<String?> refType;
+  final Value<String?> refId;
   final Value<DateTime> occurredAt;
   final Value<int> rowid;
   const StockMovementsCompanion({
@@ -3903,6 +3963,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
     this.branchId = const Value.absent(),
     this.qtyDelta = const Value.absent(),
     this.reason = const Value.absent(),
+    this.refType = const Value.absent(),
+    this.refId = const Value.absent(),
     this.occurredAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3918,6 +3980,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
     required String branchId,
     required int qtyDelta,
     required String reason,
+    this.refType = const Value.absent(),
+    this.refId = const Value.absent(),
     this.occurredAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -3937,6 +4001,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
     Expression<String>? branchId,
     Expression<int>? qtyDelta,
     Expression<String>? reason,
+    Expression<String>? refType,
+    Expression<String>? refId,
     Expression<DateTime>? occurredAt,
     Expression<int>? rowid,
   }) {
@@ -3952,6 +4018,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
       if (branchId != null) 'branch_id': branchId,
       if (qtyDelta != null) 'qty_delta': qtyDelta,
       if (reason != null) 'reason': reason,
+      if (refType != null) 'ref_type': refType,
+      if (refId != null) 'ref_id': refId,
       if (occurredAt != null) 'occurred_at': occurredAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3969,6 +4037,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
       Value<String>? branchId,
       Value<int>? qtyDelta,
       Value<String>? reason,
+      Value<String?>? refType,
+      Value<String?>? refId,
       Value<DateTime>? occurredAt,
       Value<int>? rowid}) {
     return StockMovementsCompanion(
@@ -3983,6 +4053,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
       branchId: branchId ?? this.branchId,
       qtyDelta: qtyDelta ?? this.qtyDelta,
       reason: reason ?? this.reason,
+      refType: refType ?? this.refType,
+      refId: refId ?? this.refId,
       occurredAt: occurredAt ?? this.occurredAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4024,6 +4096,12 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
     if (reason.present) {
       map['reason'] = Variable<String>(reason.value);
     }
+    if (refType.present) {
+      map['ref_type'] = Variable<String>(refType.value);
+    }
+    if (refId.present) {
+      map['ref_id'] = Variable<String>(refId.value);
+    }
     if (occurredAt.present) {
       map['occurred_at'] = Variable<DateTime>(occurredAt.value);
     }
@@ -4047,6 +4125,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
           ..write('branchId: $branchId, ')
           ..write('qtyDelta: $qtyDelta, ')
           ..write('reason: $reason, ')
+          ..write('refType: $refType, ')
+          ..write('refId: $refId, ')
           ..write('occurredAt: $occurredAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -11930,6 +12010,8 @@ typedef $$StockMovementsTableCreateCompanionBuilder = StockMovementsCompanion
   required String branchId,
   required int qtyDelta,
   required String reason,
+  Value<String?> refType,
+  Value<String?> refId,
   Value<DateTime> occurredAt,
   Value<int> rowid,
 });
@@ -11946,6 +12028,8 @@ typedef $$StockMovementsTableUpdateCompanionBuilder = StockMovementsCompanion
   Value<String> branchId,
   Value<int> qtyDelta,
   Value<String> reason,
+  Value<String?> refType,
+  Value<String?> refId,
   Value<DateTime> occurredAt,
   Value<int> rowid,
 });
@@ -11991,6 +12075,12 @@ class $$StockMovementsTableFilterComposer
 
   ColumnFilters<String> get reason => $composableBuilder(
       column: $table.reason, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get refType => $composableBuilder(
+      column: $table.refType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get refId => $composableBuilder(
+      column: $table.refId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnFilters(column));
@@ -12038,6 +12128,12 @@ class $$StockMovementsTableOrderingComposer
   ColumnOrderings<String> get reason => $composableBuilder(
       column: $table.reason, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get refType => $composableBuilder(
+      column: $table.refType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get refId => $composableBuilder(
+      column: $table.refId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnOrderings(column));
 }
@@ -12084,6 +12180,12 @@ class $$StockMovementsTableAnnotationComposer
   GeneratedColumn<String> get reason =>
       $composableBuilder(column: $table.reason, builder: (column) => column);
 
+  GeneratedColumn<String> get refType =>
+      $composableBuilder(column: $table.refType, builder: (column) => column);
+
+  GeneratedColumn<String> get refId =>
+      $composableBuilder(column: $table.refId, builder: (column) => column);
+
   GeneratedColumn<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => column);
 }
@@ -12126,6 +12228,8 @@ class $$StockMovementsTableTableManager extends RootTableManager<
             Value<String> branchId = const Value.absent(),
             Value<int> qtyDelta = const Value.absent(),
             Value<String> reason = const Value.absent(),
+            Value<String?> refType = const Value.absent(),
+            Value<String?> refId = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -12141,6 +12245,8 @@ class $$StockMovementsTableTableManager extends RootTableManager<
             branchId: branchId,
             qtyDelta: qtyDelta,
             reason: reason,
+            refType: refType,
+            refId: refId,
             occurredAt: occurredAt,
             rowid: rowid,
           ),
@@ -12156,6 +12262,8 @@ class $$StockMovementsTableTableManager extends RootTableManager<
             required String branchId,
             required int qtyDelta,
             required String reason,
+            Value<String?> refType = const Value.absent(),
+            Value<String?> refId = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -12171,6 +12279,8 @@ class $$StockMovementsTableTableManager extends RootTableManager<
             branchId: branchId,
             qtyDelta: qtyDelta,
             reason: reason,
+            refType: refType,
+            refId: refId,
             occurredAt: occurredAt,
             rowid: rowid,
           ),

@@ -1,8 +1,7 @@
-import 'package:dukan_core/dukan_core.dart' show Permission;
+import 'package:dukan_core/dukan_core.dart' show AppError, Permission;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../infrastructure/auth_api.dart' show AuthApiException;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/error_text.dart';
 import '../auth/session.dart';
@@ -33,7 +32,7 @@ class _VoidSaleButtonState extends ConsumerState<VoidSaleButton> {
       await ref.read(tillVoidProvider)(widget.saleId, reason: reason);
       messenger.showSnackBar(SnackBar(content: Text(l.saleVoidedOk)));
       widget.onVoided();
-    } on AuthApiException catch (e) {
+    } on AppError catch (e) {
       // A cash sale whose shift has closed is in that shift's count already.
       messenger.showSnackBar(SnackBar(
         content: Text(e.code == 'SALE_SHIFT_CLOSED' ? l.errVoidShiftClosed : appErrorText(l, e)),

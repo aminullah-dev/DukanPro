@@ -4,72 +4,91 @@ import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../composition.dart';
-import '../../infrastructure/auth_api.dart' show NetworkException;
-import '../../infrastructure/sales_api.dart';
 import '../auth/providers.dart';
 import '../auth/session.dart';
-import '../sync/sync_providers.dart';
 
 final localSalesProvider = Provider<LocalSales>((ref) => LocalSales(ref.watch(databaseProvider)));
 
-/// The server's sales endpoints (a void). Overridden in main; tests fake it.
-final salesApiProvider =
-    Provider<SalesApi>((ref) => throw UnimplementedError('override salesApiProvider in main'));
+/// A return the till recorded: the sale that names the one it takes goods back
+/// from. Amounts are positive here: what the goods were worth, and what the shop
+/// handed back (the rest came off the customer's account).
+final class RefundDone {
+  const RefundDone({
+    required this.id,
+    required this.number,
+    required this.totalMinor,
+    required this.moneyBackMinor,
+  });
+  final String id;
+  final String number;
+  final int totalMinor;
+  final int moneyBackMinor;
+}
 
-/// Voids a sale from the till. The server owns money and stock, so this runs
-/// online: the sale is pushed first (the server must know it), the void is
-/// asked for, and the reversal is pulled back to this device.
+/// Voids a sale from the till, with or without a connection: the till writes the
+/// void, the stock coming back and the debt coming off in one transaction, and
+/// sync carries them to the server together (docs/domain/sales.md).
 class TillVoid {
-  TillVoid({required this.api, required this.sync, required this.synced});
-  final SalesApi api;
-  final Future<void> Function() sync;
+  TillVoid({required this.sales, required this.actorId, required this.deviceId});
+  final LocalSales sales;
+  final String? actorId;
+  final String deviceId;
 
-  /// Whether the last [sync] reached the server.
-  final bool Function() synced;
-
-  Future<void> call(String saleId, {required String reason}) async {
-    await sync();
-    if (!synced()) throw const NetworkException();
-    await api.voidSale(saleId, reason: reason);
-    await sync();
+  Future<void> call(String saleId, {required String reason}) {
+    final actor = actorId;
+    if (actor == null) {
+      throw PermissionDeniedError('ACCESS_DENIED', {'permission': Permission.saleVoid.code});
+    }
+    return sales.voidSale(saleId: saleId, reason: reason, actorId: actor, deviceId: deviceId);
   }
 }
 
 final tillVoidProvider = Provider<TillVoid>((ref) => TillVoid(
-      api: ref.watch(salesApiProvider),
-      sync: () => ref.read(syncControllerProvider.notifier).syncNow(),
-      synced: () => !ref.read(syncControllerProvider).failed,
+      sales: ref.watch(localSalesProvider),
+      actorId: ref.watch(sessionActorProvider)?.user.id,
+      deviceId: ref.watch(deviceIdProvider),
     ));
 
-/// Takes goods back from a sale at the till: online, like a void. The sale is
-/// pushed first, the return asked for, and the new negative sale pulled back.
+/// Takes goods back from a sale at the till, with or without a connection. Cash
+/// handed back comes out of this till's open drawer.
 class TillRefund {
-  TillRefund({required this.api, required this.sync, required this.synced});
-  final SalesApi api;
-  final Future<void> Function() sync;
-
-  /// Whether the last [sync] reached the server.
-  final bool Function() synced;
+  TillRefund({
+    required this.sales,
+    required this.actorId,
+    required this.deviceId,
+    required this.openShift,
+  });
+  final LocalSales sales;
+  final String? actorId;
+  final String deviceId;
+  final Future<String?> Function() openShift;
 
   Future<RefundDone> call(
     String saleId, {
     required Map<String, int> lines,
     required String reason,
     required String method,
-    String? shiftId,
   }) async {
-    await sync();
-    if (!synced()) throw const NetworkException();
-    final done = await api.refundSale(saleId, lines: lines, reason: reason, method: method, shiftId: shiftId);
-    await sync();
-    return done;
+    final actor = actorId;
+    if (actor == null) {
+      throw PermissionDeniedError('ACCESS_DENIED', {'permission': Permission.saleVoid.code});
+    }
+    final refund = await sales.refund(
+      saleId: saleId, lines: lines, reason: reason, method: method, shiftId: await openShift(),
+      actorId: actor, deviceId: deviceId,
+    );
+    return RefundDone(
+      id: refund.id, number: refund.number, totalMinor: -refund.totalMinor,
+      moneyBackMinor: -refund.paidMinor,
+    );
   }
 }
 
 final tillRefundProvider = Provider<TillRefund>((ref) => TillRefund(
-      api: ref.watch(salesApiProvider),
-      sync: () => ref.read(syncControllerProvider.notifier).syncNow(),
-      synced: () => !ref.read(syncControllerProvider).failed,
+      sales: ref.watch(localSalesProvider),
+      actorId: ref.watch(sessionActorProvider)?.user.id,
+      deviceId: ref.watch(deviceIdProvider),
+      openShift: () async => (await ref.read(currentShiftProvider.future))?.id,
     ));
 
 final localShiftsProvider = Provider<LocalShifts>((ref) => LocalShifts(ref.watch(databaseProvider)));

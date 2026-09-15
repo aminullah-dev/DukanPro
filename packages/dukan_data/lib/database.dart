@@ -112,6 +112,10 @@ class StockMovements extends Table with RecordColumns {
   TextColumn get branchId => text()();
   IntColumn get qtyDelta => integer()();
   TextColumn get reason => text()();
+
+  /// What moved the stock: a sale, or the void or return that brings it back.
+  TextColumn get refType => text().nullable()();
+  TextColumn get refId => text().nullable()();
   DateTimeColumn get occurredAt => dateTime().withDefault(currentDateAndTime)();
   @override
   Set<Column> get primaryKey => {id};
@@ -286,7 +290,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -353,6 +357,19 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 14 && !await _hasColumn('outbox_entries', 'tx_id')) {
             await m.addColumn(outboxEntries, outboxEntries.txId);
+          }
+          if (from < 15) {
+            for (final column in [stockMovements.refType, stockMovements.refId]) {
+              if (!await _hasColumn('stock_movements', column.$name)) {
+                await m.addColumn(stockMovements, column);
+              }
+            }
+            // A sale's movements are linked in the op that queued them: a void
+            // recorded here needs to find them again.
+            await customStatement(r"UPDATE stock_movements SET ref_type = json_extract(o.payload, '$.ref_type'), "
+                r"ref_id = json_extract(o.payload, '$.ref_id') FROM outbox_entries o "
+                r"WHERE o.aggregate_type = 'stock_movements' AND o.aggregate_id = stock_movements.id "
+                r"AND stock_movements.ref_id IS NULL");
           }
         },
       );

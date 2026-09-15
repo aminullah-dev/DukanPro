@@ -1,93 +1,79 @@
-// Goods come back from the till online: the sale is pushed first and the
-// return pulled back. The dialog shows what the goods are worth before asking,
-// refuses more than is left, and sends what was typed.
-import 'package:drift/drift.dart' hide isNull;
+// Goods come back at the till with or without a connection: the dialog shows
+// what they are worth, refuses more than is left, and writes the return here.
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
+import 'package:dukanpro/features/auth/providers.dart';
 import 'package:dukanpro/features/auth/session.dart';
 import 'package:dukanpro/features/pos/pos_providers.dart';
 import 'package:dukanpro/features/pos/return_sale.dart';
-import 'package:dukanpro/infrastructure/auth_api.dart';
-import 'package:dukanpro/infrastructure/sales_api.dart';
 import 'package:dukanpro/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _Api implements SalesApi {
-  final asked = <String>[];
-
-  @override
-  Future<void> voidSale(String saleId, {required String reason}) async {}
-
-  @override
-  Future<RefundDone> refundSale(
-    String saleId, {
-    required Map<String, int> lines,
-    required String reason,
-    required String method,
-    String? shiftId,
-  }) async {
-    asked.add('$saleId $lines $method $reason');
-    return const RefundDone(id: 'r1', number: 'INV-2026-00002', totalMinor: 5000, moneyBackMinor: 5000);
-  }
-}
+const _piece = '00000000-0000-7000-8000-000000000001';
 
 SessionActor _actor(String role) => SessionActor(
       User(
-        id: 'u-$role', username: role, displayName: role, status: UserStatus.active,
+        id: 'u1', username: role, displayName: role, status: UserStatus.active,
         assignments: [BranchAssignment(branchId: 'B1', roleName: role)], defaultBranchId: 'B1',
       ),
       'B1',
     );
 
-/// A sale of three soaps at 50.00, with its lines, read back as the till sees it.
-Future<(SaleRow, List<SaleLineRow>)> _sale(AppDatabase db) async {
-  final id = newId();
-  await db.into(db.sales).insert(SalesCompanion.insert(
-        id: id, number: 'INV-2026-00001', branchId: 'B1',
-        subtotalMinor: const Value(15000), totalMinor: const Value(15000), paidMinor: const Value(15000),
+/// A till with a cash sale of three soaps into an open drawer.
+Future<(AppDatabase, LocalSales, SaleRow, Product, String)> _till() async {
+  final db = AppDatabase(NativeDatabase.memory());
+  final product = Product(
+    id: newId(), sku: 'S1', name: 'Soap', unitId: _piece, sellPrice: Money(5000, 'AFN'),
+  );
+  await LocalCatalog(db).createProduct(product, actorId: 'u1', deviceId: 'd1');
+  await db.into(db.stockMovements).insert(StockMovementsCompanion.insert(
+        id: newId(), productId: product.id, branchId: 'B1', qtyDelta: 10, reason: 'adjustment',
+        createdBy: const Value('u1'),
       ));
-  await db.into(db.saleLines).insert(SaleLinesCompanion.insert(
-        id: newId(), saleId: id, productId: 'soap', name: 'Soap', qtyMinor: 3,
-        unitPriceMinor: 5000, lineTotalMinor: 15000,
-      ));
+  final shift = await LocalShifts(db).open(
+    branchId: 'B1', userId: 'u1', openingFloatMinor: 0, deviceId: 'd1',
+  );
   final sales = LocalSales(db);
-  return ((await sales.byId(id))!, await sales.saleLinesFor(id));
+  final sale = await sales.settleCash(
+    lines: [
+      SaleLine(
+        productId: product.id, name: product.name, qtyMinor: 3, decimalPlaces: 0,
+        unitPriceMinor: 5000, unitCostMinor: 0, currency: 'AFN',
+      ),
+    ],
+    tenderedMinor: 15000, branchId: 'B1', actorId: 'u1', deviceId: 'd1', shiftId: shift.id,
+  );
+  return (db, sales, sale, product, shift.id);
+}
+
+Future<int> _onHand(AppDatabase db, String productId) async {
+  final rows = await (db.select(db.stockMovements)
+        ..where((t) => t.productId.equals(productId) & t.deletedAt.isNull()))
+      .get();
+  return rows.fold<int>(0, (sum, m) => sum + m.qtyDelta);
 }
 
 void main() {
-  test('the sale is pushed, the goods taken back, and the return pulled back', () async {
-    final api = _Api();
-    var syncs = 0;
-    final done = await TillRefund(api: api, sync: () async => syncs++, synced: () => true)(
-      's1', lines: {'soap': 1}, reason: 'damaged', method: 'cash', shiftId: 'sh1',
-    );
-    expect((done.totalMinor, syncs), (5000, 2));
-    expect(api.asked, ['s1 {soap: 1} cash damaged']);
-  });
-
-  test('offline, nothing is asked of the server', () async {
-    final api = _Api();
-    await expectLater(
-      TillRefund(api: api, sync: () async {}, synced: () => false)('s1', lines: {'soap': 1}, reason: 'x', method: 'cash'),
-      throwsA(isA<NetworkException>()),
-    );
-    expect(api.asked, isEmpty);
-  });
-
-  testWidgets('the dialog shows the worth, refuses more than is left, and sends what was typed', (tester) async {
-    final db = AppDatabase(NativeDatabase.memory());
+  testWidgets('the dialog shows the worth, refuses more than is left, and writes the return',
+      (tester) async {
+    final (db, sales, sale, product, shift) = (await tester.runAsync(_till))!;
     addTearDown(db.close);
-    final (sale, lines) = (await tester.runAsync(() => _sale(db)))!;
-    final api = _Api();
+    final lines = (await tester.runAsync(() => sales.saleLinesFor(sale.id)))!;
+    final returnable = (await tester.runAsync(() => sales.returnable(sale.id)))!;
     RefundDone? result;
+
     await tester.pumpWidget(ProviderScope(
       overrides: [
+        databaseProvider.overrideWithValue(db),
+        deviceIdProvider.overrideWithValue('d1'),
         sessionActorProvider.overrideWithValue(_actor('manager')),
-        currentShiftProvider.overrideWith((ref) async => null),
-        tillRefundProvider.overrideWithValue(TillRefund(api: api, sync: () async {}, synced: () => true)),
+        tillRefundProvider.overrideWithValue(TillRefund(
+          sales: sales, actorId: 'u1', deviceId: 'd1', openShift: () async => shift,
+        )),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -97,7 +83,9 @@ void main() {
             builder: (context) => TextButton(
               onPressed: () async => result = await showDialog<RefundDone>(
                 context: context,
-                builder: (_) => ReturnDialog(sale: sale, lines: lines, returnable: const {'soap': 2}, earlierReturnsMinor: -5000),
+                builder: (_) => ReturnDialog(
+                  sale: sale, lines: lines, returnable: returnable, earlierReturnsMinor: 0,
+                ),
               ),
               child: const Text('open'),
             ),
@@ -109,33 +97,41 @@ void main() {
     await tester.pumpAndSettle();
     final take = find.widgetWithText(FilledButton, 'Take back');
 
-    await tester.enterText(find.byType(TextField).first, '3');
+    await tester.enterText(find.byType(TextField).first, '4');
     await tester.pump();
     expect(find.text('That is more than is left to take back.'), findsOneWidget);
     expect(tester.widget<FilledButton>(take).onPressed, isNull);
 
     await tester.enterText(find.byType(TextField).first, '1');
     await tester.pump();
-    expect(find.textContaining('50.00'), findsOneWidget); // worth one soap
-    expect(tester.widget<FilledButton>(take).onPressed, isNull); // no reason yet
+    expect(find.textContaining('50.00'), findsOneWidget); // one soap's worth
     await tester.enterText(find.widgetWithText(TextField, 'Reason'), 'torn wrapper');
     await tester.pump();
     await tester.tap(take);
     await tester.pumpAndSettle();
-    expect(api.asked, ['${sale.id} {soap: 1} cash torn wrapper']);
-    expect(result?.number, 'INV-2026-00002');
+
+    expect(result?.moneyBackMinor, 5000);
+    final refunds = (await tester.runAsync(() => sales.returnsOf(sale.id)))!;
+    expect(refunds.single.totalMinor, -5000);
+    expect(await tester.runAsync(() => _onHand(db, product.id)), 8);
+    expect(await tester.runAsync(() => sales.returnable(sale.id)), {product.id: 2});
   });
 
   testWidgets('a cashier does not take goods back', (tester) async {
-    final db = AppDatabase(NativeDatabase.memory());
+    final (db, sales, sale, _, _) = (await tester.runAsync(_till))!;
     addTearDown(db.close);
-    final (sale, lines) = (await tester.runAsync(() => _sale(db)))!;
+    final lines = (await tester.runAsync(() => sales.saleLinesFor(sale.id)))!;
     await tester.pumpWidget(ProviderScope(
-      overrides: [sessionActorProvider.overrideWithValue(_actor('cashier'))],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        sessionActorProvider.overrideWithValue(_actor('cashier')),
+      ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(body: ReturnItemsButton(sale: sale, lines: lines, settled: true, onReturned: (_) {})),
+        home: Scaffold(
+          body: ReturnItemsButton(sale: sale, lines: lines, settled: true, onReturned: (_) {}),
+        ),
       ),
     ));
     expect(find.text('Return items'), findsNothing);

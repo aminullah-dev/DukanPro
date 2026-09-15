@@ -411,6 +411,7 @@ final class SyncEngine {
           id: Value(id), productId: _opt(d, 'product_id', _s), branchId: _opt(d, 'branch_id', _s),
           qtyDelta: _opt(d, 'qty_delta', _i), reason: _opt(d, 'reason', _s),
           occurredAt: _opt(d, 'occurred_at', _t),
+          refType: _opt(d, 'ref_type', _sN), refId: _opt(d, 'ref_id', _sN),
         ));
       case 'sales':
         await _write(_db.sales, id, exists, SalesCompanion(

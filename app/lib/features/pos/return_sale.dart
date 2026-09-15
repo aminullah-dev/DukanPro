@@ -3,7 +3,6 @@ import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../infrastructure/sales_api.dart' show RefundDone;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/bidi.dart';
 import '../../widgets/error_text.dart';
@@ -179,14 +178,8 @@ class _ReturnDialogState extends ConsumerState<ReturnDialog> {
   Future<void> _submit(AppLocalizations l, Map<String, int> wanted) async {
     setState(() => _busy = true);
     try {
-      // Cash comes out of this till's drawer: its open shift.
-      final shift = await ref.read(currentShiftProvider.future);
       final done = await ref.read(tillRefundProvider)(
-        widget.sale.id,
-        lines: wanted,
-        reason: _reason.text.trim(),
-        method: _method,
-        shiftId: shift?.id,
+        widget.sale.id, lines: wanted, reason: _reason.text.trim(), method: _method,
       );
       if (mounted) Navigator.pop(context, done);
     } on Object catch (e) {

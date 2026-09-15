@@ -15,7 +15,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, true, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
@@ -29,6 +29,7 @@ from dukan.application.sync_policy import (
     ProductRef,
     PullScope,
     RowSnapshot,
+    SaleLineRef,
     SaleRef,
     ShiftRef,
     SupplierRef,
@@ -212,7 +213,8 @@ class _SqlSyncReader:
         return SaleRef(
             id=s.id, branch_id=s.branch_id, created_by=s.created_by, customer_id=s.customer_id,
             currency=s.currency, subtotal_minor=s.subtotal_minor, total_minor=s.total_minor,
-            paid_minor=s.paid_minor, occurred_at=_aware(s.occurred_at),
+            paid_minor=s.paid_minor, occurred_at=_aware(s.occurred_at), status=s.status,
+            refund_of=s.refund_of, shift_id=s.shift_id,
         )
 
     def sale_lines_total(self, sale_id: str) -> int:
@@ -247,6 +249,74 @@ class _SqlSyncReader:
             CustomerLedgerModel.amount_minor,
             CustomerLedgerModel.type == "charge", CustomerLedgerModel.ref_type == "sale",
             CustomerLedgerModel.ref_id == sale_id, CustomerLedgerModel.deleted_at.is_(None),
+        )
+
+    def _refunds_of(self, sale_id: str) -> Any:
+        return select(SaleModel.id).where(
+            SaleModel.refund_of == sale_id, SaleModel.deleted_at.is_(None)
+        )
+
+    def sale_has_refunds(self, sale_id: str) -> bool:
+        return self._s.scalar(self._refunds_of(sale_id).limit(1)) is not None
+
+    def sale_refunds_total(self, sale_id: str) -> int:
+        return self._sum(
+            SaleModel.total_minor, SaleModel.refund_of == sale_id, SaleModel.deleted_at.is_(None)
+        )
+
+    def sale_line_ref(self, sale_id: str, product_id: str) -> SaleLineRef | None:
+        lines = self._s.scalars(
+            select(SaleLineModel)
+            .where(
+                SaleLineModel.sale_id == sale_id, SaleLineModel.product_id == product_id,
+                SaleLineModel.deleted_at.is_(None),
+            )
+            .order_by(SaleLineModel.created_at)
+        ).all()
+        if not lines:
+            return None
+        first = lines[0]
+        return SaleLineRef(
+            qty_minor=sum(line.qty_minor for line in lines),
+            value_minor=sum(line.line_total_minor for line in lines),
+            unit_price_minor=first.unit_price_minor, unit_cost_minor=first.unit_cost_minor,
+            decimal_places=first.decimal_places,
+        )
+
+    def refunded_qty(self, sale_id: str, product_id: str) -> int:
+        return -self._sum(
+            SaleLineModel.qty_minor,
+            SaleLineModel.sale_id.in_(self._refunds_of(sale_id)),
+            SaleLineModel.product_id == product_id, SaleLineModel.deleted_at.is_(None),
+        )
+
+    def returned_stock_qty(self, ref_type: str, ref_id: str, product_id: str) -> int:
+        return self._sum(
+            StockMovementModel.qty_delta,
+            StockMovementModel.reason == "returned", StockMovementModel.ref_type == ref_type,
+            StockMovementModel.ref_id == ref_id, StockMovementModel.product_id == product_id,
+            StockMovementModel.deleted_at.is_(None),
+        )
+
+    def sale_reversed_debt(self, sale_id: str) -> int:
+        return -self._sum(
+            CustomerLedgerModel.amount_minor,
+            CustomerLedgerModel.type == "adjustment",
+            or_(
+                and_(CustomerLedgerModel.ref_type == "void", CustomerLedgerModel.ref_id == sale_id),
+                and_(
+                    CustomerLedgerModel.ref_type == "refund",
+                    CustomerLedgerModel.ref_id.in_(self._refunds_of(sale_id)),
+                ),
+            ),
+            CustomerLedgerModel.deleted_at.is_(None),
+        )
+
+    def sale_cash_taken(self, sale_id: str) -> int:
+        return self._sum(
+            PaymentModel.amount_minor,
+            PaymentModel.sale_id == sale_id, PaymentModel.method == "cash",
+            PaymentModel.deleted_at.is_(None),
         )
 
     def branch_active(self, branch_id: str) -> bool:
@@ -560,7 +630,8 @@ class SqlSyncService(SyncService):
                     update(model)
                     .where(
                         model.id == op.row_id,
-                        model.version == op.base_version,
+                        # A one-way change (a void) takes no compare-and-set.
+                        model.version == op.base_version if plan.compare_version else true(),
                         model.deleted_at.is_(None),
                     )
                     .values(

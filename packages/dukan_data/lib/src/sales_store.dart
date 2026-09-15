@@ -119,7 +119,8 @@ final class LocalSales {
         final movementId = newId();
         await _db.into(_db.stockMovements).insert(StockMovementsCompanion.insert(
               id: movementId, productId: l.productId, branchId: branchId,
-              qtyDelta: -l.qtyMinor, reason: 'sale', createdBy: Value(actorId),
+              qtyDelta: -l.qtyMinor, reason: 'sale', refType: const Value('sale'),
+              refId: Value(saleId), createdBy: Value(actorId),
             ));
         await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
           'product_id': l.productId, 'branch_id': branchId, 'qty_delta': -l.qtyMinor, 'reason': 'sale',
@@ -156,6 +157,277 @@ final class LocalSales {
       saved = await (_db.select(_db.sales)..where((t) => t.id.equals(saleId))).getSingle();
     });
     return saved;
+  }
+
+  /// Voids a sale on this till, with or without a connection: the stock the sale
+  /// took comes back and what the customer still owes for it comes off, all in
+  /// one transaction. The server checks it when the rows arrive
+  /// (docs/domain/sales.md).
+  Future<void> voidSale({
+    required String saleId,
+    required String reason,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    final why = reason.trim();
+    if (why.isEmpty) throw ValidationError('SALE_VOID_REASON_REQUIRED');
+    final sale = await byId(saleId);
+    if (sale == null) throw NotFoundError('SALE_NOT_FOUND', {'sale_id': saleId});
+    if (sale.status != 'settled' || sale.refundOf != null || (await returnsOf(saleId)).isNotEmpty) {
+      throw ConflictError('SALE_NOT_VOIDABLE', {'status': sale.status});
+    }
+    // Cash counted in a closed drawer does not come back out of it: that is a return.
+    final shiftId = sale.shiftId;
+    if (shiftId != null && await _cashTaken(saleId) > 0) {
+      final shift = await (_db.select(_db.shifts)..where((t) => t.id.equals(shiftId))).getSingleOrNull();
+      if (shift != null && shift.status != 'open') {
+        throw ConflictError('SALE_SHIFT_CLOSED', {'shift_id': shiftId});
+      }
+    }
+    await _db.transaction(() async {
+      await (_db.update(_db.sales)..where((t) => t.id.equals(saleId))).write(SalesCompanion(
+            status: const Value('voided'), updatedBy: Value(actorId),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ));
+      await _rec.record(
+        table: 'sales', rowId: saleId, op: 'update', baseVersion: 0,
+        data: {'status': 'voided', 'void_reason': why}, actorId: actorId, deviceId: deviceId,
+      );
+      for (final movement in await _saleMovements(saleId)) {
+        await _returnStock(
+          productId: movement.productId, branchId: movement.branchId, qty: -movement.qtyDelta,
+          refType: 'void', refId: saleId, actorId: actorId, deviceId: deviceId,
+        );
+      }
+      await _reverseDebt(
+        sale: sale, refType: 'void', refId: saleId, actorId: actorId, deviceId: deviceId,
+      );
+    });
+  }
+
+  /// Takes goods back from a settled sale, with or without a connection: a new
+  /// sale with negative amounts that names it ([lines] is how much of each
+  /// product comes back). What the customer still owes for the sale comes off
+  /// first; the rest goes back by [method], cash out of [shiftId]'s drawer.
+  Future<SaleRow> refund({
+    required String saleId,
+    required Map<String, int> lines,
+    required String reason,
+    required String method,
+    String? shiftId,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    final why = reason.trim();
+    final sale = await byId(saleId);
+    if (sale == null) throw NotFoundError('SALE_NOT_FOUND', {'sale_id': saleId});
+    if (sale.status != 'settled' || sale.refundOf != null) {
+      throw ConflictError('SALE_NOT_REFUNDABLE', {'status': sale.status});
+    }
+    if (!_refundMethods.contains(method)) {
+      throw ValidationError('REFUND_METHOD_INVALID', {'method': method});
+    }
+    final wanted = {for (final e in lines.entries) if (e.value != 0) e.key: e.value};
+    assertRefundValid(reason: why, wanted: wanted, returnable: await returnable(saleId));
+
+    final sold = <String, int>{};
+    final value = <String, int>{};
+    final source = <String, SaleLineRow>{};
+    for (final line in await saleLinesFor(saleId)) {
+      sold[line.productId] = (sold[line.productId] ?? 0) + line.qtyMinor;
+      value[line.productId] = (value[line.productId] ?? 0) + line.lineTotalMinor;
+      source.putIfAbsent(line.productId, () => line);
+    }
+    final worth = {
+      for (final e in wanted.entries)
+        e.key: returnedValueMinor(
+          lineTotalMinor: value[e.key] ?? 0, soldQtyMinor: sold[e.key] ?? 0, returnedQtyMinor: e.value,
+        ),
+    };
+    final gross = worth.values.fold<int>(0, (sum, v) => sum + v);
+    final earlier = (await returnsOf(saleId)).fold<int>(0, (sum, r) => sum + r.totalMinor);
+    final left = sale.totalMinor + earlier; // what is still to give back
+    final everything = (await returnable(saleId)).entries.every((e) => (wanted[e.key] ?? 0) == e.value);
+    var total = everything
+        ? left
+        : refundTotalMinor(
+            grossMinor: gross, saleSubtotalMinor: sale.subtotalMinor,
+            saleDiscountMinor: sale.discountMinor,
+          );
+    if (total > left) total = left;
+    final debtBack = await _debtToReverse(sale, upTo: total);
+    final moneyBack = total - debtBack;
+    if (method == 'cash' && moneyBack > 0) {
+      if (shiftId == null) throw ConflictError('SHIFT_NOT_OPEN', {'shift_id': null});
+      await _requireOpenShift(shiftId, branchId: sale.branchId, userId: actorId);
+    }
+    final refundId = newId();
+    late SaleRow saved;
+    await _db.transaction(() async {
+      final number = await _nextNumber(deviceId);
+      await _db.into(_db.sales).insert(SalesCompanion.insert(
+            id: refundId, number: number, branchId: sale.branchId,
+            customerId: Value(sale.customerId), status: const Value('settled'),
+            currency: Value(sale.currency), discountMinor: Value(gross - total),
+            subtotalMinor: Value(-gross), totalMinor: Value(-total), paidMinor: Value(-moneyBack),
+            changeMinor: const Value(0), shiftId: Value(shiftId), refundOf: Value(saleId),
+            createdBy: Value(actorId), updatedBy: Value(actorId),
+          ));
+      await _rec.record(table: 'sales', rowId: refundId, op: 'insert', data: {
+        'number': number, 'branch_id': sale.branchId, 'shift_id': shiftId,
+        'customer_id': sale.customerId, 'status': 'settled', 'currency': sale.currency,
+        'discount_minor': gross - total, 'subtotal_minor': -gross, 'tax_minor': 0,
+        'total_minor': -total, 'paid_minor': -moneyBack, 'change_minor': 0,
+        'refund_of': saleId, 'refund_reason': why,
+      }, actorId: actorId, deviceId: deviceId);
+
+      for (final entry in wanted.entries) {
+        final line = source[entry.key]!;
+        final lineId = newId();
+        await _db.into(_db.saleLines).insert(SaleLinesCompanion.insert(
+              id: lineId, saleId: refundId, productId: entry.key, name: line.name,
+              qtyMinor: -entry.value, decimalPlaces: Value(line.decimalPlaces),
+              unitPriceMinor: line.unitPriceMinor, unitCostMinor: Value(line.unitCostMinor),
+              lineTotalMinor: -worth[entry.key]!, currency: Value(sale.currency),
+              createdBy: Value(actorId),
+            ));
+        await _rec.record(table: 'sale_lines', rowId: lineId, op: 'insert', data: {
+          'sale_id': refundId, 'product_id': entry.key, 'name': line.name,
+          'qty_minor': -entry.value, 'decimal_places': line.decimalPlaces,
+          'unit_price_minor': line.unitPriceMinor, 'unit_cost_minor': line.unitCostMinor,
+          'line_total_minor': -worth[entry.key]!, 'currency': sale.currency,
+        }, actorId: actorId, deviceId: deviceId);
+      }
+      // Goods come back to stock only where the sale took them from it.
+      final took = {for (final m in await _saleMovements(saleId)) m.productId: m.branchId};
+      for (final entry in wanted.entries) {
+        final branchId = took[entry.key];
+        if (branchId == null) continue;
+        await _returnStock(
+          productId: entry.key, branchId: branchId, qty: entry.value, refType: 'refund',
+          refId: refundId, actorId: actorId, deviceId: deviceId,
+        );
+      }
+      if (moneyBack > 0) {
+        final paymentId = newId();
+        await _db.into(_db.payments).insert(PaymentsCompanion.insert(
+              id: paymentId, saleId: refundId, method: method, amountMinor: -moneyBack,
+              currency: Value(sale.currency), createdBy: Value(actorId),
+            ));
+        await _rec.record(table: 'payments', rowId: paymentId, op: 'insert', data: {
+          'sale_id': refundId, 'method': method, 'amount_minor': -moneyBack,
+          'currency': sale.currency, 'tendered_minor': null, 'change_minor': null,
+        }, actorId: actorId, deviceId: deviceId);
+      }
+      if (debtBack > 0) {
+        await _writeDebtReversal(
+          sale: sale, amount: debtBack, refType: 'refund', refId: refundId, actorId: actorId,
+          deviceId: deviceId,
+        );
+      }
+      saved = await (_db.select(_db.sales)..where((t) => t.id.equals(refundId))).getSingle();
+    });
+    return saved;
+  }
+
+  static const _refundMethods = {'cash', 'card', 'transfer'};
+
+  Future<int> _cashTaken(String saleId) async {
+    final rows = await (_db.select(_db.payments)
+          ..where((t) => t.saleId.equals(saleId) & t.deletedAt.isNull()))
+        .get();
+    return rows
+        .where((p) => p.method == PaymentMethod.cash.name)
+        .fold<int>(0, (sum, p) => sum + p.amountMinor);
+  }
+
+  /// The stock this sale took, as this device recorded it.
+  Future<List<StockMovementRow>> _saleMovements(String saleId) => (_db.select(_db.stockMovements)
+        ..where((t) => t.refType.equals('sale') & t.refId.equals(saleId) & t.deletedAt.isNull()))
+      .get();
+
+  Future<void> _returnStock({
+    required String productId,
+    required String branchId,
+    required int qty,
+    required String refType,
+    required String refId,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    final id = newId();
+    await _db.into(_db.stockMovements).insert(StockMovementsCompanion.insert(
+          id: id, productId: productId, branchId: branchId, qtyDelta: qty, reason: 'returned',
+          refType: Value(refType), refId: Value(refId), createdBy: Value(actorId),
+        ));
+    await _rec.record(table: 'stock_movements', rowId: id, op: 'insert', data: {
+      'product_id': productId, 'branch_id': branchId, 'qty_delta': qty, 'reason': 'returned',
+      'ref_type': refType, 'ref_id': refId,
+    }, actorId: actorId, deviceId: deviceId);
+  }
+
+  /// What a void or a return takes off the customer: what the sale charged, less
+  /// what earlier ones took back, and never more than the customer still owes
+  /// (money they paid is handed back instead) or than [upTo].
+  Future<int> _debtToReverse(SaleRow sale, {int? upTo}) async {
+    final customerId = sale.customerId;
+    if (customerId == null) return 0;
+    final charges = await (_db.select(_db.customerLedger)
+          ..where((t) =>
+              t.type.equals('charge') & t.refType.equals('sale') & t.refId.equals(sale.id) & t.deletedAt.isNull()))
+        .get();
+    final charged = charges.fold<int>(0, (sum, c) => sum + c.amountMinor);
+    if (charged <= 0) return 0;
+    final refunds = [for (final r in await returnsOf(sale.id)) r.id];
+    final reversals = await (_db.select(_db.customerLedger)
+          ..where((t) =>
+              t.type.equals('adjustment') &
+              ((t.refType.equals('void') & t.refId.equals(sale.id)) |
+                  (t.refType.equals('refund') & t.refId.isIn(refunds))) &
+              t.deletedAt.isNull()))
+        .get();
+    final reversed = reversals.fold<int>(0, (sum, r) => sum - r.amountMinor);
+    var back = charged - reversed;
+    if (upTo != null && upTo < back) back = upTo;
+    final owed = await _customerBalance(customerId);
+    if (owed < back) back = owed;
+    return back > 0 ? back : 0;
+  }
+
+  Future<void> _reverseDebt({
+    required SaleRow sale,
+    required String refType,
+    required String refId,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    final back = await _debtToReverse(sale);
+    if (back <= 0) return;
+    await _writeDebtReversal(
+      sale: sale, amount: back, refType: refType, refId: refId, actorId: actorId,
+      deviceId: deviceId,
+    );
+  }
+
+  Future<void> _writeDebtReversal({
+    required SaleRow sale,
+    required int amount,
+    required String refType,
+    required String refId,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    final customerId = sale.customerId!;
+    final id = newId();
+    await _db.into(_db.customerLedger).insert(CustomerLedgerCompanion.insert(
+          id: id, customerId: customerId, type: 'adjustment', amountMinor: -amount,
+          currency: Value(sale.currency), refType: Value(refType), refId: Value(refId),
+          createdBy: Value(actorId),
+        ));
+    await _rec.record(table: 'customer_ledger', rowId: id, op: 'insert', data: {
+      'customer_id': customerId, 'type': 'adjustment', 'amount_minor': -amount,
+      'currency': sale.currency, 'ref_type': refType, 'ref_id': refId,
+    }, actorId: actorId, deviceId: deviceId);
   }
 
   /// A single till sells no more of a stock-tracked product than it holds, as
