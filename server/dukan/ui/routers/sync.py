@@ -32,6 +32,7 @@ class OpReq(BaseModel):
     base_version: int | None = None
     actor_id: str | None = None  # outbox actorId: must equal the pusher when present
     created_at: str | None = None  # outbox createdAt: dates append-only rows (see policy)
+    tx_id: str | None = Field(default=None, max_length=64)  # the device transaction
 
 
 class PushRequest(BaseModel):
@@ -51,6 +52,7 @@ def push(body: PushRequest, actor: Actor, svc: Sync, x_branch_id: BranchHeader =
             OpInput(
                 op_id=o.op_id, table=o.table, row_id=o.row_id, op=o.op, data=o.data,
                 base_version=o.base_version, actor_id=o.actor_id, created_at=o.created_at,
+                tx_id=o.tx_id,
             )
             for o in body.ops
         ],

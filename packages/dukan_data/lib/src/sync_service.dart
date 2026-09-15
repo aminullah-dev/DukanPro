@@ -90,6 +90,10 @@ final class SyncEngine {
   /// Ops per push request, below the server's cap of 500 (docs/sync-protocol.md).
   static const maxPushBatch = 200;
 
+  /// The server's cap on ops per push: only a device transaction bigger than
+  /// this is split.
+  static const serverPushCap = 500;
+
   /// Pulled changes this device could not apply, kept for support (newest last).
   static const quarantineKey = 'sync.quarantine';
   static const _quarantineMax = 50;
@@ -150,8 +154,14 @@ final class SyncEngine {
     var next = 0;
     while (next < pending.length) {
       final batch = <OutboxOp>[];
-      while (next < pending.length && batch.length < pushBatch) {
+      String? lastTx;
+      // A push ends at pushBatch ops, but not inside a device transaction: its
+      // ledger rows apply together (docs/sync-protocol.md).
+      while (next < pending.length &&
+          batch.length < serverPushCap &&
+          (batch.length < pushBatch || (lastTx != null && pending[next].txId == lastTx))) {
         final o = pending[next++];
+        lastTx = o.txId;
         final verdict = failed[rowOf(o)];
         if (verdict == null) {
           batch.add(o);
