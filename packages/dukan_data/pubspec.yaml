@@ -22,3 +22,10 @@ dev_dependencies:
   lints: ">=4.0.0 <7.0.0"
   drift_dev: ^2.35.0
   build_runner: ^2.16.1
+
+# The device database is encrypted: link SQLCipher instead of plain SQLite
+# (docs/domain/identity-access.md, "Backups"). The app's pubspec says the same.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlcipher

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:dukan_data/dukan_data.dart' show SettingsStore;
+import 'package:dukan_data/dukan_data.dart' show AppDatabase, SettingsStore;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,11 +24,26 @@ import 'infrastructure/secure_store.dart';
 import 'infrastructure/sync_api.dart';
 import 'l10n/app_localizations.dart';
 import 'router.dart';
+import 'startup_failed_app.dart';
 import 'widgets/localization_delegates.dart';
+
+/// The device database, or null when it cannot be opened (see StartupFailedApp).
+Future<AppDatabase?> _openDatabase() async {
+  try {
+    return await openAppDatabase(FlutterSecureStore.thisDeviceOnly());
+  } on Object catch (e) {
+    debugPrint('The local database could not be opened: ${e.runtimeType}'); // never the key
+    return null;
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final db = await openAppDatabase();
+  final db = await _openDatabase();
+  if (db == null) {
+    runApp(const StartupFailedApp());
+    return;
+  }
   final deviceId = await loadDeviceId(db);
   // The language chosen last on this device, from the first frame on.
   final settings = SettingsStore(db);

@@ -23,12 +23,25 @@ class SecureKeys {
 
   /// The user who opted in to biometric unlock on this device.
   static const biometricUser = 'biometric_user';
+
+  /// The key the device database is encrypted with (64 hex digits), kept by
+  /// [FlutterSecureStore.thisDeviceOnly]. Signing out never removes it.
+  static const databaseKey = 'db_key';
 }
 
 /// Real implementation backed by Keychain / Keystore.
 class FlutterSecureStore implements SecureStore {
   FlutterSecureStore([FlutterSecureStorage? storage])
       : _s = storage ?? const FlutterSecureStorage();
+
+  /// Items that never leave this device: on iOS they are not restored from a
+  /// backup onto another phone, and they can be read from the first unlock
+  /// after a restart. For the database key.
+  FlutterSecureStore.thisDeviceOnly()
+      : _s = const FlutterSecureStorage(
+          iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+        );
+
   final FlutterSecureStorage _s;
 
   @override

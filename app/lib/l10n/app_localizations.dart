@@ -647,6 +647,12 @@ abstract class AppLocalizations {
   /// **'This device\'s secure storage could not be read. Sign in again; if it keeps happening, restart the device.'**
   String get errStorage;
 
+  /// No description provided for @errLocalDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'The data on this device could not be opened. Close the app and open it again; if it keeps happening, restart the device.'**
+  String get errLocalDatabase;
+
   /// No description provided for @errTotalTooLarge.
   ///
   /// In en, this message translates to:

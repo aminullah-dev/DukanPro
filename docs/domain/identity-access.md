@@ -87,7 +87,12 @@ The server is authoritative; the device keeps just enough to work offline.
   - The lock screen offers no sign-out.
   - Instead it offers "use another account", which keeps the cached session until that sign-in succeeds. Going back keeps the POS cart.
 - **Biometric unlock.** It stays off until the user opts in with their password. It accepts biometrics only (never the device PIN) and belongs to that one user.
-- **Backups.** Android cloud backup and device transfer exclude all app data. The local database is not encrypted yet (SQLCipher).
+- **Backups.** Android cloud backup and device transfer exclude all app data.
+- **The local database is encrypted** with SQLCipher (review F047). The key is 32 random bytes that only this device's secure storage holds, and on iOS it is never restored onto another phone. A copied file or a backup cannot be read anywhere else.
+  - A database written before encryption is encrypted in place at the next start, keeping every row.
+  - A file the key cannot open (the key was lost, or the file came from another device) is renamed aside, never deleted. The device starts empty and fills again from the server; changes that had not synced stay in the file set aside.
+  - If the key cannot be read at all, the app says so instead of starting. It never opens the database unencrypted.
+  - The SQLCipher build is the community edition that `package:sqlite3` ships (BSD licence; on Android, Windows and Linux it links OpenSSL).
 
 ## Server secrets and first run
 
