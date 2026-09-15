@@ -18,7 +18,8 @@ typedef ChangeView = Map<String, Object?>? Function(Map<String, Object?> change)
 /// [pageSize] with the watermark at the last row scanned.
 final class FakeSyncServer {
   FakeSyncServer({this.pageSize = 500});
-  static const _master = {'products', 'barcodes', 'customers', 'suppliers', 'units', 'categories'};
+  // The server's MASTER_TABLES.
+  static const _master = {'products', 'barcodes', 'customers', 'suppliers', 'units', 'categories', 'shifts'};
 
   final int pageSize;
 
@@ -26,16 +27,34 @@ final class FakeSyncServer {
   /// it (the state-dependent outcomes the real server does not cache).
   String? Function(OutboxOp op)? rejectWith;
 
+  /// The pulling user's read scope, as the server names it: granting a role or a
+  /// branch changes it.
+  String scope = 'scope-1';
+
   final Map<String, PushResult> _processed = {}; // opId -> result (idempotency)
   final Map<String, Map<String, Object?>> _rows = {}; // "table/id" -> master row incl. version
   final List<Map<String, Object?>> _log = []; // change feed, seq == index + 1
 
+  /// A master row as the server holds it, for assertions.
+  Map<String, Object?>? row(String table, String id) => _rows['$table/$id'];
+
   List<PushResult> push(List<OutboxOp> ops) {
     final out = <PushResult>[];
+    // As the server: an op on a row whose earlier op in this push was not taken
+    // takes the same verdict.
+    final failed = <String, PushResult>{};
     for (final op in ops) {
       final seen = _processed[op.opId];
       if (seen != null) {
         out.add(seen); // replay ⇒ same result, no duplicate applied
+        continue;
+      }
+      final key = '${op.aggregateType}/${op.aggregateId}';
+      final earlier = failed[key];
+      if (earlier != null) {
+        final result = PushResult(op.opId, earlier.outcome, code: earlier.code, current: earlier.current);
+        _processed[op.opId] = result;
+        out.add(result);
         continue;
       }
       final code = rejectWith?.call(op);
@@ -44,7 +63,14 @@ final class FakeSyncServer {
         continue;
       }
       final result = _apply(op);
-      _processed[op.opId] = result;
+      if (!result.code.toString().endsWith('_NOT_FOUND')) _processed[op.opId] = result;
+      final lostCas = result.outcome == OpOutcome.conflict &&
+          op.opType == 'update' &&
+          result.code.toString().endsWith('_VERSION_CONFLICT');
+      final refusedInsert = result.outcome == OpOutcome.rejected &&
+          op.opType == 'insert' &&
+          !result.code.toString().endsWith('_NOT_FOUND');
+      if (lostCas || refusedInsert) failed[key] = result;
       out.add(result);
     }
     return out;
@@ -64,35 +90,57 @@ final class FakeSyncServer {
       if (current != null) {
         return PushResult(op.opId, OpOutcome.conflict, code: '${prefix}_ALREADY_EXISTS', current: current);
       }
-      _rows[key] = {...op.payload, 'version': 1};
+      if (table == 'barcodes' &&
+          _rows.entries.any((e) =>
+              e.key.startsWith('barcodes/') && e.value['code'] == op.payload['code'] && e.value['deleted_at'] == null)) {
+        return PushResult(op.opId, OpOutcome.rejected, code: 'BARCODE_DUPLICATE'); // one live row per code
+      }
+      _rows[key] = {...op.payload, 'version': 1, 'created_at': DateTime.now().toUtc().toIso8601String()};
     } else {
       if (op.baseVersion == null) {
         return PushResult(op.opId, OpOutcome.rejected, code: 'SYNC_BASE_VERSION_REQUIRED');
       }
       if (current == null) {
-        return PushResult(op.opId, OpOutcome.rejected, code: 'PRODUCT_NOT_FOUND'); // app updates products only
+        final noun = table.substring(0, table.length - 1).toUpperCase();
+        return PushResult(op.opId, OpOutcome.rejected, code: '${noun}_NOT_FOUND');
+      }
+      if (table == 'barcodes' && current['deleted_at'] != null) {
+        // Another till took it off already: the removal is done.
+        return PushResult(op.opId, OpOutcome.applied, version: current['version']! as int);
       }
       if (op.baseVersion != current['version']) {
         return PushResult(op.opId, OpOutcome.conflict, code: '${prefix}_VERSION_CONFLICT', current: current);
       }
-      _rows[key] = {...current, ...op.payload, 'version': (current['version']! as int) + 1};
+      final changes = table == 'barcodes'
+          ? {'deleted_at': DateTime.now().toUtc().toIso8601String()} // a removal
+          : op.payload;
+      _rows[key] = {...current, ...changes, 'version': (current['version']! as int) + 1};
     }
     log(table, op.aggregateId, op.opType, _rows[key]!); // the post-image, not the payload
     return PushResult(op.opId, OpOutcome.applied, version: _rows[key]!['version']! as int, serverSeq: _log.length);
   }
 
   /// Appends a change_log row (a post-image), as an applied write would.
-  void log(String table, String rowId, String op, Map<String, Object?> data) => _log.add(
-        {'seq': _log.length + 1, 'table': table, 'row_id': rowId, 'op': op, 'data': data},
-      );
+  void log(String table, String rowId, String op, Map<String, Object?> data) => _log.add({
+        'seq': _log.length + 1, 'table': table, 'row_id': rowId, 'op': op, 'data': data,
+        // Unique per server, as the real token: a restored server holds other changes.
+        'token': '${identityHashCode(this)}-${_log.length + 1}',
+      });
 
   /// Up to [pageSize] rows after [since], seen through [view]; the watermark
   /// moves past hidden rows too.
-  PullResult pull(int since, {ChangeView? view}) {
+  PullResult pull(int since, {String? sinceToken, ChangeView? view}) {
+    if (since > 0 && sinceToken != null && (since > _log.length || _log[since - 1]['token'] != sinceToken)) {
+      return PullResult(
+          watermark: 0, changed: const [], tombstones: const [], maxSeq: _log.length, scope: scope, reset: true);
+    }
     final page = _log.skip(since).take(pageSize).toList();
+    final watermark = page.isEmpty ? since : page.last['seq']! as int;
     return PullResult(
       maxSeq: _log.length,
-      watermark: page.isEmpty ? since : page.last['seq']! as int,
+      scope: scope,
+      watermarkToken: watermark == 0 || watermark > _log.length ? null : _log[watermark - 1]['token'] as String?,
+      watermark: watermark,
       changed: [for (final c in page) view == null ? c : view(c)].whereType<Map<String, Object?>>().toList(),
       tombstones: const [],
     );
@@ -117,9 +165,9 @@ final class FakeSyncClient implements SyncClient {
   }
 
   @override
-  Future<PullResult> pull({required int sinceWatermark}) async {
+  Future<PullResult> pull({required int sinceWatermark, String? sinceToken}) async {
     pulledSince.add(sinceWatermark);
-    return _server.pull(sinceWatermark, view: view);
+    return _server.pull(sinceWatermark, sinceToken: sinceToken, view: view);
   }
 }
 
@@ -148,6 +196,10 @@ Map<String, Object?> _product(String sku, {int? cost}) => {
 
 Product _renamed(Product p, String name) => Product(
       id: p.id, sku: p.sku, name: name, unitId: p.unitId, sellPrice: p.sellPrice, version: p.version,
+    );
+
+Product _priced(Product p, int priceMinor) => Product(
+      id: p.id, sku: p.sku, name: p.name, unitId: p.unitId, sellPrice: Money(priceMinor, 'AFN'), version: p.version,
     );
 
 void main() {
@@ -507,5 +559,129 @@ void main() {
     await engine.pullSince();
     final kept = (await customers.find(customerId))!;
     expect((kept.creditLimitMinor, kept.version), (500000, 2)); // the older image did not rewind it
+  });
+
+  // ── Review of themes 6-9 ──────────────────────────────────────────────────
+
+  for (final batch in [1, SyncEngine.maxPushBatch]) {
+    test("an edit chained on a conflicted one never overwrites another device's (batch $batch)", () async {
+      final server = FakeSyncServer();
+      final a = AppDatabase(NativeDatabase.memory());
+      final b = AppDatabase(NativeDatabase.memory());
+      addTearDown(a.close);
+      addTearDown(b.close);
+      final clientB = FakeSyncClient(server);
+      final syncA = SyncEngine(a, FakeSyncClient(server), deviceId: 'dA');
+      final syncB = SyncEngine(b, clientB, deviceId: 'dB', pushBatch: batch);
+      final p = Product(id: newId(), sku: 'T1', name: 'Tea', unitId: 'kg', sellPrice: Money(10000, 'AFN'));
+      await LocalCatalog(a).createProduct(p, actorId: 'u1', deviceId: 'dA');
+      await syncA.syncNow();
+      await syncB.syncNow();
+
+      // B, offline: a rename, then a price made on top of it.
+      final onB = (await LocalCatalog(b).products.findById(p.id))!;
+      await LocalCatalog(b).updateProduct(_renamed(onB, 'Tea (B)'), actorId: 'u2', deviceId: 'dB');
+      final renamed = (await LocalCatalog(b).products.findById(p.id))!;
+      await LocalCatalog(b).updateProduct(_priced(renamed, 12000), actorId: 'u2', deviceId: 'dB');
+      // A sets its price first.
+      final onA = (await LocalCatalog(a).products.findById(p.id))!;
+      await LocalCatalog(a).updateProduct(_priced(onA, 15000), actorId: 'u1', deviceId: 'dA');
+      await syncA.syncNow();
+      await syncB.syncNow();
+
+      expect(server.row('products', p.id)!['sell_price_minor'], 15000); // A's price stands
+      final issues = await syncB.issues();
+      expect(issues.map((i) => i.status), ['conflict', 'conflict']); // both of B's edits wait for review
+      expect((await LocalCatalog(b).products.findById(p.id))!.sellPrice.amountMinor, 15000);
+      if (batch == 1) {
+        // The price edit was never sent: it took its rename's verdict on the device.
+        expect(clientB.pushed.where((o) => o.payload.containsKey('sell_price_minor')), isEmpty);
+      }
+    });
+  }
+
+  test('a barcode the server refused stays off this till, and its removal settles', () async {
+    final server = FakeSyncServer();
+    final a = AppDatabase(NativeDatabase.memory());
+    final b = AppDatabase(NativeDatabase.memory());
+    addTearDown(a.close);
+    addTearDown(b.close);
+    final syncA = SyncEngine(a, FakeSyncClient(server), deviceId: 'dA');
+    final syncB = SyncEngine(b, FakeSyncClient(server), deviceId: 'dB', pushBatch: 1);
+    final rice = Product(id: newId(), sku: 'R1', name: 'Rice', unitId: 'kg', sellPrice: Money(10000, 'AFN'));
+    final flour = Product(id: newId(), sku: 'F1', name: 'Flour', unitId: 'kg', sellPrice: Money(8000, 'AFN'));
+    await LocalCatalog(a).createProduct(rice, actorId: 'u1', deviceId: 'dA');
+    await LocalCatalog(a).createProduct(flour, actorId: 'u1', deviceId: 'dA');
+    await syncA.syncNow();
+    await syncB.syncNow();
+
+    // Offline, both tills give the code to a different product; B then takes its copy off.
+    await LocalCatalog(a).addBarcode(rice.id, '3340861717488', actorId: 'u1', deviceId: 'dA');
+    final mine = await LocalCatalog(b).addBarcode(flour.id, '3340861717488', actorId: 'u2', deviceId: 'dB');
+    await LocalCatalog(b).removeBarcode(mine.id, actorId: 'u2', deviceId: 'dB');
+    await syncA.syncNow();
+    await syncB.syncNow();
+
+    expect((await LocalCatalog(b).products.findByBarcode('3340861717488'))?.name, 'Rice');
+    expect(await syncB.pendingCount(), 0); // the removal took its insert's verdict: nothing loops
+    expect((await syncB.issues()).map((i) => (i.table, i.status, i.code)),
+        everyElement(('barcodes', 'rejected', 'BARCODE_DUPLICATE')));
+  });
+
+  test('a removal of a barcode another till removed settles as done', () async {
+    final server = FakeSyncServer();
+    final a = AppDatabase(NativeDatabase.memory());
+    final b = AppDatabase(NativeDatabase.memory());
+    addTearDown(a.close);
+    addTearDown(b.close);
+    final syncA = SyncEngine(a, FakeSyncClient(server), deviceId: 'dA');
+    final syncB = SyncEngine(b, FakeSyncClient(server), deviceId: 'dB');
+    final rice = Product(id: newId(), sku: 'R1', name: 'Rice', unitId: 'kg', sellPrice: Money(10000, 'AFN'));
+    await LocalCatalog(a).createProduct(rice, actorId: 'u1', deviceId: 'dA');
+    final code = await LocalCatalog(a).addBarcode(rice.id, '111', actorId: 'u1', deviceId: 'dA');
+    await syncA.syncNow();
+    await syncB.syncNow();
+
+    await LocalCatalog(a).removeBarcode(code.id, actorId: 'u1', deviceId: 'dA');
+    await LocalCatalog(b).removeBarcode(code.id, actorId: 'u2', deviceId: 'dB');
+    await syncA.syncNow();
+    await syncB.syncNow();
+    expect((await syncB.pendingCount(), (await syncB.issues()).length), (0, 0));
+  });
+
+  test('a server restored from a backup whose feed grew back past the cursor is read again', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final before = FakeSyncServer();
+    for (var i = 0; i < 5; i++) {
+      before.log('units', newId(), 'insert', {'name': 'u$i', 'decimal_places': 0, 'version': 1});
+    }
+    await SyncEngine(db, FakeSyncClient(before), deviceId: 'd1').pullSince();
+    // Restored to an older copy, then written to: its seq 5 is another change.
+    final restored = FakeSyncServer();
+    for (var i = 0; i < 8; i++) {
+      restored.log('units', newId(), 'insert', {'name': 'r$i', 'decimal_places': 0, 'version': 1});
+    }
+    await SyncEngine(db, FakeSyncClient(restored), deviceId: 'd1').pullSince();
+    final names = (await db.select(db.units).get()).map((u) => u.name).toSet();
+    expect(names, containsAll(['r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7']));
+  });
+
+  test('a user granted a wider scope reads the feed again and gets what the old scope hid', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final server = FakeSyncServer();
+    final pid = newId();
+    server.log('products', pid, 'insert', _product('C1', cost: 700));
+    // As a cashier: the cost is omitted.
+    await SyncEngine(db, FakeSyncClient(server, view: _cashierView), deviceId: 'd1').pullSince(actorId: 'u1');
+    Future<int?> cost() async =>
+        (await (db.select(db.products)..where((t) => t.id.equals(pid))).getSingle()).costMinor;
+    expect(await cost(), isNull);
+
+    // Promoted to manager: the server names another scope.
+    server.scope = 'scope-2';
+    await SyncEngine(db, FakeSyncClient(server), deviceId: 'd1').pullSince(actorId: 'u1');
+    expect(await cost(), 700);
   });
 }

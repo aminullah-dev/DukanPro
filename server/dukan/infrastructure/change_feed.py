@@ -8,6 +8,7 @@ pass a row that later commits with a lower seq. SQLite serializes writers anyway
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from typing import Any
 
@@ -46,3 +47,10 @@ def record_change(
     session.add(entry)
     session.flush()
     return int(entry.seq)
+
+
+def change_token(row: ChangeLogModel) -> str:
+    """Names one change for a device's cursor. After a restore from a backup the
+    seq a device stopped at holds another change, or none, and so another token."""
+    key = f"{row.seq}:{row.table_name}:{row.row_id}:{jsonable(row.occurred_at)}"
+    return hashlib.sha256(key.encode()).hexdigest()[:24]

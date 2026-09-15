@@ -228,6 +228,14 @@ class SupplierLedger extends Table with RecordColumns {
 class SyncStates extends Table {
   TextColumn get deviceId => text()();
   IntColumn get lastPulledSeq => integer().withDefault(const Constant(0))();
+
+  /// The server's name for the change at the cursor: another change there means
+  /// the server was restored from a backup (docs/sync-protocol.md, "Pull").
+  TextColumn get watermarkToken => text().nullable()();
+
+  /// The read scope the cursor was pulled in: a new one (a role or a branch
+  /// granted) reads the feed again, for the rows the old scope hid.
+  TextColumn get scope => text().nullable()();
   @override
   Set<Column> get primaryKey => {deviceId};
 }
@@ -254,7 +262,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -306,6 +314,13 @@ class AppDatabase extends _$AppDatabase {
             for (final column in [supplierLedger.method, supplierLedger.shiftId]) {
               if (!await _hasColumn('supplier_ledger', column.$name)) {
                 await m.addColumn(supplierLedger, column);
+              }
+            }
+          }
+          if (from < 12) {
+            for (final column in [syncStates.watermarkToken, syncStates.scope]) {
+              if (!await _hasColumn('sync_states', column.$name)) {
+                await m.addColumn(syncStates, column);
               }
             }
           }

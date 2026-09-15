@@ -12,6 +12,7 @@ the SyncReader port, implemented in infrastructure.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
@@ -73,7 +74,8 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
         "sku", "name", "unit_id", "category_id", "sell_price_minor", "sell_currency",
         "cost_minor", "cost_currency", "track_stock", "is_active", "version",
     ),
-    "barcodes": ("product_id", "code", "symbology", "version", "deleted_at"),  # removals too
+    # removals too; created_at orders codes that tills repeated before codes were unique
+    "barcodes": ("product_id", "code", "symbology", "version", "deleted_at", "created_at"),
     "units": ("name", "decimal_places", "version"),
     "categories": ("name", "parent_id", "version"),
     "customers": ("name", "phone", "credit_limit_minor", "currency", "is_active", "version"),
@@ -525,6 +527,9 @@ class ApplyPlan:
     auth_branch_id: str  # branch the permission was checked in
     row_branch_id: str | None  # branch the row belongs to (change_log scope); None = shop-wide
     audit: AuditIntent
+    # The op's intent already holds (the removal of a barcode another till removed):
+    # recorded as applied, nothing written.
+    noop: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -683,9 +688,14 @@ def _barcodes_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     row is soft-deleted, and devices drop it on their next pull."""
     branch = _active(ctx)
     _need(ctx, Permission.PRODUCT_MANAGE, branch)
-    current = _guard_update(ctx, "BARCODE_NOT_FOUND")
     if v.get("deleted") is not True:
         raise ValidationError("SYNC_OP_INVALID", field="data", reason="barcode_edit")
+    if ctx.existing is not None and ctx.existing.deleted:
+        # Another till took it off already: this removal is done too, not an op that
+        # comes back as BARCODE_NOT_FOUND on every sync.
+        after = {"product_id": ctx.existing.values.get("product_id"), "already_removed": True}
+        return ApplyPlan({}, branch, None, AuditIntent("barcode.removed", "barcode", after), True)
+    current = _guard_update(ctx, "BARCODE_NOT_FOUND")
     after = {"product_id": current.values.get("product_id"), "code": current.values.get("code")}
     return ApplyPlan(
         {"deleted_at": ctx.now}, branch, None, AuditIntent("barcode.removed", "barcode", after)
@@ -1176,6 +1186,14 @@ def is_cacheable(code: str) -> bool:
     pushes, a parent not present yet, an unexpected error) are re-evaluated on
     replay instead; nothing was applied, so exactly-once still holds."""
     return code not in _TRANSIENT and not code.endswith("_NOT_FOUND")
+
+
+def scope_fingerprint(actor: User) -> str:
+    """Names what a user's pull may read: their roles by branch. A device whose
+    cursor was read in another scope (a role or a branch granted since) reads the
+    feed again, for the rows the old scope hid."""
+    roles = sorted(f"{a.branch_id}:{a.role_name}" for a in actor.assignments)
+    return hashlib.sha256("|".join(roles).encode()).hexdigest()[:24]
 
 
 def role_label(actor: User, branch_id: str) -> str | None:

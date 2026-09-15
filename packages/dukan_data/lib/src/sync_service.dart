@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math' show min;
 
 import 'package:drift/drift.dart';
-import 'package:dukan_core/dukan_core.dart' show systemActorId;
+import 'package:dukan_core/dukan_core.dart' show OutboxOp, systemActorId;
 import 'package:dukan_sync/dukan_sync.dart';
 
 import '../database.dart';
@@ -76,10 +76,13 @@ final class SyncIssue {
 /// Drains the outbox to the server and applies server changes back — the
 /// offline-first sync loop. See docs/sync-protocol.md.
 final class SyncEngine {
-  SyncEngine(this._db, this._client, {this.deviceId = 'app'});
+  SyncEngine(this._db, this._client, {this.deviceId = 'app', this.pushBatch = maxPushBatch});
   final AppDatabase _db;
   final SyncClient _client;
   final String deviceId;
+
+  /// Ops per push request.
+  final int pushBatch;
 
   /// Pull pages per sync at most; the next sync resumes from the saved cursor.
   static const maxPullPages = 50;
@@ -135,17 +138,40 @@ final class SyncEngine {
       for (final o in await outbox.pending())
         if (actorId == null || o.actorId == actorId || o.actorId == systemActorId) o,
     ];
-    for (var i = 0; i < pending.length; i += maxPushBatch) {
-      final batch = pending.sublist(i, min(i + maxPushBatch, pending.length));
+    // Rows where an op broke this device's chain, with its verdict: an edit that
+    // lost its compare-and-set (local versions now collide with the server's, so a
+    // later edit's base_version can match by accident), or an insert refused for
+    // good (the row never existed). A later op on such a row was made on top of
+    // it, so it takes the same verdict instead of being sent: applied alone it
+    // would overwrite the server's row without review. The server does the same
+    // within one push; other refusals make the next edit conflict on its own.
+    final failed = <String, (String, String?)>{};
+    String rowOf(OutboxOp o) => '${o.aggregateType}/${o.aggregateId}';
+    var next = 0;
+    while (next < pending.length) {
+      final batch = <OutboxOp>[];
+      while (next < pending.length && batch.length < pushBatch) {
+        final o = pending[next++];
+        final verdict = failed[rowOf(o)];
+        if (verdict == null) {
+          batch.add(o);
+        } else {
+          await _setStatus(o.opId, verdict.$1, code: verdict.$2);
+        }
+      }
+      if (batch.isEmpty) continue;
       final byId = {for (final o in batch) o.opId: o};
       final results = await _client.push(batch);
       for (final r in results) {
+        final op = byId[r.opId];
         switch (r.outcome) {
           case OpOutcome.applied:
             await outbox.markAcked(r.opId);
           case OpOutcome.conflict:
             await _setStatus(r.opId, 'conflict', code: r.code);
-            final op = byId[r.opId];
+            if (op != null && op.opType == 'update' && (r.code ?? '').endsWith('_VERSION_CONFLICT')) {
+              failed[rowOf(op)] = ('conflict', r.code);
+            }
             final current = r.current;
             if (op != null && current != null) {
               // The server's state wins: the losing local copy is replaced, and the
@@ -154,7 +180,16 @@ final class SyncEngine {
                   () => _apply(op.aggregateType, op.aggregateId, 'update', current, force: true));
             }
           case OpOutcome.rejected:
-            if (!_retryable(r.code)) await _setStatus(r.opId, 'rejected', code: r.code);
+            if (_retryable(r.code)) break;
+            await _setStatus(r.opId, 'rejected', code: r.code);
+            if (op == null || op.opType != 'insert') break;
+            failed[rowOf(op)] = ('rejected', r.code);
+            if (op.aggregateType == 'barcodes') {
+              // The server kept this code on another product: this till's refused
+              // copy must not win the code's scans.
+              await (_db.update(_db.barcodes)..where((t) => t.id.equals(op.aggregateId)))
+                  .write(BarcodesCompanion(deletedAt: Value(DateTime.now().toUtc())));
+            }
         }
       }
     }
@@ -167,17 +202,30 @@ final class SyncEngine {
   /// the device-wide one (pulls made before per-user cursors were unscoped).
   Future<void> pullSince({String? actorId}) async {
     final cursor = actorId == null ? deviceId : '$deviceId/$actorId';
-    var since = await _lastPulled(cursor) ?? await _lastPulled(deviceId) ?? 0;
+    final saved = await _cursorOf(cursor) ?? await _cursorOf(deviceId);
+    var since = saved?.seq ?? 0;
+    var token = saved?.token;
+    var scope = saved?.scope;
+    var restarted = false;
     for (var page = 0; page < maxPullPages; page++) {
-      final result = await _client.pull(sinceWatermark: since);
+      final result = await _client.pull(sinceWatermark: since, sinceToken: since == 0 ? null : token);
       final maxSeq = result.maxSeq;
-      if (maxSeq != null && since > maxSeq) {
-        // The server was restored from a backup: its feed now ends below this
-        // device's cursor. Read it again from the start (applying is idempotent).
+      // Read the feed again from the start (applying is idempotent) when the
+      // server no longer holds what this device read (restored from a backup: the
+      // change at the cursor is gone, or is another one), or when this user's
+      // scope changed (a role or a branch granted: rows the old scope hid were
+      // skipped and would never come).
+      final restored = result.reset || (maxSeq != null && since > maxSeq);
+      final rescoped = result.scope != null && result.scope != scope;
+      if (since > 0 && !restarted && (restored || rescoped)) {
+        restarted = true;
         since = 0;
-        await _setLastPulled(cursor, 0);
+        token = null;
+        scope = result.scope;
+        await _setCursor(cursor, 0, null, scope);
         continue;
       }
+      scope = result.scope ?? scope;
       await _db.transaction(() async {
         final unreadable = <Map<String, Object?>>[];
         for (final change in result.changed) {
@@ -199,10 +247,15 @@ final class SyncEngine {
           }
         }
         if (unreadable.isNotEmpty) await _quarantine(unreadable);
-        if (result.watermark > since) await _setLastPulled(cursor, result.watermark);
+        if (result.watermark > since) {
+          await _setCursor(cursor, result.watermark, result.watermarkToken, scope);
+        } else if (scope != saved?.scope) {
+          await _setCursor(cursor, since, token, scope);
+        }
       });
       if (result.watermark <= since) break; // caught up
       since = result.watermark;
+      token = result.watermarkToken;
     }
   }
 
@@ -255,16 +308,16 @@ final class SyncEngine {
     await settings.set(quarantineKey, jsonEncode(kept.sublist(start)));
   }
 
-  Future<int?> _lastPulled(String cursor) async {
+  Future<({int seq, String? token, String? scope})?> _cursorOf(String cursor) async {
     final row = await (_db.select(_db.syncStates)..where((t) => t.deviceId.equals(cursor)))
         .getSingleOrNull();
-    return row?.lastPulledSeq;
+    return row == null ? null : (seq: row.lastPulledSeq, token: row.watermarkToken, scope: row.scope);
   }
 
-  Future<void> _setLastPulled(String cursor, int seq) async {
-    await _db.into(_db.syncStates).insertOnConflictUpdate(
-          SyncStatesCompanion.insert(deviceId: cursor, lastPulledSeq: Value(seq)),
-        );
+  Future<void> _setCursor(String cursor, int seq, String? token, String? scope) async {
+    await _db.into(_db.syncStates).insertOnConflictUpdate(SyncStatesCompanion.insert(
+      deviceId: cursor, lastPulledSeq: Value(seq), watermarkToken: Value(token), scope: Value(scope),
+    ));
   }
 
   Future<void> _setStatus(String opId, String status, {String? code}) async {
@@ -318,6 +371,7 @@ final class SyncEngine {
         await _write(_db.barcodes, id, exists, BarcodesCompanion(
           id: Value(id), productId: _opt(d, 'product_id', _s), code: _opt(d, 'code', _s),
           symbology: _opt(d, 'symbology', _s), version: _opt(d, 'version', _i),
+          createdAt: _opt(d, 'created_at', _t), // the server's order: the oldest live code wins a scan
           deletedAt: _opt(d, 'deleted_at', _tN), // a barcode taken off its product
         ));
       case 'units':

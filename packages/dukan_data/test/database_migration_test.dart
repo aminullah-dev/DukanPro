@@ -92,4 +92,21 @@ void main() {
     expect(pending.containsKey(unitOp.opId), isFalse); // the copy's own insert is set aside
     expect(pending[productOp.opId], containsPair('unit_id', kg.id));
   });
+
+  test('upgrading to v12 gives each sync cursor a token and a scope, keeping its position', () async {
+    final dir = await Directory.systemTemp.createTemp('dukan_migration');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/app.db');
+    final old = AppDatabase(NativeDatabase(file));
+    await old.into(old.syncStates).insert(SyncStatesCompanion.insert(deviceId: 'd1', lastPulledSeq: const Value(7)));
+    await old.customStatement('ALTER TABLE sync_states DROP COLUMN watermark_token');
+    await old.customStatement('ALTER TABLE sync_states DROP COLUMN scope');
+    await old.customStatement('PRAGMA user_version = 11');
+    await old.close();
+
+    final db = AppDatabase(NativeDatabase(file));
+    addTearDown(db.close);
+    final row = await (db.select(db.syncStates)..where((t) => t.deviceId.equals('d1'))).getSingle();
+    expect((row.lastPulledSeq, row.watermarkToken, row.scope), (7, null, null));
+  });
 }

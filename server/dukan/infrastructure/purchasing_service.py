@@ -127,6 +127,15 @@ class SqlPurchasingService(PurchasingService):
             )
             if supplier is None:
                 raise NotFoundError("SUPPLIER_NOT_FOUND", supplier_id=supplier_id)
+        # Row locks before the feed's (record_change takes it): a sync edit of one of
+        # these products takes its row, then the feed lock, so the reverse order here
+        # could deadlock on PostgreSQL. Ids in order, so two receipts take turns.
+        self._s.scalars(
+            select(ProductModel.id)
+            .where(ProductModel.id.in_(sorted({l.product_id for l in lines})))
+            .order_by(ProductModel.id)
+            .with_for_update()
+        ).all()
         # Each line in its product's unit: a quantity of 10^dp minor units at a cost
         # per whole unit, so 2.500 kg at 40.00 bills 100.00.
         products: dict[str, ProductModel] = {}

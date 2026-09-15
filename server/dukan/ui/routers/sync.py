@@ -72,11 +72,15 @@ def pull(
     svc: Sync,
     since: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=PULL_LIMIT_MAX)] = 500,
+    since_token: Annotated[str | None, Query(max_length=64)] = None,
 ) -> dict:
-    result = svc.pull(actor=actor, since=since, limit=limit)
+    result = svc.pull(actor=actor, since=since, limit=limit, since_token=since_token)
     return {
         "watermark": result.watermark,
+        "watermark_token": result.watermark_token,
         "max_seq": result.max_seq,
+        "scope": result.scope,
+        "reset": result.reset,
         "changes": [
             {"seq": c.seq, "table": c.table, "row_id": c.row_id, "op": c.op, "data": c.data}
             for c in result.changes

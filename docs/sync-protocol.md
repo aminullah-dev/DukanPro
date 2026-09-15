@@ -106,9 +106,9 @@ Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories,
 
 ## Outcome caching
 
-A recorded outcome is returned on every replay of its op_id. Outcomes that depend on server state that can change are **not** recorded, so a replay re-evaluates them: `ACCESS_DENIED`, `SYNC_ACTOR_MISMATCH`, `BRANCH_REQUIRED`, `BRANCH_INACTIVE`, `ROW_INVALID` and every `*_NOT_FOUND`. Nothing was applied, so exactly-once still holds.
+A recorded outcome, with the version an applied master op produced (`processed_ops.version`, migration 0015), is returned on every replay of its op_id. Outcomes that depend on server state that can change are **not** recorded, so a replay re-evaluates them: `ACCESS_DENIED`, `SYNC_ACTOR_MISMATCH`, `BRANCH_REQUIRED`, `BRANCH_INACTIVE`, `ROW_INVALID` and every `*_NOT_FOUND`. Nothing was applied, so exactly-once still holds.
 
-The client mirrors this: such an op stays pending and is re-sent on the next sync, for example when a parent still queued by another user arrives, a role is granted, or the right user signs in. An op whose parent was rejected for good keeps coming back as `*_NOT_FOUND` and stays pending.
+The client mirrors this: such an op stays pending and is re-sent on the next sync, for example when a parent still queued by another user arrives, a role is granted, or the right user signs in. An op on the same row as one refused for good takes that verdict (see "Master data concurrency"). An op whose parent row was rejected for good keeps coming back as `*_NOT_FOUND` and stays pending.
 
 A recorded outcome belongs to the user who pushed it. When another user pushes the same op_id, a recorded failure (nothing was written) is discarded and the op is decided afresh; an op_id already applied for someone else is `SYNC_OP_ID_TAKEN`.
 
@@ -117,11 +117,20 @@ A recorded outcome belongs to the user who pushed it. When another user pushes t
 An update is a compare-and-set: `UPDATE … WHERE id = :row_id AND version = :base_version AND deleted_at IS NULL`, then `version + 1`. Zero rows updated is a `conflict`, so two concurrent pushes can never both win. REST edits bump the version too (`PATCH /products/{id}` takes an optional `version` and answers `PRODUCT_VERSION_CONFLICT` when it is stale).
 
 - A device bumps its local version with each edit and sends the version before the edit as `base_version`, so offline edits to one row chain.
+- Some failures break the device's chain for a row. When one does, every later op on that row takes the same verdict: the server applies this within one push, the device across pushes. The later op was made on top of the failed one, and applied alone it would overwrite the server's row without review (for example, a price set after a conflicted rename). Two failures break the chain:
+  - An edit that loses its compare-and-set (`*_VERSION_CONFLICT`). The device's local versions now collide with the server's, so a later edit's `base_version` can match by accident.
+  - An insert refused for good. The row never existed.
+
+  Other refusals leave the server's version where it was, so the device's next edit conflicts on its own.
 - An applied master op returns the row's new `version`. A conflict returns `current`, the server's row as the pusher may read it (replays too).
 - On a conflict the server's state wins. The device replaces its local copy with `current` and keeps the edit in a review list (Sync issues).
   - There the user can apply it again: the edit is written locally and queued against the server's version.
   - Or set it aside: it stays in the outbox for support, off the counts.
 - A pulled master post-image older than the local row is skipped, so edits not yet pushed are never rewound.
+- Barcodes:
+  - An insert the server refuses (`BARCODE_DUPLICATE`, because another till gave the code first) is soft-deleted on the device, so the code the server kept wins its scans.
+  - Removing a barcode another till already removed is applied as done, with nothing written.
+  - Barcode images carry `created_at`.
 
 ## Attribution
 
@@ -131,7 +140,7 @@ The server applies an op only under the token of the user who recorded it: when 
 
 ## Pull
 
-`GET /sync/pull?since=<watermark>&limit=<1..1000, default 500>` returns `{changes: [{seq, table, row_id, op, data}], watermark}`.
+`GET /sync/pull?since=<watermark>&since_token=<token>&limit=<1..1000, default 500>` returns `{changes: [{seq, table, row_id, op, data}], watermark, watermark_token, max_seq, scope, reset}`.
 - `since < 0` or a limit out of range is `422 REQUEST_INVALID`.
 - A user with no active role gets `403 ACCESS_DENIED`.
 
@@ -148,7 +157,13 @@ Each change is the row's **post-image**: its allow-listed business columns, plus
 
 Cost fields (`products.cost_minor`, `products.cost_currency`, `sale_lines.unit_cost_minor`) are **omitted** unless the user has product.manage or report.view. They are omitted, not nulled, because the client writes only the keys that are present. One user's pull therefore never wipes a value another user of the same device can see.
 
-The watermark is the last row scanned, visible or not, so paging is monotonic. Because the scope is per user, the client keeps **one cursor per user** on the device and pages until the watermark stops advancing. A user's first cursor starts from the device-wide cursor that earlier, unscoped pulls left behind.
+The watermark is the last row scanned, visible or not, so paging is monotonic. `watermark_token` names the change at the watermark, and the device sends it back as `since_token`.
+
+Two answers make the device read the feed again from the start:
+- `reset: true`: the server no longer holds that change. It was restored from a backup, even one whose feed has since grown back past the cursor.
+- A different `scope`: the device's cursor was read in another scope. `scope` names what the user may read (their roles by branch), so a new value means a role or a branch was granted since. Reading again brings the rows the old scope hid, such as costs or another branch's history.
+
+ Because the scope is per user, the client keeps **one cursor per user** on the device and pages until the watermark stops advancing. A user's first cursor starts from the device-wide cursor that earlier, unscoped pulls left behind.
 
 Two rules keep one user's pull from undoing another's work on a shared device:
 - A product post-image older than the local row is skipped. The local row is newer when it carries edits not yet pushed.
@@ -158,7 +173,8 @@ Two rules keep one user's pull from undoing another's work on a shared device:
 
 - **One feed for every write.** Every write to a synced table, through sync or REST (products, barcodes, stock, customers, debt payments, suppliers, receipts, sales, voids), appends the row's post-image to `change_log` in the same transaction.
   - On PostgreSQL a transaction-scoped advisory lock taken before the append and held until commit makes `seq` follow commit order, so a pull never passes a row that commits later.
-- **Restores.** Pull returns `max_seq`. A device whose cursor is past it is talking to a server restored from a backup, and reads the feed again from the start (applying is idempotent).
+  - A writing transaction takes its row locks before its first append (a goods receipt locks its products first). The feed lock therefore always comes last, and a receipt cannot deadlock against a sync edit of the same product.
+- **Restores.** A device reads the feed again from the start (applying is idempotent) in two cases: its cursor is past `max_seq`, or the server answers `reset` because the change named by the cursor's token is gone or has been replaced by another.
 - **Device time.** Append-only rows (sales, stock movements, customer and supplier ledger entries) take the op's `created_at`, the moment the device recorded it, when it lies between 45 days before and 5 minutes after the server's clock. Otherwise they take the server's time. A till offline from Monday to Wednesday keeps Monday's sales on Monday. `occurred_at` itself is still never accepted in `data`.
 - **Unreadable changes.** A pulled change the device cannot read is set aside (app setting `sync.quarantine`, the last 50) and the cursor still advances, so one bad row never stops every device's pull.
 - **Receipt costs** travel as a `products` update of `cost_minor` against the version the device read.

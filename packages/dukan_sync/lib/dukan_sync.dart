@@ -38,7 +38,15 @@ final class PushResult {
 }
 
 final class PullResult {
-  const PullResult({required this.watermark, required this.changed, required this.tombstones, this.maxSeq});
+  const PullResult({
+    required this.watermark,
+    required this.changed,
+    required this.tombstones,
+    this.maxSeq,
+    this.watermarkToken,
+    this.scope,
+    this.reset = false,
+  });
   final int watermark;
   final List<Map<String, Object?>> changed;
   final List<String> tombstones; // ids soft-deleted upstream
@@ -46,6 +54,19 @@ final class PullResult {
   /// The feed's newest seq. A device already past it is pulling from a server
   /// restored from a backup, and starts over from the beginning.
   final int? maxSeq;
+
+  /// Names the change at the watermark. Sent back as the next pull's
+  /// `sinceToken`, it lets the server tell that its feed still holds what this
+  /// device read.
+  final String? watermarkToken;
+
+  /// The pulling user's read scope. A different one (a role or a branch granted)
+  /// means rows the old scope hid were skipped: the device reads the feed again.
+  final String? scope;
+
+  /// The server no longer holds the change at `sinceToken` (it was restored from a
+  /// backup): the device reads the feed again from the start.
+  final bool reset;
 }
 
 /// The client sync engine port. Implemented over an authoritative HTTP API
@@ -54,6 +75,7 @@ abstract interface class SyncClient {
   /// Push unacked ops in local_seq order. Server dedupes by opId (idempotent).
   Future<List<PushResult>> push(List<OutboxOp> ops);
 
-  /// Pull changes since [sinceWatermark].
-  Future<PullResult> pull({required int sinceWatermark});
+  /// Pull changes since [sinceWatermark]; [sinceToken] is the token the previous
+  /// pull returned for that watermark.
+  Future<PullResult> pull({required int sinceWatermark, String? sinceToken});
 }

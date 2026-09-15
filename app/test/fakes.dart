@@ -114,7 +114,7 @@ class FakeSyncClient implements SyncClient {
   }
 
   @override
-  Future<PullResult> pull({required int sinceWatermark}) async =>
+  Future<PullResult> pull({required int sinceWatermark, String? sinceToken}) async =>
       const PullResult(watermark: 0, changed: [], tombstones: []);
 }
 

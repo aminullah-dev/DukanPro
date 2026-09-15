@@ -404,7 +404,6 @@ def test_master_rows_use_compare_and_set(client: TestClient) -> None:
         product_op(shop.units["piece"], sku="P1", row_id=pid),
         upd(None, name="No base"),
         upd(1, name="Renamed"),
-        upd(1, name="Stale"),
         upd(2, version=1),
         upd(2, sku="X"),
         upd(2),
@@ -414,12 +413,15 @@ def test_master_rows_use_compare_and_set(client: TestClient) -> None:
         ("conflict", "PRODUCTS_ALREADY_EXISTS"),
         ("rejected", "SYNC_BASE_VERSION_REQUIRED"),
         ("applied", None),
-        ("conflict", "PRODUCTS_VERSION_CONFLICT"),
         ("rejected", "SYNC_FIELD_NOT_ALLOWED"),
         ("rejected", "SYNC_FIELD_NOT_ALLOWED"),
         ("rejected", "SYNC_OP_INVALID"),
         ("rejected", "PRODUCT_NOT_FOUND"),
     ]
+    # A stale edit loses its compare-and-set (a push of its own: within one push,
+    # the edits after it on the row would be taken as made on top of it).
+    stale = shop.push(shop.owner, upd(1, name="Stale"))
+    assert outcomes(stale) == [("conflict", "PRODUCTS_VERSION_CONFLICT")]
     last = [c for c in shop.pull(shop.owner)["changes"] if c["row_id"] == pid][-1]
     assert last["op"] == "update"
     assert last["data"]["version"] == 2 and last["data"]["name"] == "Renamed"

@@ -267,6 +267,7 @@ class ProcessedOpModel(Base):
     result: Mapped[str] = mapped_column(String(12))
     code: Mapped[str | None] = mapped_column(String(64), default=None)
     server_seq: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    version: Mapped[int | None] = mapped_column(Integer, default=None)  # a master row's, replayed
     actor_id: Mapped[str | None] = mapped_column(String(36), default=None)
     device_id: Mapped[str | None] = mapped_column(String(128), default=None)
     applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

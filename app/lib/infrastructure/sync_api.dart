@@ -54,11 +54,11 @@ class DioSyncClient implements SyncClient {
   }
 
   @override
-  Future<PullResult> pull({required int sinceWatermark}) async {
+  Future<PullResult> pull({required int sinceWatermark, String? sinceToken}) async {
     try {
       final r = await _dio.get(
         '/sync/pull',
-        queryParameters: {'since': sinceWatermark},
+        queryParameters: {'since': sinceWatermark, 'since_token': ?sinceToken},
         options: await _auth(),
       );
       final data = (r.data as Map).cast<String, dynamic>();
@@ -66,6 +66,9 @@ class DioSyncClient implements SyncClient {
       return PullResult(
         watermark: (data['watermark'] as num).toInt(),
         maxSeq: (data['max_seq'] as num?)?.toInt(),
+        watermarkToken: data['watermark_token'] as String?,
+        scope: data['scope'] as String?,
+        reset: data['reset'] == true,
         changed: changes.map((c) => c.cast<String, Object?>()).toList(growable: false),
         tombstones: const [],
       );

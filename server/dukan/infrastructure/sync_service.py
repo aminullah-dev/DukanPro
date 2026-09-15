@@ -38,10 +38,11 @@ from dukan.application.sync_policy import (
     is_uuid,
     plan_op,
     role_label,
+    scope_fingerprint,
 )
 from dukan.domain.customers import CustomerLedgerEntry, LedgerEntryType, ledger_balance
 from dukan.domain.identity import User
-from dukan.infrastructure.change_feed import post_image, record_change
+from dukan.infrastructure.change_feed import change_token, post_image, record_change
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     BarcodeModel,
@@ -276,6 +277,18 @@ def _aware(at: datetime) -> datetime:
     return at if at.tzinfo is not None else at.replace(tzinfo=UTC)
 
 
+def _breaks_chain(op: OpInput, result: OpResult) -> bool:
+    """Whether later ops on the row were made on top of one the server did not take.
+    Two cases break the chain: an edit that lost its compare-and-set (the device's
+    local versions now collide with the server's, so a later edit's base_version can
+    match by accident), and an insert refused for good (the row never existed).
+    Other refusals leave the server's version where the device's next edit will
+    conflict on its own."""
+    if result.outcome == "conflict":
+        return op.op == "update" and (result.code or "").endswith("_VERSION_CONFLICT")
+    return result.outcome == "rejected" and op.op == "insert"
+
+
 class SqlSyncService(SyncService):
     def __init__(self, session: Session) -> None:
         self._s = session
@@ -285,7 +298,26 @@ class SqlSyncService(SyncService):
     def push(
         self, *, actor: User, device_id: str, branch_id: str | None, ops: list[OpInput]
     ) -> list[OpResult]:
-        return [self._push_one(actor, device_id, branch_id, op) for op in ops]
+        results: list[OpResult] = []
+        # Rows where an earlier op in this push broke the device's chain (see
+        # _breaks_chain). A later op on such a row was made on top of it: it takes the
+        # same verdict, or it would overwrite the server's row without review. The
+        # device does the same across pushes.
+        failed: dict[tuple[str, str], OpResult] = {}
+        for op in ops:
+            row = (op.table, op.row_id)
+            earlier = failed.get(row)
+            fresh = is_uuid(op.op_id) and self._s.get(ProcessedOpModel, op.op_id) is None
+            if earlier is not None and earlier.code is not None and fresh:
+                result = self._settle(op, actor, device_id, earlier.outcome, earlier.code)
+                if result.outcome == "conflict":
+                    result = replace(result, current=self._current(actor, op))
+            else:
+                result = self._push_one(actor, device_id, branch_id, op)
+            if result.code and is_cacheable(result.code) and _breaks_chain(op, result):
+                failed[row] = result
+            results.append(result)
+        return results
 
     def _push_one(
         self, actor: User, device_id: str, branch_id: str | None, op: OpInput
@@ -317,8 +349,8 @@ class SqlSyncService(SyncService):
                 seq, version = self._apply(actor, device_id, branch_id, op)
                 self._s.add(
                     ProcessedOpModel(
-                        op_id=op.op_id, result="applied", server_seq=seq, actor_id=actor.id,
-                        device_id=device_id,
+                        op_id=op.op_id, result="applied", server_seq=seq, version=version,
+                        actor_id=actor.id, device_id=device_id,
                     )
                 )
                 self._s.commit()
@@ -352,7 +384,8 @@ class SqlSyncService(SyncService):
 
     def _replay(self, prior: ProcessedOpModel, actor: User, op: OpInput) -> OpResult:
         result = OpResult(
-            op_id=prior.op_id, outcome=prior.result, server_seq=prior.server_seq, code=prior.code
+            op_id=prior.op_id, outcome=prior.result, server_seq=prior.server_seq, code=prior.code,
+            version=prior.version,
         )
         if prior.result == "conflict":
             return replace(result, current=self._current(actor, op))
@@ -393,9 +426,9 @@ class SqlSyncService(SyncService):
 
     def _apply(
         self, actor: User, device_id: str, branch_id: str | None, op: OpInput
-    ) -> tuple[int, int | None]:
+    ) -> tuple[int | None, int | None]:
         """Writes the op; returns its change_log seq and, for a master row, its new
-        version."""
+        version. An op whose intent already holds writes nothing and has no seq."""
         check_envelope(op, actor)
         model = _MODELS[op.table]
         now = datetime.now(UTC)
@@ -404,6 +437,9 @@ class SqlSyncService(SyncService):
             existing=_snapshot(op.table, self._s.get(model, op.row_id)),
             reader=self._reader, now=now,
         )
+        if plan.noop:
+            done = self._s.get(model, op.row_id)
+            return None, (done.version if done is not None else None)
         if op.op == "insert":
             row = model(id=op.row_id, created_by=actor.id, updated_by=actor.id, **plan.values)
             self._s.add(row)
@@ -458,10 +494,22 @@ class SqlSyncService(SyncService):
         return seq, (row.version if op.table in MASTER_TABLES else None)
 
     # ---- pull -------------------------------------------------------------
-    def pull(self, *, actor: User, since: int, limit: int) -> PullResult:
+    def pull(
+        self, *, actor: User, since: int, limit: int, since_token: str | None = None
+    ) -> PullResult:
         scope = PullScope.for_actor(actor)
         if scope.is_empty:
             raise PermissionDeniedError("ACCESS_DENIED", actor_id=actor.id, scope="sync.pull")
+        fingerprint = scope_fingerprint(actor)
+        max_seq = int(self._s.scalar(select(func.max(ChangeLogModel.seq))) or 0)
+        if since > 0 and since_token is not None:
+            at = self._s.get(ChangeLogModel, since)
+            if at is None or change_token(at) != since_token:
+                # The feed no longer holds the change this device read last: the
+                # server was restored from a backup. The device reads it again.
+                return PullResult(
+                    changes=[], watermark=0, max_seq=max_seq, scope=fingerprint, reset=True
+                )
         rows = self._s.scalars(
             select(ChangeLogModel)
             .where(ChangeLogModel.seq > max(since, 0))
@@ -477,7 +525,8 @@ class SqlSyncService(SyncService):
                 )
         # The watermark advances past rows this actor may not see, so paging stays
         # monotonic and a scoped reader never re-scans them.
-        max_seq = int(self._s.scalar(select(func.max(ChangeLogModel.seq))) or 0)
+        last = rows[-1] if rows else (self._s.get(ChangeLogModel, since) if since > 0 else None)
         return PullResult(
-            changes=changes, watermark=rows[-1].seq if rows else since, max_seq=max_seq
+            changes=changes, watermark=rows[-1].seq if rows else since, max_seq=max_seq,
+            watermark_token=change_token(last) if last is not None else None, scope=fingerprint,
         )

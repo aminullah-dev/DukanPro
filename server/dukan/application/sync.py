@@ -46,6 +46,9 @@ class PullResult:
     changes: list[ChangeItem]
     watermark: int
     max_seq: int = 0  # the feed's newest seq: a device ahead of it was restored from
+    watermark_token: str | None = None  # names the change at the watermark (change_token)
+    scope: str = ""  # the puller's read scope (scope_fingerprint)
+    reset: bool = False  # the change at since_token is gone: the device reads the feed again
 
 
 class SyncService(Protocol):
@@ -53,4 +56,6 @@ class SyncService(Protocol):
         self, *, actor: User, device_id: str, branch_id: str | None, ops: list[OpInput]
     ) -> list[OpResult]: ...
 
-    def pull(self, *, actor: User, since: int, limit: int) -> PullResult: ...
+    def pull(
+        self, *, actor: User, since: int, limit: int, since_token: str | None = None
+    ) -> PullResult: ...

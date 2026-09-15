@@ -9714,8 +9714,20 @@ class $SyncStatesTable extends SyncStates
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _watermarkTokenMeta =
+      const VerificationMeta('watermarkToken');
   @override
-  List<GeneratedColumn> get $columns => [deviceId, lastPulledSeq];
+  late final GeneratedColumn<String> watermarkToken = GeneratedColumn<String>(
+      'watermark_token', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _scopeMeta = const VerificationMeta('scope');
+  @override
+  late final GeneratedColumn<String> scope = GeneratedColumn<String>(
+      'scope', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [deviceId, lastPulledSeq, watermarkToken, scope];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -9738,6 +9750,16 @@ class $SyncStatesTable extends SyncStates
           lastPulledSeq.isAcceptableOrUnknown(
               data['last_pulled_seq']!, _lastPulledSeqMeta));
     }
+    if (data.containsKey('watermark_token')) {
+      context.handle(
+          _watermarkTokenMeta,
+          watermarkToken.isAcceptableOrUnknown(
+              data['watermark_token']!, _watermarkTokenMeta));
+    }
+    if (data.containsKey('scope')) {
+      context.handle(
+          _scopeMeta, scope.isAcceptableOrUnknown(data['scope']!, _scopeMeta));
+    }
     return context;
   }
 
@@ -9751,6 +9773,10 @@ class $SyncStatesTable extends SyncStates
           .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
       lastPulledSeq: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}last_pulled_seq'])!,
+      watermarkToken: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}watermark_token']),
+      scope: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}scope']),
     );
   }
 
@@ -9763,12 +9789,30 @@ class $SyncStatesTable extends SyncStates
 class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
   final String deviceId;
   final int lastPulledSeq;
-  const SyncStateRow({required this.deviceId, required this.lastPulledSeq});
+
+  /// The server's name for the change at the cursor: another change there means
+  /// the server was restored from a backup (docs/sync-protocol.md, "Pull").
+  final String? watermarkToken;
+
+  /// The read scope the cursor was pulled in: a new one (a role or a branch
+  /// granted) reads the feed again, for the rows the old scope hid.
+  final String? scope;
+  const SyncStateRow(
+      {required this.deviceId,
+      required this.lastPulledSeq,
+      this.watermarkToken,
+      this.scope});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['device_id'] = Variable<String>(deviceId);
     map['last_pulled_seq'] = Variable<int>(lastPulledSeq);
+    if (!nullToAbsent || watermarkToken != null) {
+      map['watermark_token'] = Variable<String>(watermarkToken);
+    }
+    if (!nullToAbsent || scope != null) {
+      map['scope'] = Variable<String>(scope);
+    }
     return map;
   }
 
@@ -9776,6 +9820,11 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
     return SyncStatesCompanion(
       deviceId: Value(deviceId),
       lastPulledSeq: Value(lastPulledSeq),
+      watermarkToken: watermarkToken == null && nullToAbsent
+          ? const Value.absent()
+          : Value(watermarkToken),
+      scope:
+          scope == null && nullToAbsent ? const Value.absent() : Value(scope),
     );
   }
 
@@ -9785,6 +9834,8 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
     return SyncStateRow(
       deviceId: serializer.fromJson<String>(json['deviceId']),
       lastPulledSeq: serializer.fromJson<int>(json['lastPulledSeq']),
+      watermarkToken: serializer.fromJson<String?>(json['watermarkToken']),
+      scope: serializer.fromJson<String?>(json['scope']),
     );
   }
   @override
@@ -9793,12 +9844,22 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
     return <String, dynamic>{
       'deviceId': serializer.toJson<String>(deviceId),
       'lastPulledSeq': serializer.toJson<int>(lastPulledSeq),
+      'watermarkToken': serializer.toJson<String?>(watermarkToken),
+      'scope': serializer.toJson<String?>(scope),
     };
   }
 
-  SyncStateRow copyWith({String? deviceId, int? lastPulledSeq}) => SyncStateRow(
+  SyncStateRow copyWith(
+          {String? deviceId,
+          int? lastPulledSeq,
+          Value<String?> watermarkToken = const Value.absent(),
+          Value<String?> scope = const Value.absent()}) =>
+      SyncStateRow(
         deviceId: deviceId ?? this.deviceId,
         lastPulledSeq: lastPulledSeq ?? this.lastPulledSeq,
+        watermarkToken:
+            watermarkToken.present ? watermarkToken.value : this.watermarkToken,
+        scope: scope.present ? scope.value : this.scope,
       );
   SyncStateRow copyWithCompanion(SyncStatesCompanion data) {
     return SyncStateRow(
@@ -9806,6 +9867,10 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
       lastPulledSeq: data.lastPulledSeq.present
           ? data.lastPulledSeq.value
           : this.lastPulledSeq,
+      watermarkToken: data.watermarkToken.present
+          ? data.watermarkToken.value
+          : this.watermarkToken,
+      scope: data.scope.present ? data.scope.value : this.scope,
     );
   }
 
@@ -9813,52 +9878,73 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
   String toString() {
     return (StringBuffer('SyncStateRow(')
           ..write('deviceId: $deviceId, ')
-          ..write('lastPulledSeq: $lastPulledSeq')
+          ..write('lastPulledSeq: $lastPulledSeq, ')
+          ..write('watermarkToken: $watermarkToken, ')
+          ..write('scope: $scope')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(deviceId, lastPulledSeq);
+  int get hashCode =>
+      Object.hash(deviceId, lastPulledSeq, watermarkToken, scope);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SyncStateRow &&
           other.deviceId == this.deviceId &&
-          other.lastPulledSeq == this.lastPulledSeq);
+          other.lastPulledSeq == this.lastPulledSeq &&
+          other.watermarkToken == this.watermarkToken &&
+          other.scope == this.scope);
 }
 
 class SyncStatesCompanion extends UpdateCompanion<SyncStateRow> {
   final Value<String> deviceId;
   final Value<int> lastPulledSeq;
+  final Value<String?> watermarkToken;
+  final Value<String?> scope;
   final Value<int> rowid;
   const SyncStatesCompanion({
     this.deviceId = const Value.absent(),
     this.lastPulledSeq = const Value.absent(),
+    this.watermarkToken = const Value.absent(),
+    this.scope = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SyncStatesCompanion.insert({
     required String deviceId,
     this.lastPulledSeq = const Value.absent(),
+    this.watermarkToken = const Value.absent(),
+    this.scope = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : deviceId = Value(deviceId);
   static Insertable<SyncStateRow> custom({
     Expression<String>? deviceId,
     Expression<int>? lastPulledSeq,
+    Expression<String>? watermarkToken,
+    Expression<String>? scope,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (deviceId != null) 'device_id': deviceId,
       if (lastPulledSeq != null) 'last_pulled_seq': lastPulledSeq,
+      if (watermarkToken != null) 'watermark_token': watermarkToken,
+      if (scope != null) 'scope': scope,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   SyncStatesCompanion copyWith(
-      {Value<String>? deviceId, Value<int>? lastPulledSeq, Value<int>? rowid}) {
+      {Value<String>? deviceId,
+      Value<int>? lastPulledSeq,
+      Value<String?>? watermarkToken,
+      Value<String?>? scope,
+      Value<int>? rowid}) {
     return SyncStatesCompanion(
       deviceId: deviceId ?? this.deviceId,
       lastPulledSeq: lastPulledSeq ?? this.lastPulledSeq,
+      watermarkToken: watermarkToken ?? this.watermarkToken,
+      scope: scope ?? this.scope,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -9872,6 +9958,12 @@ class SyncStatesCompanion extends UpdateCompanion<SyncStateRow> {
     if (lastPulledSeq.present) {
       map['last_pulled_seq'] = Variable<int>(lastPulledSeq.value);
     }
+    if (watermarkToken.present) {
+      map['watermark_token'] = Variable<String>(watermarkToken.value);
+    }
+    if (scope.present) {
+      map['scope'] = Variable<String>(scope.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -9883,6 +9975,8 @@ class SyncStatesCompanion extends UpdateCompanion<SyncStateRow> {
     return (StringBuffer('SyncStatesCompanion(')
           ..write('deviceId: $deviceId, ')
           ..write('lastPulledSeq: $lastPulledSeq, ')
+          ..write('watermarkToken: $watermarkToken, ')
+          ..write('scope: $scope, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -14569,11 +14663,15 @@ typedef $$SupplierLedgerTableProcessedTableManager = ProcessedTableManager<
 typedef $$SyncStatesTableCreateCompanionBuilder = SyncStatesCompanion Function({
   required String deviceId,
   Value<int> lastPulledSeq,
+  Value<String?> watermarkToken,
+  Value<String?> scope,
   Value<int> rowid,
 });
 typedef $$SyncStatesTableUpdateCompanionBuilder = SyncStatesCompanion Function({
   Value<String> deviceId,
   Value<int> lastPulledSeq,
+  Value<String?> watermarkToken,
+  Value<String?> scope,
   Value<int> rowid,
 });
 
@@ -14591,6 +14689,13 @@ class $$SyncStatesTableFilterComposer
 
   ColumnFilters<int> get lastPulledSeq => $composableBuilder(
       column: $table.lastPulledSeq, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get watermarkToken => $composableBuilder(
+      column: $table.watermarkToken,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get scope => $composableBuilder(
+      column: $table.scope, builder: (column) => ColumnFilters(column));
 }
 
 class $$SyncStatesTableOrderingComposer
@@ -14608,6 +14713,13 @@ class $$SyncStatesTableOrderingComposer
   ColumnOrderings<int> get lastPulledSeq => $composableBuilder(
       column: $table.lastPulledSeq,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get watermarkToken => $composableBuilder(
+      column: $table.watermarkToken,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get scope => $composableBuilder(
+      column: $table.scope, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SyncStatesTableAnnotationComposer
@@ -14624,6 +14736,12 @@ class $$SyncStatesTableAnnotationComposer
 
   GeneratedColumn<int> get lastPulledSeq => $composableBuilder(
       column: $table.lastPulledSeq, builder: (column) => column);
+
+  GeneratedColumn<String> get watermarkToken => $composableBuilder(
+      column: $table.watermarkToken, builder: (column) => column);
+
+  GeneratedColumn<String> get scope =>
+      $composableBuilder(column: $table.scope, builder: (column) => column);
 }
 
 class $$SyncStatesTableTableManager extends RootTableManager<
@@ -14654,21 +14772,29 @@ class $$SyncStatesTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<String> deviceId = const Value.absent(),
             Value<int> lastPulledSeq = const Value.absent(),
+            Value<String?> watermarkToken = const Value.absent(),
+            Value<String?> scope = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SyncStatesCompanion(
             deviceId: deviceId,
             lastPulledSeq: lastPulledSeq,
+            watermarkToken: watermarkToken,
+            scope: scope,
             rowid: rowid,
           ),
           createCompanionCallback: ({
             required String deviceId,
             Value<int> lastPulledSeq = const Value.absent(),
+            Value<String?> watermarkToken = const Value.absent(),
+            Value<String?> scope = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SyncStatesCompanion.insert(
             deviceId: deviceId,
             lastPulledSeq: lastPulledSeq,
+            watermarkToken: watermarkToken,
+            scope: scope,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
