@@ -33,6 +33,7 @@ final class SyncRecorder {
       deviceId: deviceId,
       actorId: actorId,
       createdAt: DateTime.now().toUtc(),
+      txId: currentOutboxTx(),
     ));
   }
 }

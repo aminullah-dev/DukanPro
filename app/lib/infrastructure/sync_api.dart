@@ -37,6 +37,7 @@ class DioSyncClient implements SyncClient {
                 'op': o.opType,
                 'data': o.payload,
                 'base_version': o.baseVersion,
+                if (o.txId != null) 'tx_id': o.txId,
                 // The server applies an op only under the token of the user who
                 // recorded it; system seeds carry no actor and apply as the pusher.
                 if (o.actorId != systemActorId) 'actor_id': o.actorId,

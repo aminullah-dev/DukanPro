@@ -3,7 +3,7 @@ docs/domain/sales.md."""
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -162,3 +162,47 @@ def assert_shift_cash_valid(*, amount_minor: int) -> None:
     or more. Raises ValidationError SHIFT_CASH_INVALID."""
     if amount_minor < 0:
         raise ValidationError("SHIFT_CASH_INVALID", amount=amount_minor)
+
+
+def _div_round_half_up(numerator: int, denominator: int) -> int:
+    """numerator / denominator, half away from zero; denominator > 0."""
+    magnitude = (2 * abs(numerator) + denominator) // (2 * denominator)
+    return -magnitude if numerator < 0 else magnitude
+
+
+def returned_value_minor(
+    *, line_total_minor: int, sold_qty_minor: int, returned_qty_minor: int
+) -> int:
+    """What returned_qty_minor of goods sold as sold_qty_minor for line_total_minor
+    is worth: the same share of the line's total, ROUND_HALF_UP."""
+    if sold_qty_minor <= 0:
+        return 0
+    return _div_round_half_up(line_total_minor * returned_qty_minor, sold_qty_minor)
+
+
+def refund_total_minor(
+    *, gross_minor: int, sale_subtotal_minor: int, sale_discount_minor: int
+) -> int:
+    """The money a return gives back: the returned goods' value less their share
+    of the sale's discount (the discount spread over the sale by value)."""
+    if sale_subtotal_minor <= 0 or sale_discount_minor == 0:
+        return gross_minor
+    share = _div_round_half_up(sale_discount_minor * gross_minor, sale_subtotal_minor)
+    return gross_minor - share
+
+
+def assert_refund_valid(
+    *, reason: str, wanted: Mapping[str, int], returnable: Mapping[str, int]
+) -> None:
+    """A return says why and takes back at least one thing, and of each product
+    no more than the sale sold less what earlier returns took back. Raises
+    ValidationError REFUND_REASON_REQUIRED, REFUND_EMPTY or REFUND_QTY_INVALID."""
+    if not reason.strip():
+        raise ValidationError("REFUND_REASON_REQUIRED")
+    if not wanted:
+        raise ValidationError("REFUND_EMPTY")
+    for product_id, qty in wanted.items():
+        left = returnable.get(product_id, 0)
+        if qty <= 0 or qty > left:
+            raise ValidationError("REFUND_QTY_INVALID", product_id=product_id, returnable=left)
+

@@ -22,6 +22,12 @@ class PaymentInput:
 
 
 @dataclass(frozen=True, slots=True)
+class RefundLineInput:
+    product_id: str
+    qty_minor: int  # how much of the product comes back, in its unit's minor units
+
+
+@dataclass(frozen=True, slots=True)
 class SaleLineView:
     product_id: str
     name: str
@@ -44,6 +50,7 @@ class SaleView:
     change_minor: int
     customer_id: str | None
     lines: tuple[SaleLineView, ...]
+    refund_of: str | None = None  # a return: the sale it takes goods back from
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +77,11 @@ class SalesService(Protocol):
     ) -> SaleView: ...
 
     def void_sale(self, *, actor: User, sale_id: str, reason: str) -> SaleView: ...
+
+    def refund_sale(
+        self, *, actor: User, sale_id: str, lines: list[RefundLineInput], reason: str,
+        method: str, shift_id: str | None,
+    ) -> SaleView: ...
 
     def get_sale(self, *, actor: User, sale_id: str) -> SaleView: ...
 

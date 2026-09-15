@@ -20,6 +20,9 @@ class OpInput:
     # for attribution: an op is applied only when actor_id equals the pusher.
     actor_id: str | None = None
     created_at: str | None = None
+    # The local transaction the device wrote it in: a transaction's ledger rows
+    # apply together or not at all (docs/sync-protocol.md).
+    tx_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

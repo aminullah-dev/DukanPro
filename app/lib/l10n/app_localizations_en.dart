@@ -89,6 +89,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginFailed => 'Sign-in failed. Check your username and password.';
 
   @override
+  String errLoginLocked(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'Too many wrong passwords. Wait $minutesString minutes, then try again.';
+  }
+
+  @override
   String get wrongSecret => 'Incorrect — try again.';
 
   @override
@@ -542,6 +551,86 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voided => 'Voided';
 
   @override
+  String get voidSale => 'Void sale';
+
+  @override
+  String get voidSaleTitle => 'Void this sale?';
+
+  @override
+  String get voidSaleBody =>
+      'The stock comes back, and what the customer still owes for it is taken off their account. This can\'t be undone.';
+
+  @override
+  String get voidReason => 'Reason';
+
+  @override
+  String get saleVoidedOk => 'The sale was voided.';
+
+  @override
+  String get returnItems => 'Return items';
+
+  @override
+  String get returnTitle => 'Take goods back';
+
+  @override
+  String returnUpTo(String qty) {
+    return 'Up to $qty';
+  }
+
+  @override
+  String get returnPayBack => 'Pay back by';
+
+  @override
+  String returnWorth(String amount) {
+    return 'Worth $amount';
+  }
+
+  @override
+  String get returnConfirm => 'Take back';
+
+  @override
+  String returnDoneGiveBack(String amount) {
+    return 'Returned. Give back $amount.';
+  }
+
+  @override
+  String get returnDoneAccount =>
+      'Returned. It came off the customer\'s account.';
+
+  @override
+  String get returnNothingLeft =>
+      'Everything from this sale has come back already.';
+
+  @override
+  String get returnLabel => 'Return';
+
+  @override
+  String returnOf(String number) {
+    return 'Return of $number';
+  }
+
+  @override
+  String get errRefundQty => 'That is more than is left to take back.';
+
+  @override
+  String get errSaleNotRefundable =>
+      'Goods can\'t be taken back from this sale.';
+
+  @override
+  String get errRefundReason => 'Write why the goods come back.';
+
+  @override
+  String get errSaleNotSynced =>
+      'This sale hasn\'t reached the server yet. Sync, then try again.';
+
+  @override
+  String get errVoidReasonRequired => 'Write why the sale is being voided.';
+
+  @override
+  String get errVoidShiftClosed =>
+      'This sale\'s shift is already closed and the sale took cash, so it can\'t be voided. Take the goods back with Return items instead.';
+
+  @override
   String get language => 'Language';
 
   @override
@@ -728,6 +817,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get printerSettings => 'Receipt printer';
+
+  @override
+  String get paperWidth => 'Paper width';
+
+  @override
+  String paperMillimetres(int mm) {
+    final intl.NumberFormat mmNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String mmString = mmNumberFormat.format(mm);
+
+    return '$mmString mm';
+  }
 
   @override
   String get enablePrinting => 'Print receipts';

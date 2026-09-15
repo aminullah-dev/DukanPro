@@ -11,6 +11,7 @@ import 'features/auth/providers.dart';
 import 'features/iam/iam_providers.dart';
 import 'features/audit/audit_providers.dart';
 import 'features/insights/insights_providers.dart';
+import 'features/pos/pos_providers.dart';
 import 'infrastructure/audit_api.dart';
 import 'infrastructure/auth_api.dart';
 import 'infrastructure/biometric.dart';
@@ -20,6 +21,7 @@ import 'infrastructure/iam_api.dart';
 import 'infrastructure/insights_api.dart';
 import 'infrastructure/keyboard_wedge_scanner.dart';
 import 'infrastructure/local_db.dart';
+import 'infrastructure/sales_api.dart';
 import 'infrastructure/secure_store.dart';
 import 'infrastructure/sync_api.dart';
 import 'l10n/app_localizations.dart';
@@ -73,6 +75,7 @@ Future<void> main() async {
       insightsApiProvider
           .overrideWithValue(DioInsightsApi(baseUrl: apiBase, store: secureStore, dio: api())),
       auditApiProvider.overrideWithValue(DioAuditApi(baseUrl: apiBase, store: secureStore, dio: api())),
+      salesApiProvider.overrideWithValue(DioSalesApi(baseUrl: apiBase, store: secureStore, dio: api())),
       scannerProvider.overrideWithValue(KeyboardWedgeScanner()),
     ],
   );

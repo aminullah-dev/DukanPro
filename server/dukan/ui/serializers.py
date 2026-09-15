@@ -98,6 +98,7 @@ def sale_view_dict(v: SaleView) -> dict:
         "paid_minor": v.paid_minor,
         "change_minor": v.change_minor,
         "customer_id": v.customer_id,
+        "refund_of": v.refund_of,
         "lines": [
             {
                 "product_id": l.product_id,

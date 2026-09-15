@@ -90,6 +90,15 @@ class AppLocalizationsFa extends AppLocalizations {
       'ورود ناکام شد. نام کاربری و رمز عبور را بررسی کنید.';
 
   @override
+  String errLoginLocked(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'رمز عبور چند بار اشتباه وارد شد. $minutesString دقیقه صبر کنید و دوباره تلاش کنید.';
+  }
+
+  @override
   String get wrongSecret => 'نادرست است — دوباره تلاش کنید.';
 
   @override
@@ -540,6 +549,85 @@ class AppLocalizationsFa extends AppLocalizations {
   String get voided => 'باطل‌شده';
 
   @override
+  String get voidSale => 'باطل کردن فروش';
+
+  @override
+  String get voidSaleTitle => 'این فروش باطل شود؟';
+
+  @override
+  String get voidSaleBody =>
+      'موجودی برمی‌گردد و آنچه مشتری هنوز بابت آن بدهکار است از حسابش برداشته می‌شود. این کار برگشت ندارد.';
+
+  @override
+  String get voidReason => 'دلیل';
+
+  @override
+  String get saleVoidedOk => 'فروش باطل شد.';
+
+  @override
+  String get returnItems => 'بازگشت کالا';
+
+  @override
+  String get returnTitle => 'پس گرفتن کالا';
+
+  @override
+  String returnUpTo(String qty) {
+    return 'تا $qty';
+  }
+
+  @override
+  String get returnPayBack => 'بازپرداخت با';
+
+  @override
+  String returnWorth(String amount) {
+    return 'ارزش: $amount';
+  }
+
+  @override
+  String get returnConfirm => 'پس گرفتن';
+
+  @override
+  String returnDoneGiveBack(String amount) {
+    return 'کالا پس گرفته شد. $amount پس بدهید.';
+  }
+
+  @override
+  String get returnDoneAccount => 'کالا پس گرفته شد و از حساب مشتری کم شد.';
+
+  @override
+  String get returnNothingLeft =>
+      'همهٔ کالاهای این فروش پیش‌تر پس گرفته شده است.';
+
+  @override
+  String get returnLabel => 'برگشتی';
+
+  @override
+  String returnOf(String number) {
+    return 'برگشتی از $number';
+  }
+
+  @override
+  String get errRefundQty =>
+      'این بیشتر از مقداری است که برای پس گرفتن مانده است.';
+
+  @override
+  String get errSaleNotRefundable => 'از این فروش کالا پس گرفته نمی‌شود.';
+
+  @override
+  String get errRefundReason => 'بنویسید کالا چرا پس گرفته می‌شود.';
+
+  @override
+  String get errSaleNotSynced =>
+      'این فروش هنوز به سرور نرسیده است. همگام‌سازی کنید و دوباره تلاش کنید.';
+
+  @override
+  String get errVoidReasonRequired => 'بنویسید که فروش چرا باطل می‌شود.';
+
+  @override
+  String get errVoidShiftClosed =>
+      'شیفت این فروش بسته شده و این فروش پول نقد گرفته است، پس باطل نمی‌شود. کالا را با «بازگشت کالا» پس بگیرید.';
+
+  @override
   String get language => 'زبان';
 
   @override
@@ -725,6 +813,19 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get printerSettings => 'چاپگر رسید';
+
+  @override
+  String get paperWidth => 'عرض کاغذ';
+
+  @override
+  String paperMillimetres(int mm) {
+    final intl.NumberFormat mmNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String mmString = mmNumberFormat.format(mm);
+
+    return '$mmString میلی‌متر';
+  }
 
   @override
   String get enablePrinting => 'چاپ رسیدها';
@@ -1236,6 +1337,15 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
       'ورود ناکام شد. نام کاربری و رمز عبور را بررسی کنید.';
 
   @override
+  String errLoginLocked(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'رمز عبور چند بار اشتباه وارد شد. $minutesString دقیقه صبر کنید و دوباره تلاش کنید.';
+  }
+
+  @override
   String get wrongSecret => 'نادرست است — دوباره تلاش کنید.';
 
   @override
@@ -1686,6 +1796,85 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   String get voided => 'باطل‌شده';
 
   @override
+  String get voidSale => 'باطل کردن فروش';
+
+  @override
+  String get voidSaleTitle => 'این فروش باطل شود؟';
+
+  @override
+  String get voidSaleBody =>
+      'موجودی برمی‌گردد و آنچه مشتری هنوز بابت آن بدهکار است از حسابش برداشته می‌شود. این کار برگشت ندارد.';
+
+  @override
+  String get voidReason => 'دلیل';
+
+  @override
+  String get saleVoidedOk => 'فروش باطل شد.';
+
+  @override
+  String get returnItems => 'بازگشت کالا';
+
+  @override
+  String get returnTitle => 'پس گرفتن کالا';
+
+  @override
+  String returnUpTo(String qty) {
+    return 'تا $qty';
+  }
+
+  @override
+  String get returnPayBack => 'بازپرداخت با';
+
+  @override
+  String returnWorth(String amount) {
+    return 'ارزش: $amount';
+  }
+
+  @override
+  String get returnConfirm => 'پس گرفتن';
+
+  @override
+  String returnDoneGiveBack(String amount) {
+    return 'کالا پس گرفته شد. $amount پس بدهید.';
+  }
+
+  @override
+  String get returnDoneAccount => 'کالا پس گرفته شد و از حساب مشتری کم شد.';
+
+  @override
+  String get returnNothingLeft =>
+      'همهٔ کالاهای این فروش پیش‌تر پس گرفته شده است.';
+
+  @override
+  String get returnLabel => 'برگشتی';
+
+  @override
+  String returnOf(String number) {
+    return 'برگشتی از $number';
+  }
+
+  @override
+  String get errRefundQty =>
+      'این بیشتر از مقداری است که برای پس گرفتن مانده است.';
+
+  @override
+  String get errSaleNotRefundable => 'از این فروش کالا پس گرفته نمی‌شود.';
+
+  @override
+  String get errRefundReason => 'بنویسید کالا چرا پس گرفته می‌شود.';
+
+  @override
+  String get errSaleNotSynced =>
+      'این فروش هنوز به سرور نرسیده است. همگام‌سازی کنید و دوباره تلاش کنید.';
+
+  @override
+  String get errVoidReasonRequired => 'بنویسید که فروش چرا باطل می‌شود.';
+
+  @override
+  String get errVoidShiftClosed =>
+      'شیفت این فروش بسته شده و این فروش پول نقد گرفته است، پس باطل نمی‌شود. کالا را با «بازگشت کالا» پس بگیرید.';
+
+  @override
   String get language => 'زبان';
 
   @override
@@ -1871,6 +2060,19 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get printerSettings => 'چاپگر رسید';
+
+  @override
+  String get paperWidth => 'عرض کاغذ';
+
+  @override
+  String paperMillimetres(int mm) {
+    final intl.NumberFormat mmNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String mmString = mmNumberFormat.format(mm);
+
+    return '$mmString میلی‌متر';
+  }
 
   @override
   String get enablePrinting => 'چاپ رسیدها';

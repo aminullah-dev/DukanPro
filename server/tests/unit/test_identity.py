@@ -17,6 +17,7 @@ from dukan.domain.identity import (
     assert_role_mutable,
     assert_shop_keeps_owner,
     assert_username_available,
+    login_locked,
 )
 from dukan.shared.errors import ConflictError, PermissionDeniedError, ValidationError
 
@@ -93,6 +94,11 @@ def test_device_settings_belong_to_owner_and_manager() -> None:
                           ("stock_keeper", False), ("accountant", False)):
         u = _user([BranchAssignment("B1", role)])
         assert POLICY.can(u, Permission.SETTINGS_MANAGE, "B1") is allowed, role
+
+
+def test_sign_in_closes_after_five_wrong_passwords() -> None:
+    assert not login_locked(failures_since_success=4)
+    assert login_locked(failures_since_success=5)
 
 
 def test_duplicate_username_rejected() -> None:

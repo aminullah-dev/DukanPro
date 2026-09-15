@@ -53,6 +53,7 @@ final class OutboxOp {
     required this.createdAt,
     this.baseVersion,
     this.status = OutboxStatus.pending,
+    this.txId,
   });
 
   final String opId; // UUIDv7 — also the idempotency key
@@ -66,6 +67,10 @@ final class OutboxOp {
   final DateTime createdAt;
   final int? baseVersion; // for mutable-master-data conflict detection
   final OutboxStatus status;
+
+  /// The local transaction it was written in: the server applies one
+  /// transaction's ledger rows together or not at all (docs/sync-protocol.md).
+  final String? txId;
 }
 
 /// The [OutboxOp.actorId] of automatic device writes no user performed (the

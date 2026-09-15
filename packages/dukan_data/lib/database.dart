@@ -1,9 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:dukan_core/dukan_core.dart';
 
 part 'database.g.dart';
+
+/// The zone value naming the device transaction a write belongs to.
+final _outboxTx = Object();
+
+/// The device transaction the current code runs in (see [AppDatabase.transaction]),
+/// or null outside one.
+String? currentOutboxTx() => Zone.current[_outboxTx] as String?;
 
 /// The standard record columns carried by every table (platform invariant):
 /// id, created_at, updated_at, deleted_at, created_by, updated_by, version.
@@ -32,6 +40,9 @@ class OutboxEntries extends Table with RecordColumns {
   IntColumn get baseVersion => integer().nullable()();
   /// The server's code for an op it conflicted or rejected (shown for review).
   TextColumn get lastError => text().nullable()();
+
+  /// The local transaction it was written in (see [currentOutboxTx]).
+  TextColumn get txId => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -123,6 +134,9 @@ class Sales extends Table with RecordColumns {
   IntColumn get paidMinor => integer().withDefault(const Constant(0))();
   IntColumn get changeMinor => integer().withDefault(const Constant(0))();
   DateTimeColumn get occurredAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// A return: the sale it takes goods back from. Only the server writes returns.
+  TextColumn get refundOf => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -261,8 +275,18 @@ class AppSettings extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
+  /// Every write in one transaction is one device transaction: the ops it
+  /// records share a tx id, and the server applies their ledger rows together
+  /// or not at all (docs/sync-protocol.md). A nested transaction keeps the
+  /// outer one's id.
   @override
-  int get schemaVersion => 12;
+  Future<T> transaction<T>(Future<T> Function() action, {bool requireNew = false}) {
+    if (currentOutboxTx() != null) return super.transaction(action, requireNew: requireNew);
+    return runZoned(() => super.transaction(action, requireNew: requireNew), zoneValues: {_outboxTx: newId()});
+  }
+
+  @override
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -323,6 +347,12 @@ class AppDatabase extends _$AppDatabase {
                 await m.addColumn(syncStates, column);
               }
             }
+          }
+          if (from < 13 && !await _hasColumn('sales', 'refund_of')) {
+            await m.addColumn(sales, sales.refundOf);
+          }
+          if (from < 14 && !await _hasColumn('outbox_entries', 'tx_id')) {
+            await m.addColumn(outboxEntries, outboxEntries.txId);
           }
         },
       );
@@ -432,6 +462,7 @@ final class DriftSyncOutbox implements SyncOutbox {
             status: Value(op.status.name),
             baseVersion: Value(op.baseVersion),
             createdAt: Value(op.createdAt),
+            txId: Value(op.txId),
           ),
         );
   }
@@ -463,6 +494,7 @@ final class DriftSyncOutbox implements SyncOutbox {
         createdAt: r.createdAt,
         baseVersion: r.baseVersion,
         status: OutboxStatus.values.byName(r.status),
+        txId: r.txId,
       );
 }
 

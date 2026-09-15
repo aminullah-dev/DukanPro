@@ -119,6 +119,11 @@ class $OutboxEntriesTable extends OutboxEntries
   late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
       'last_error', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _txIdMeta = const VerificationMeta('txId');
+  @override
+  late final GeneratedColumn<String> txId = GeneratedColumn<String>(
+      'tx_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -137,7 +142,8 @@ class $OutboxEntriesTable extends OutboxEntries
         actorId,
         status,
         baseVersion,
-        lastError
+        lastError,
+        txId
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -238,6 +244,10 @@ class $OutboxEntriesTable extends OutboxEntries
       context.handle(_lastErrorMeta,
           lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta));
     }
+    if (data.containsKey('tx_id')) {
+      context.handle(
+          _txIdMeta, txId.isAcceptableOrUnknown(data['tx_id']!, _txIdMeta));
+    }
     return context;
   }
 
@@ -281,6 +291,8 @@ class $OutboxEntriesTable extends OutboxEntries
           .read(DriftSqlType.int, data['${effectivePrefix}base_version']),
       lastError: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}last_error']),
+      txId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tx_id']),
     );
   }
 
@@ -310,6 +322,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
 
   /// The server's code for an op it conflicted or rejected (shown for review).
   final String? lastError;
+
+  /// The local transaction it was written in (see [currentOutboxTx]).
+  final String? txId;
   const OutboxRow(
       {required this.id,
       required this.createdAt,
@@ -327,7 +342,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       required this.actorId,
       required this.status,
       this.baseVersion,
-      this.lastError});
+      this.lastError,
+      this.txId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -357,6 +373,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     }
     if (!nullToAbsent || lastError != null) {
       map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || txId != null) {
+      map['tx_id'] = Variable<String>(txId);
     }
     return map;
   }
@@ -390,6 +409,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       lastError: lastError == null && nullToAbsent
           ? const Value.absent()
           : Value(lastError),
+      txId: txId == null && nullToAbsent ? const Value.absent() : Value(txId),
     );
   }
 
@@ -414,6 +434,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       status: serializer.fromJson<String>(json['status']),
       baseVersion: serializer.fromJson<int?>(json['baseVersion']),
       lastError: serializer.fromJson<String?>(json['lastError']),
+      txId: serializer.fromJson<String?>(json['txId']),
     );
   }
   @override
@@ -437,6 +458,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       'status': serializer.toJson<String>(status),
       'baseVersion': serializer.toJson<int?>(baseVersion),
       'lastError': serializer.toJson<String?>(lastError),
+      'txId': serializer.toJson<String?>(txId),
     };
   }
 
@@ -457,7 +479,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           String? actorId,
           String? status,
           Value<int?> baseVersion = const Value.absent(),
-          Value<String?> lastError = const Value.absent()}) =>
+          Value<String?> lastError = const Value.absent(),
+          Value<String?> txId = const Value.absent()}) =>
       OutboxRow(
         id: id ?? this.id,
         createdAt: createdAt ?? this.createdAt,
@@ -476,6 +499,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
         status: status ?? this.status,
         baseVersion: baseVersion.present ? baseVersion.value : this.baseVersion,
         lastError: lastError.present ? lastError.value : this.lastError,
+        txId: txId.present ? txId.value : this.txId,
       );
   OutboxRow copyWithCompanion(OutboxEntriesCompanion data) {
     return OutboxRow(
@@ -500,6 +524,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       baseVersion:
           data.baseVersion.present ? data.baseVersion.value : this.baseVersion,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      txId: data.txId.present ? data.txId.value : this.txId,
     );
   }
 
@@ -522,7 +547,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           ..write('actorId: $actorId, ')
           ..write('status: $status, ')
           ..write('baseVersion: $baseVersion, ')
-          ..write('lastError: $lastError')
+          ..write('lastError: $lastError, ')
+          ..write('txId: $txId')
           ..write(')'))
         .toString();
   }
@@ -545,7 +571,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       actorId,
       status,
       baseVersion,
-      lastError);
+      lastError,
+      txId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -566,7 +593,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           other.actorId == this.actorId &&
           other.status == this.status &&
           other.baseVersion == this.baseVersion &&
-          other.lastError == this.lastError);
+          other.lastError == this.lastError &&
+          other.txId == this.txId);
 }
 
 class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
@@ -587,6 +615,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
   final Value<String> status;
   final Value<int?> baseVersion;
   final Value<String?> lastError;
+  final Value<String?> txId;
   final Value<int> rowid;
   const OutboxEntriesCompanion({
     this.id = const Value.absent(),
@@ -606,6 +635,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     this.status = const Value.absent(),
     this.baseVersion = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.txId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   OutboxEntriesCompanion.insert({
@@ -626,6 +656,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     this.status = const Value.absent(),
     this.baseVersion = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.txId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         aggregateType = Value(aggregateType),
@@ -653,6 +684,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     Expression<String>? status,
     Expression<int>? baseVersion,
     Expression<String>? lastError,
+    Expression<String>? txId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -673,6 +705,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       if (status != null) 'status': status,
       if (baseVersion != null) 'base_version': baseVersion,
       if (lastError != null) 'last_error': lastError,
+      if (txId != null) 'tx_id': txId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -695,6 +728,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       Value<String>? status,
       Value<int?>? baseVersion,
       Value<String?>? lastError,
+      Value<String?>? txId,
       Value<int>? rowid}) {
     return OutboxEntriesCompanion(
       id: id ?? this.id,
@@ -714,6 +748,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       status: status ?? this.status,
       baseVersion: baseVersion ?? this.baseVersion,
       lastError: lastError ?? this.lastError,
+      txId: txId ?? this.txId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -772,6 +807,9 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     if (lastError.present) {
       map['last_error'] = Variable<String>(lastError.value);
     }
+    if (txId.present) {
+      map['tx_id'] = Variable<String>(txId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -798,6 +836,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
           ..write('status: $status, ')
           ..write('baseVersion: $baseVersion, ')
           ..write('lastError: $lastError, ')
+          ..write('txId: $txId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4164,6 +4203,12 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _refundOfMeta =
+      const VerificationMeta('refundOf');
+  @override
+  late final GeneratedColumn<String> refundOf = GeneratedColumn<String>(
+      'refund_of', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4185,7 +4230,8 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
         totalMinor,
         paidMinor,
         changeMinor,
-        occurredAt
+        occurredAt,
+        refundOf
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4294,6 +4340,10 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
           occurredAt.isAcceptableOrUnknown(
               data['occurred_at']!, _occurredAtMeta));
     }
+    if (data.containsKey('refund_of')) {
+      context.handle(_refundOfMeta,
+          refundOf.isAcceptableOrUnknown(data['refund_of']!, _refundOfMeta));
+    }
     return context;
   }
 
@@ -4343,6 +4393,8 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
           .read(DriftSqlType.int, data['${effectivePrefix}change_minor'])!,
       occurredAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}occurred_at'])!,
+      refundOf: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}refund_of']),
     );
   }
 
@@ -4373,6 +4425,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
   final int paidMinor;
   final int changeMinor;
   final DateTime occurredAt;
+
+  /// A return: the sale it takes goods back from. Only the server writes returns.
+  final String? refundOf;
   const SaleRow(
       {required this.id,
       required this.createdAt,
@@ -4393,7 +4448,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       required this.totalMinor,
       required this.paidMinor,
       required this.changeMinor,
-      required this.occurredAt});
+      required this.occurredAt,
+      this.refundOf});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4427,6 +4483,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
     map['paid_minor'] = Variable<int>(paidMinor);
     map['change_minor'] = Variable<int>(changeMinor);
     map['occurred_at'] = Variable<DateTime>(occurredAt);
+    if (!nullToAbsent || refundOf != null) {
+      map['refund_of'] = Variable<String>(refundOf);
+    }
     return map;
   }
 
@@ -4462,6 +4521,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       paidMinor: Value(paidMinor),
       changeMinor: Value(changeMinor),
       occurredAt: Value(occurredAt),
+      refundOf: refundOf == null && nullToAbsent
+          ? const Value.absent()
+          : Value(refundOf),
     );
   }
 
@@ -4489,6 +4551,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       paidMinor: serializer.fromJson<int>(json['paidMinor']),
       changeMinor: serializer.fromJson<int>(json['changeMinor']),
       occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
+      refundOf: serializer.fromJson<String?>(json['refundOf']),
     );
   }
   @override
@@ -4515,6 +4578,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       'paidMinor': serializer.toJson<int>(paidMinor),
       'changeMinor': serializer.toJson<int>(changeMinor),
       'occurredAt': serializer.toJson<DateTime>(occurredAt),
+      'refundOf': serializer.toJson<String?>(refundOf),
     };
   }
 
@@ -4538,7 +4602,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           int? totalMinor,
           int? paidMinor,
           int? changeMinor,
-          DateTime? occurredAt}) =>
+          DateTime? occurredAt,
+          Value<String?> refundOf = const Value.absent()}) =>
       SaleRow(
         id: id ?? this.id,
         createdAt: createdAt ?? this.createdAt,
@@ -4560,6 +4625,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
         paidMinor: paidMinor ?? this.paidMinor,
         changeMinor: changeMinor ?? this.changeMinor,
         occurredAt: occurredAt ?? this.occurredAt,
+        refundOf: refundOf.present ? refundOf.value : this.refundOf,
       );
   SaleRow copyWithCompanion(SalesCompanion data) {
     return SaleRow(
@@ -4591,6 +4657,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           data.changeMinor.present ? data.changeMinor.value : this.changeMinor,
       occurredAt:
           data.occurredAt.present ? data.occurredAt.value : this.occurredAt,
+      refundOf: data.refundOf.present ? data.refundOf.value : this.refundOf,
     );
   }
 
@@ -4616,33 +4683,36 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           ..write('totalMinor: $totalMinor, ')
           ..write('paidMinor: $paidMinor, ')
           ..write('changeMinor: $changeMinor, ')
-          ..write('occurredAt: $occurredAt')
+          ..write('occurredAt: $occurredAt, ')
+          ..write('refundOf: $refundOf')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      createdAt,
-      updatedAt,
-      deletedAt,
-      createdBy,
-      updatedBy,
-      version,
-      number,
-      branchId,
-      shiftId,
-      customerId,
-      status,
-      currency,
-      discountMinor,
-      subtotalMinor,
-      taxMinor,
-      totalMinor,
-      paidMinor,
-      changeMinor,
-      occurredAt);
+  int get hashCode => Object.hashAll([
+        id,
+        createdAt,
+        updatedAt,
+        deletedAt,
+        createdBy,
+        updatedBy,
+        version,
+        number,
+        branchId,
+        shiftId,
+        customerId,
+        status,
+        currency,
+        discountMinor,
+        subtotalMinor,
+        taxMinor,
+        totalMinor,
+        paidMinor,
+        changeMinor,
+        occurredAt,
+        refundOf
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4666,7 +4736,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           other.totalMinor == this.totalMinor &&
           other.paidMinor == this.paidMinor &&
           other.changeMinor == this.changeMinor &&
-          other.occurredAt == this.occurredAt);
+          other.occurredAt == this.occurredAt &&
+          other.refundOf == this.refundOf);
 }
 
 class SalesCompanion extends UpdateCompanion<SaleRow> {
@@ -4690,6 +4761,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
   final Value<int> paidMinor;
   final Value<int> changeMinor;
   final Value<DateTime> occurredAt;
+  final Value<String?> refundOf;
   final Value<int> rowid;
   const SalesCompanion({
     this.id = const Value.absent(),
@@ -4712,6 +4784,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     this.paidMinor = const Value.absent(),
     this.changeMinor = const Value.absent(),
     this.occurredAt = const Value.absent(),
+    this.refundOf = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SalesCompanion.insert({
@@ -4735,6 +4808,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     this.paidMinor = const Value.absent(),
     this.changeMinor = const Value.absent(),
     this.occurredAt = const Value.absent(),
+    this.refundOf = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         number = Value(number),
@@ -4760,6 +4834,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     Expression<int>? paidMinor,
     Expression<int>? changeMinor,
     Expression<DateTime>? occurredAt,
+    Expression<String>? refundOf,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4783,6 +4858,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       if (paidMinor != null) 'paid_minor': paidMinor,
       if (changeMinor != null) 'change_minor': changeMinor,
       if (occurredAt != null) 'occurred_at': occurredAt,
+      if (refundOf != null) 'refund_of': refundOf,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4808,6 +4884,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       Value<int>? paidMinor,
       Value<int>? changeMinor,
       Value<DateTime>? occurredAt,
+      Value<String?>? refundOf,
       Value<int>? rowid}) {
     return SalesCompanion(
       id: id ?? this.id,
@@ -4830,6 +4907,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       paidMinor: paidMinor ?? this.paidMinor,
       changeMinor: changeMinor ?? this.changeMinor,
       occurredAt: occurredAt ?? this.occurredAt,
+      refundOf: refundOf ?? this.refundOf,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4897,6 +4975,9 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     if (occurredAt.present) {
       map['occurred_at'] = Variable<DateTime>(occurredAt.value);
     }
+    if (refundOf.present) {
+      map['refund_of'] = Variable<String>(refundOf.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4926,6 +5007,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
           ..write('paidMinor: $paidMinor, ')
           ..write('changeMinor: $changeMinor, ')
           ..write('occurredAt: $occurredAt, ')
+          ..write('refundOf: $refundOf, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10237,6 +10319,7 @@ typedef $$OutboxEntriesTableCreateCompanionBuilder = OutboxEntriesCompanion
   Value<String> status,
   Value<int?> baseVersion,
   Value<String?> lastError,
+  Value<String?> txId,
   Value<int> rowid,
 });
 typedef $$OutboxEntriesTableUpdateCompanionBuilder = OutboxEntriesCompanion
@@ -10258,6 +10341,7 @@ typedef $$OutboxEntriesTableUpdateCompanionBuilder = OutboxEntriesCompanion
   Value<String> status,
   Value<int?> baseVersion,
   Value<String?> lastError,
+  Value<String?> txId,
   Value<int> rowid,
 });
 
@@ -10320,6 +10404,9 @@ class $$OutboxEntriesTableFilterComposer
 
   ColumnFilters<String> get lastError => $composableBuilder(
       column: $table.lastError, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get txId => $composableBuilder(
+      column: $table.txId, builder: (column) => ColumnFilters(column));
 }
 
 class $$OutboxEntriesTableOrderingComposer
@@ -10382,6 +10469,9 @@ class $$OutboxEntriesTableOrderingComposer
 
   ColumnOrderings<String> get lastError => $composableBuilder(
       column: $table.lastError, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get txId => $composableBuilder(
+      column: $table.txId, builder: (column) => ColumnOrderings(column));
 }
 
 class $$OutboxEntriesTableAnnotationComposer
@@ -10443,6 +10533,9 @@ class $$OutboxEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get lastError =>
       $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<String> get txId =>
+      $composableBuilder(column: $table.txId, builder: (column) => column);
 }
 
 class $$OutboxEntriesTableTableManager extends RootTableManager<
@@ -10485,6 +10578,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             Value<String> status = const Value.absent(),
             Value<int?> baseVersion = const Value.absent(),
             Value<String?> lastError = const Value.absent(),
+            Value<String?> txId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               OutboxEntriesCompanion(
@@ -10505,6 +10599,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             status: status,
             baseVersion: baseVersion,
             lastError: lastError,
+            txId: txId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -10525,6 +10620,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             Value<String> status = const Value.absent(),
             Value<int?> baseVersion = const Value.absent(),
             Value<String?> lastError = const Value.absent(),
+            Value<String?> txId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               OutboxEntriesCompanion.insert(
@@ -10545,6 +10641,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             status: status,
             baseVersion: baseVersion,
             lastError: lastError,
+            txId: txId,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -12124,6 +12221,7 @@ typedef $$SalesTableCreateCompanionBuilder = SalesCompanion Function({
   Value<int> paidMinor,
   Value<int> changeMinor,
   Value<DateTime> occurredAt,
+  Value<String?> refundOf,
   Value<int> rowid,
 });
 typedef $$SalesTableUpdateCompanionBuilder = SalesCompanion Function({
@@ -12147,6 +12245,7 @@ typedef $$SalesTableUpdateCompanionBuilder = SalesCompanion Function({
   Value<int> paidMinor,
   Value<int> changeMinor,
   Value<DateTime> occurredAt,
+  Value<String?> refundOf,
   Value<int> rowid,
 });
 
@@ -12217,6 +12316,9 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
 
   ColumnFilters<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get refundOf => $composableBuilder(
+      column: $table.refundOf, builder: (column) => ColumnFilters(column));
 }
 
 class $$SalesTableOrderingComposer
@@ -12289,6 +12391,9 @@ class $$SalesTableOrderingComposer
 
   ColumnOrderings<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get refundOf => $composableBuilder(
+      column: $table.refundOf, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SalesTableAnnotationComposer
@@ -12359,6 +12464,9 @@ class $$SalesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => column);
+
+  GeneratedColumn<String> get refundOf =>
+      $composableBuilder(column: $table.refundOf, builder: (column) => column);
 }
 
 class $$SalesTableTableManager extends RootTableManager<
@@ -12404,6 +12512,7 @@ class $$SalesTableTableManager extends RootTableManager<
             Value<int> paidMinor = const Value.absent(),
             Value<int> changeMinor = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
+            Value<String?> refundOf = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SalesCompanion(
@@ -12427,6 +12536,7 @@ class $$SalesTableTableManager extends RootTableManager<
             paidMinor: paidMinor,
             changeMinor: changeMinor,
             occurredAt: occurredAt,
+            refundOf: refundOf,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -12450,6 +12560,7 @@ class $$SalesTableTableManager extends RootTableManager<
             Value<int> paidMinor = const Value.absent(),
             Value<int> changeMinor = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
+            Value<String?> refundOf = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SalesCompanion.insert(
@@ -12473,6 +12584,7 @@ class $$SalesTableTableManager extends RootTableManager<
             paidMinor: paidMinor,
             changeMinor: changeMinor,
             occurredAt: occurredAt,
+            refundOf: refundOf,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

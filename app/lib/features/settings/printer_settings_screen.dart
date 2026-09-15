@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../widgets/error_text.dart';
-import '../pos/receipt_builder.dart';
+import '../pos/receipt_raster.dart';
 import '../auth/session.dart';
 import '../../widgets/shell_scope.dart';
 import '../auth/auth_controller.dart';
@@ -22,6 +22,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
   final _host = TextEditingController();
   final _port = TextEditingController(text: '9100');
   bool _enabled = false;
+  int _paperMm = 80;
   bool _loaded = false;
 
   @override
@@ -37,12 +38,14 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     _enabled = c.enabled;
     _host.text = c.host;
     _port.text = c.port.toString();
+    _paperMm = c.paperMm;
   }
 
   PrinterConfig get _current => PrinterConfig(
         enabled: _enabled,
         host: _host.text.trim(),
         port: int.tryParse(_port.text.trim()) ?? 9100,
+        paperMm: _paperMm,
       );
 
   Future<void> _save(AppLocalizations l) async {
@@ -59,15 +62,18 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
       return;
     }
     final printer = TcpReceiptPrinter(host: cfg.host, port: cfg.port);
-    final bytes = const EscPosEncoder().encode(ReceiptData(
-      shopName: 'DukanPro',
-      number: l.testPrint,
-      stamp: receiptStamp(ref.read(branchZoneProvider), DateTime.now()),
-      lines: const [ReceiptLineData(name: 'TEST', qtyLabel: '×1', lineTotalMinor: 0)],
-      subtotalMinor: 0, totalMinor: 0, paidMinor: 0, changeMinor: 0,
-    ));
     try {
-      await printer.printRaw(bytes);
+      // A sample in the reader's language: the page shows that Dari or Pashto prints.
+      final image = await rasterReceipt(
+        l: l,
+        data: ReceiptData(
+          shopName: ref.read(shopNameProvider), number: l.testPrint, stamp: '',
+          lines: [ReceiptLineData(name: l.testPrint, qtyLabel: '×1', lineTotalMinor: 0)],
+          subtotalMinor: 0, totalMinor: 0, paidMinor: 0, changeMinor: 0, currency: ref.read(shopCurrencyProvider),
+        ),
+        occurredAt: DateTime.now(), zone: ref.read(branchZoneProvider), paperMm: cfg.paperMm,
+      );
+      await printer.printRaw(const EscPosEncoder().encodeRaster(image));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.printSucceeded)));
       }
@@ -118,6 +124,16 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                 enabled: _enabled,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(labelText: l.printerPort, border: const OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              Text(l.paperWidth, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 4),
+              SegmentedButton<int>(
+                segments: [
+                  for (final mm in const [58, 80]) ButtonSegment(value: mm, label: Text(l.paperMillimetres(mm))),
+                ],
+                selected: {_paperMm},
+                onSelectionChanged: _enabled ? (s) => setState(() => _paperMm = s.first) : null,
               ),
               const SizedBox(height: 24),
               Row(
