@@ -34,6 +34,8 @@ _DIGIT = re.compile(r"[0-9٠-٩۰-۹]")
 _EXACT_BRANCH = re.compile(r"=\d+\{")
 _ANY_PLACEHOLDER = re.compile(r"\{[^{}]*\}")
 _LETTER = re.compile(r"[^\W\d_]")
+# A currency written into a message: an amount carries its own through formatMoney.
+_CURRENCY = re.compile(r"\b(AFN|USD|PKR|EUR)\b|افغانی|افغانۍ|کلدار|دالر|ډالر|یورو")
 
 
 def load(path: Path) -> dict:
@@ -81,6 +83,8 @@ def main() -> int:
                 errors.append(f"{name} {key}: unknown placeholder(s) {sorted(used - declared[key])}")
             if key not in DIGITS_ALLOWED and _DIGIT.search(_EXACT_BRANCH.sub("{", text)):
                 errors.append(f"{name} {key}: a digit typed into the text; use a number placeholder")
+            if not key.startswith(("symbol", "currency")) and _CURRENCY.search(text):
+                errors.append(f"{name} {key}: a currency written into the text; pass the amount through formatMoney")
             words = _ANY_PLACEHOLDER.sub("", text)
             if name != TEMPLATE and text == en[key] and _LETTER.search(words):
                 errors.append(f"{name} {key}: still the English text")

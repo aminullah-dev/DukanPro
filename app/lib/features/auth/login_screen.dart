@@ -71,7 +71,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         'SETUP_TOKEN_INVALID' => l.errSetupCode,
         'OFFLINE_EXPIRED' => l.errOfflineExpired,
         'STORAGE_UNAVAILABLE' => l.errStorage,
-        'USER_DISABLED' || 'SESSION_REVOKED' || 'REFRESH_INVALID' || 'TOKEN_INVALID' => l.errSessionEnded,
+        'USER_DISABLED' => l.errAccountDisabled, // signing in again cannot help
+        'SESSION_REVOKED' || 'REFRESH_INVALID' || 'TOKEN_INVALID' => l.errSessionEnded,
         _ => _setup ? l.setupFailed : l.loginFailed,
       };
 

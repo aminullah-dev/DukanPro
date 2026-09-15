@@ -1,8 +1,10 @@
+import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
 import '../../widgets/money.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
@@ -78,7 +80,7 @@ class DashboardScreen extends ConsumerWidget {
                   dense: true,
                   leading: const Icon(Icons.star_outline),
                   title: Text(s.name),
-                  trailing: Text(s.qtyLabel),
+                  trailing: Text('${formatQuantity(s.qtyMinor, s.decimalPlaces)} ${unitLabel(l, s.unitId, s.unitName)}'),
                 ),
           ],
         ),

@@ -4,18 +4,17 @@ import 'package:dukan_core/dukan_core.dart';
 import '../database.dart';
 
 class TopSeller {
-  const TopSeller(this.name, this.qtyMinor, {this.decimalPlaces = 0, this.unitName = '', this.revenueMinor = 0});
+  const TopSeller(this.name, this.qtyMinor,
+      {this.decimalPlaces = 0, this.unitName = '', this.unitId = '', this.revenueMinor = 0});
   final String name;
   final int qtyMinor;
   final int decimalPlaces;
   final String unitName;
+
+  /// The unit's id, so the app names a built-in unit in the user's language.
+  final String unitId;
   final int revenueMinor;
 
-  /// The quantity for people: "1.500 kg", not 1500.
-  String get qtyLabel {
-    final qty = formatQuantity(qtyMinor, decimalPlaces);
-    return unitName.isEmpty ? qty : '$qty $unitName';
-  }
 }
 
 /// Read-model projection for the dashboard. Computed from the local ledgers
@@ -89,6 +88,7 @@ final class LocalReports {
         ln.name, (prev?.qtyMinor ?? 0) + ln.qtyMinor,
         decimalPlaces: ln.decimalPlaces,
         unitName: unitOf[ln.productId]?.name ?? '',
+        unitId: unitOf[ln.productId]?.id ?? '',
         revenueMinor: (prev?.revenueMinor ?? 0) + ln.lineTotalMinor,
       );
     }

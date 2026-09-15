@@ -196,7 +196,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (mounted) {
       final l = AppLocalizations.of(context);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.shiftClosed(amountText(closed.varianceMinor ?? 0)))));
+          .showSnackBar(SnackBar(content: Text(l.shiftClosed(formatMoney(l, closed.varianceMinor ?? 0, shopCurrencyOf(context))))));
     }
   }
 

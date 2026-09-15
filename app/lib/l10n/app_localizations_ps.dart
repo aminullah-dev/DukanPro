@@ -103,13 +103,13 @@ class AppLocalizationsPs extends AppLocalizations {
   String get setupFailed => 'چمتو کول ناکام شول. بیا هڅه وکړئ.';
 
   @override
-  String get products => 'محصولات';
+  String get products => 'توکي';
 
   @override
-  String get addProduct => 'محصول اضافه کول';
+  String get addProduct => 'توکی زیاتول';
 
   @override
-  String get editProduct => 'محصول سمول';
+  String get editProduct => 'توکی سمول';
 
   @override
   String get productName => 'نوم';
@@ -145,7 +145,7 @@ class AppLocalizationsPs extends AppLocalizations {
   String get onHand => 'موجود';
 
   @override
-  String get noProducts => 'لا تر اوسه محصول نشته';
+  String get noProducts => 'لا تر اوسه توکی نشته';
 
   @override
   String get searchHint => 'لټون یا سکن…';
@@ -397,7 +397,7 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get errDebtCurrency =>
-      'د دې پېرودونکي پور په بله اسعارو دی؛ پور یوازې د هغه په اسعارو ورکول کېږي.';
+      'د دې پېرودونکي پور په بلو اسعارو دی؛ پور یوازې د هغه په اسعارو ورکول کېږي.';
 
   @override
   String get errOverCreditLimit =>
@@ -461,7 +461,7 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String shiftClosed(String variance) {
-    return 'شفټ بند شو. توپیر: $variance افغانۍ';
+    return 'شفټ بند شو. توپیر: $variance';
   }
 
   @override
@@ -510,7 +510,7 @@ class AppLocalizationsPs extends AppLocalizations {
       'دا مبلغ د دې عرضه کوونکي له پور څخه زیات دی.';
 
   @override
-  String get errNotStockTracked => 'د دې توکي زېرمه نه څارل کېږي.';
+  String get errNotStockTracked => 'د دې توکي ذخیره نه څارل کېږي.';
 
   @override
   String get recentSales => 'وروستي پلورونه';
@@ -1090,4 +1090,35 @@ class AppLocalizationsPs extends AppLocalizations {
   String moneyAmount(String amount, String currency) {
     return '$amount $currency';
   }
+
+  @override
+  String get shift => 'شفټ';
+
+  @override
+  String get category => 'کټګوري';
+
+  @override
+  String get syncIssueOther => 'نور معلومات';
+
+  @override
+  String get errAccountDisabled =>
+      'دا حساب غیر فعال شوی دی. د دوکان له مالک څخه وپوښتئ.';
+
+  @override
+  String get timeZoneKarachi => 'د کراچۍ وخت';
+
+  @override
+  String get timeZoneTashkent => 'د تاشکند وخت';
+
+  @override
+  String get timeZoneDushanbe => 'د دوشنبې وخت';
+
+  @override
+  String get timeZoneDubai => 'د دوبۍ وخت';
+
+  @override
+  String get timeZoneTehran => 'د تهران وخت';
+
+  @override
+  String get timeZoneUtc => 'نړیوال وخت';
 }

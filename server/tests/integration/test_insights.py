@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi.testclient import TestClient
+from sqlalchemy import update
+from sqlalchemy.orm import Session
+
+from dukan.infrastructure.db.models import ProductModel
 
 
 def _seed(client: TestClient) -> dict:
@@ -29,7 +35,7 @@ def _seed(client: TestClient) -> dict:
               "payments": [{"method": "cash", "amount_minor": 1820000, "tendered_minor": 1820000}]},
     )
 
-    # Product 2: stocked (+10), never sold ⇒ dead stock.
+    # Product 2: added 40 days ago, stocked (+10), never sold ⇒ dead stock.
     p2 = client.post(
         "/products", headers=h,
         json={"sku": "P2", "name": "Rope", "unit_id": piece, "sell_price_minor": 10000},
@@ -38,6 +44,10 @@ def _seed(client: TestClient) -> dict:
         "/goods-receipts", headers=h,
         json={"lines": [{"product_id": p2, "qty_minor": 10, "unit_cost_minor": 5000}]},
     )
+    with Session(client.app.state.engine) as s:  # type: ignore[attr-defined]
+        s.execute(update(ProductModel).where(ProductModel.id == p2).values(
+            created_at=datetime.now(UTC) - timedelta(days=40)))
+        s.commit()
 
     # Customer at 80% of credit limit ⇒ debt-risk warning.
     customer = client.post(
@@ -59,6 +69,7 @@ def test_insights_surface_reorder_dead_stock_and_debt(client: TestClient) -> Non
     assert by_code["insight.reorder"]["entity_type"] == "product"
     assert by_code["insight.reorder"]["data"]["suggested_minor"] > 0
     assert "insight.dead_stock" in by_code
+    assert by_code["insight.dead_stock"]["data"]["days"] == 40  # since it was added, not 10,000
     assert by_code["insight.debt_risk"]["severity"] == "warning"
     assert "insight.digest" in by_code
 
@@ -93,3 +104,16 @@ def test_insights_require_report_view(client: TestClient) -> None:
     ch = {"Authorization": f"Bearer {cashier['tokens']['access_token']}"}
     assert client.get("/insights", headers=ch).status_code == 403
     assert client.post("/notifications/refresh", headers=ch).status_code == 403
+
+
+def test_a_product_added_today_is_not_dead_stock(client: TestClient) -> None:
+    h = _seed(client)
+    fresh = client.post(
+        "/products", headers=h,
+        json={"sku": "P3", "name": "Tea", "unit_id": client.get("/units", headers=h).json()[0]["id"],
+              "sell_price_minor": 5000},
+    ).json()["id"]
+    client.post("/goods-receipts", headers=h, json={"lines": [{"product_id": fresh, "qty_minor": 5}]})
+    dead = [i for i in client.get("/insights", headers=h).json()["insights"] if i["code"] == "insight.dead_stock"]
+    assert [i["entity_id"] for i in dead] != [] and fresh not in [i["entity_id"] for i in dead]
+

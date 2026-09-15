@@ -28,6 +28,18 @@ void main() {
       }
     });
 
+    test('covers the years of its table, and refuses days that do not exist', () {
+      final last = SolarHijriDate.fromGregorian(DateTime.utc(3799, 1, 1));
+      expect(last.year, 3177);
+      expect(last.toGregorian(), DateTime.utc(3799, 1, 1));
+      expect(() => SolarHijriDate.fromGregorian(DateTime.utc(560, 1, 1)), throwsArgumentError);
+      expect(() => SolarHijriDate.fromGregorian(DateTime.utc(3900, 1, 1)), throwsArgumentError);
+      expect(() => const SolarHijriDate(1404, 12, 30).toGregorian(), throwsArgumentError); // a common year
+      expect(() => const SolarHijriDate(1404, 13, 1).toGregorian(), throwsArgumentError);
+      expect(() => const SolarHijriDate(1404, 7, 31).toGregorian(), throwsArgumentError);
+      expect(const SolarHijriDate(1403, 12, 30).toGregorian(), DateTime.utc(2025, 3, 20));
+    });
+
     test('knows the leap years and the length of Hut', () {
       for (final y in [1395, 1399, 1403, 1408]) {
         expect(SolarHijriDate.isLeapYear(y), isTrue, reason: '$y');

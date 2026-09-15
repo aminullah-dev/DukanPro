@@ -45,6 +45,11 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def _aware(value: datetime) -> datetime:
+    """SQLite hands back naive datetimes; every stored time is UTC."""
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
 class SqlInsightService(InsightService):
     def __init__(self, session: Session) -> None:
         self._s = session
@@ -111,8 +116,9 @@ class SqlInsightService(InsightService):
                         entity_id=p.id,
                     )
                 )
-            last = last_sold.get(p.id)
-            days_since = (now - last).days if last is not None else 10_000
+            # Never sold: counted from when the product was added, not "10,000 days".
+            since = last_sold.get(p.id) or _aware(p.created_at)
+            days_since = (now - since).days
             if is_dead_stock(
                 on_hand_minor=on_hand,
                 days_since_last_sale=days_since,

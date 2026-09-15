@@ -3,12 +3,16 @@
 // one digit system, the chosen language survives a restart, and Pashto text
 // fields have a copy and paste menu on Apple platforms.
 import 'package:dukan_core/dukan_core.dart';
+import 'package:dukan_data/dukan_data.dart';
 import 'package:dukanpro/composition.dart';
+import 'package:dukanpro/features/dashboard/dashboard_screen.dart';
+import 'package:dukanpro/features/sync/sync_issues_screen.dart';
 import 'package:dukanpro/infrastructure/auth_api.dart';
 import 'package:dukanpro/l10n/app_localizations.dart';
 import 'package:dukanpro/widgets/error_text.dart';
 import 'package:dukanpro/widgets/labels.dart';
 import 'package:dukanpro/widgets/localization_delegates.dart';
+import 'package:dukanpro/widgets/money.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -137,4 +141,43 @@ void main() {
     ));
     expect(cupertino?.pasteButtonLabel, isNotEmpty);
   });
+
+  test('every synced table and every branch zone has a label', () {
+    for (final table in ['products', 'barcodes', 'units', 'categories', 'customers', 'suppliers',
+      'stock_movements', 'sales', 'sale_lines', 'payments', 'customer_ledger', 'supplier_ledger', 'shifts']) {
+      expect(syncTableLabel(fa, table), isNot(table), reason: table);
+    }
+    expect(syncTableLabel(fa, 'something_new'), fa.syncIssueOther);
+    for (final zone in branchZoneOffsets.keys) {
+      expect(timeZoneLabel(ps, zone), isNot(zone), reason: zone);
+    }
+    expect(errorCodeText(fa, 'USER_DISABLED'), fa.errAccountDisabled); // signing in again cannot help
+    // The shift-close sentence takes its amount with the currency, not a fixed AFN.
+    expect(en.shiftClosed(formatMoney(en, -500, 'USD')), allOf(contains('USD'), isNot(contains('AFN'))));
+  });
+
+  testWidgets("the dashboard's top sellers name built-in units in the user's language", (tester) async {
+    final kg = builtInUnits[1];
+    final container = ProviderContainer(overrides: [
+      dashboardProvider.overrideWith((ref) async => DashboardData(
+            salesTodayMinor: 0, profitTodayMinor: 0, outstandingDebtMinor: 0, lowStockCount: 0,
+            topSellers: [TopSeller('برنج', 1500, decimalPlaces: 3, unitName: kg.name, unitId: kg.id)],
+          )),
+    ]);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        locale: const Locale('fa', 'AF'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: const DashboardScreen(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('1.500 ${fa.unitKg}'), findsOneWidget);
+    expect(find.textContaining('kg'), findsNothing);
+  });
 }
+
+

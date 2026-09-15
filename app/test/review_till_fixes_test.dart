@@ -225,4 +225,22 @@ void main() {
     await _scanNow(tester, scanner);
     expect(container.read(posCartProvider).single.qtyMinor, 2);
   });
+
+  testWidgets('the payment refuses an amount that is not one, and charges nothing', (tester) async {
+    _size(tester, const Size(1280, 800));
+    final scanner = _Scanner();
+    final container = await _till(tester, scanner);
+    await _scanNow(tester, scanner);
+    await tester.tap(find.byIcon(Icons.point_of_sale));
+    await tester.pumpAndSettle();
+    await tester.enterText(_inDialog(find.byType(TextField)).first, '12abc');
+    await tester.pumpAndSettle();
+    expect(_inDialog(find.text(en.errAmountInvalid)), findsOneWidget);
+    final charge = _inDialog(find.widgetWithText(FilledButton, en.charge));
+    expect(tester.widget<FilledButton>(charge).onPressed, isNull);
+    await tester.tap(find.text(en.cancel));
+    await tester.pumpAndSettle();
+    expect(container.read(posCartProvider), hasLength(1)); // nothing was sold
+  });
 }
+

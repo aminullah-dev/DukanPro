@@ -104,13 +104,13 @@ class AppLocalizationsFa extends AppLocalizations {
   String get setupFailed => 'راه‌اندازی ناکام شد. دوباره تلاش کنید.';
 
   @override
-  String get products => 'محصولات';
+  String get products => 'اجناس';
 
   @override
-  String get addProduct => 'افزودن محصول';
+  String get addProduct => 'افزودن جنس';
 
   @override
-  String get editProduct => 'ویرایش محصول';
+  String get editProduct => 'ویرایش جنس';
 
   @override
   String get productName => 'نام';
@@ -146,7 +146,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get onHand => 'موجود';
 
   @override
-  String get noProducts => 'هنوز محصولی نیست';
+  String get noProducts => 'هنوز جنسی نیست';
 
   @override
   String get searchHint => 'جستجو یا اسکن…';
@@ -463,7 +463,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String shiftClosed(String variance) {
-    return 'شیفت ختم شد. تفاوت: $variance افغانی';
+    return 'شیفت ختم شد. تفاوت: $variance';
   }
 
   @override
@@ -662,7 +662,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get errUnitUnknown =>
-      'واحد این کالا هنوز بارگذاری نشده است. همگام‌سازی کنید و دوباره امتحان کنید.';
+      'واحد این جنس هنوز بارگذاری نشده است. همگام‌سازی کنید و دوباره امتحان کنید.';
 
   @override
   String get editQuantity => 'تغییر مقدار';
@@ -680,7 +680,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errMustBePositive => 'عددی بزرگ‌تر از صفر وارد کنید.';
 
   @override
-  String get errChooseProduct => 'یک کالا انتخاب کنید.';
+  String get errChooseProduct => 'یک جنس انتخاب کنید.';
 
   @override
   String get errRequired => 'این بخش لازم است.';
@@ -1092,6 +1092,37 @@ class AppLocalizationsFa extends AppLocalizations {
   String moneyAmount(String amount, String currency) {
     return '$amount $currency';
   }
+
+  @override
+  String get shift => 'شیفت';
+
+  @override
+  String get category => 'دسته‌بندی';
+
+  @override
+  String get syncIssueOther => 'اطلاعات دیگر';
+
+  @override
+  String get errAccountDisabled =>
+      'این حساب غیرفعال شده است. از مالک دکان بپرسید.';
+
+  @override
+  String get timeZoneKarachi => 'وقت کراچی';
+
+  @override
+  String get timeZoneTashkent => 'وقت تاشکند';
+
+  @override
+  String get timeZoneDushanbe => 'وقت دوشنبه';
+
+  @override
+  String get timeZoneDubai => 'وقت دبی';
+
+  @override
+  String get timeZoneTehran => 'وقت تهران';
+
+  @override
+  String get timeZoneUtc => 'زمان جهانی';
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -1193,13 +1224,13 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   String get setupFailed => 'راه‌اندازی ناکام شد. دوباره تلاش کنید.';
 
   @override
-  String get products => 'محصولات';
+  String get products => 'اجناس';
 
   @override
-  String get addProduct => 'افزودن محصول';
+  String get addProduct => 'افزودن جنس';
 
   @override
-  String get editProduct => 'ویرایش محصول';
+  String get editProduct => 'ویرایش جنس';
 
   @override
   String get productName => 'نام';
@@ -1235,7 +1266,7 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   String get onHand => 'موجود';
 
   @override
-  String get noProducts => 'هنوز محصولی نیست';
+  String get noProducts => 'هنوز جنسی نیست';
 
   @override
   String get searchHint => 'جستجو یا اسکن…';
@@ -1552,7 +1583,7 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String shiftClosed(String variance) {
-    return 'شیفت ختم شد. تفاوت: $variance افغانی';
+    return 'شیفت ختم شد. تفاوت: $variance';
   }
 
   @override
@@ -1751,7 +1782,7 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get errUnitUnknown =>
-      'واحد این کالا هنوز بارگذاری نشده است. همگام‌سازی کنید و دوباره امتحان کنید.';
+      'واحد این جنس هنوز بارگذاری نشده است. همگام‌سازی کنید و دوباره امتحان کنید.';
 
   @override
   String get editQuantity => 'تغییر مقدار';
@@ -1769,7 +1800,7 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   String get errMustBePositive => 'عددی بزرگ‌تر از صفر وارد کنید.';
 
   @override
-  String get errChooseProduct => 'یک کالا انتخاب کنید.';
+  String get errChooseProduct => 'یک جنس انتخاب کنید.';
 
   @override
   String get errRequired => 'این بخش لازم است.';
@@ -2181,4 +2212,35 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   String moneyAmount(String amount, String currency) {
     return '$amount $currency';
   }
+
+  @override
+  String get shift => 'شیفت';
+
+  @override
+  String get category => 'دسته‌بندی';
+
+  @override
+  String get syncIssueOther => 'اطلاعات دیگر';
+
+  @override
+  String get errAccountDisabled =>
+      'این حساب غیرفعال شده است. از مالک دکان بپرسید.';
+
+  @override
+  String get timeZoneKarachi => 'وقت کراچی';
+
+  @override
+  String get timeZoneTashkent => 'وقت تاشکند';
+
+  @override
+  String get timeZoneDushanbe => 'وقت دوشنبه';
+
+  @override
+  String get timeZoneDubai => 'وقت دبی';
+
+  @override
+  String get timeZoneTehran => 'وقت تهران';
+
+  @override
+  String get timeZoneUtc => 'زمان جهانی';
 }

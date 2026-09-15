@@ -8,7 +8,8 @@ import '../auth/session.dart';
 import '../../widgets/error_text.dart';
 import 'sync_providers.dart';
 
-String _what(AppLocalizations l, String table) => switch (table) {
+/// What a synced table holds, in the user's words (never the table's name).
+String syncTableLabel(AppLocalizations l, String table) => switch (table) {
       'products' => l.products,
       'customers' => l.customers,
       'suppliers' => l.supplier,
@@ -17,7 +18,10 @@ String _what(AppLocalizations l, String table) => switch (table) {
       'stock_movements' => l.adjustStock,
       'customer_ledger' => l.recordPayment,
       'supplier_ledger' => l.receiveStock,
-      _ => table,
+      'barcodes' => l.barcodes,
+      'shifts' => l.shift,
+      'categories' => l.category,
+      _ => l.syncIssueOther,
     };
 
 /// Changes the server did not take: an edit someone else made first (the
@@ -49,7 +53,7 @@ class SyncIssuesScreen extends ConsumerWidget {
                   return ListTile(
                     leading: Icon(conflict ? Icons.call_split : Icons.block, color: error),
                     title: Text(
-                      '${_what(l, issue.table)} · ${conflict ? l.syncIssueConflict : l.syncIssueRejected}',
+                      '${syncTableLabel(l, issue.table)} · ${conflict ? l.syncIssueConflict : l.syncIssueRejected}',
                     ),
                     subtitle: Text(
                       '${formatDateTime(l, issue.createdAt, zone)}'

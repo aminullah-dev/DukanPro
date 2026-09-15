@@ -129,7 +129,7 @@
   "transfer": "Transfer",
   "addPayment": "Add payment",
   "remaining": "Still to pay",
-  "shiftClosed": "Shift closed. Difference: {variance} AFN",
+  "shiftClosed": "Shift closed. Difference: {variance}",
   "@shiftClosed": { "placeholders": { "variance": { "type": "String" } } },
   "errShiftNotOpen": "Open a shift first: sales go into an open shift of yours.",
   "errShiftAlreadyOpen": "You already have an open shift here.",
@@ -332,5 +332,15 @@
   "symbolPkr": "PKR",
   "symbolEur": "EUR",
   "moneyAmount": "{amount} {currency}",
-  "@moneyAmount": { "placeholders": { "amount": { "type": "String" }, "currency": { "type": "String" } } }
+  "@moneyAmount": { "placeholders": { "amount": { "type": "String" }, "currency": { "type": "String" } } },
+  "shift": "Shift",
+  "category": "Category",
+  "syncIssueOther": "Other data",
+  "errAccountDisabled": "This account is disabled. Ask the shop's owner.",
+  "timeZoneKarachi": "Karachi time",
+  "timeZoneTashkent": "Tashkent time",
+  "timeZoneDushanbe": "Dushanbe time",
+  "timeZoneDubai": "Dubai time",
+  "timeZoneTehran": "Tehran time",
+  "timeZoneUtc": "UTC"
 }

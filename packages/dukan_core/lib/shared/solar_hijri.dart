@@ -1,7 +1,9 @@
 /// A date in the Solar Hijri (Hijri Shamsi) calendar: Afghanistan's civil
 /// calendar (months Hamal to Hut) and Iran's. Pure arithmetic after the jalaali
-/// algorithm (Borkowski's leap-year breaks), exact for the years -61 to 3177 SH.
-/// Store Gregorian UTC; this is for display only (docs/localization.md).
+/// algorithm (Borkowski's leap-year breaks), exact for the years −61 to 3177 SH.
+/// Outside them, or for a day that does not exist (month 13, 30 Hut of a common
+/// year), it throws [ArgumentError]. Store Gregorian UTC; this is for display
+/// only (docs/localization.md).
 final class SolarHijriDate {
   const SolarHijriDate(this.year, this.month, this.day);
 
@@ -14,6 +16,9 @@ final class SolarHijriDate {
 
   /// The Gregorian date (UTC midnight) of this day.
   DateTime toGregorian() {
+    if (month < 1 || month > 12 || day < 1 || day > monthLength(year, month)) {
+      throw ArgumentError.value('$this', 'date', 'no such day in the Solar Hijri calendar');
+    }
     final start = _yearStart(year);
     final dayNumber = _gregorianToDayNumber(start.gy, 3, start.march) +
         (month - 1) * 31 - _div(month, 7) * (month - 7) + day - 1;
@@ -77,19 +82,25 @@ int _mod(int a, int b) => a.remainder(b);
 }
 
 SolarHijriDate _fromDayNumber(int dayNumber) {
-  final gy = _dayNumberToGregorian(dayNumber).year;
-  var year = gy - 621;
-  final start = _yearStart(year);
-  var k = dayNumber - _gregorianToDayNumber(gy, 3, start.march);
-  if (k >= 0) {
-    if (k <= 185) return SolarHijriDate(year, 1 + _div(k, 31), _mod(k, 31) + 1);
-    k -= 186;
-  } else {
-    year -= 1;
-    k += 179;
-    if (start.leap == 1) k += 1;
+  // A Solar Hijri year starts in March of Gregorian year + 621: the date is in
+  // year gy − 621, or in the one before when it falls before that year's 1 Hamal.
+  var year = _dayNumberToGregorian(dayNumber).year - 621;
+  if (year >= _breaks.last || dayNumber < _nowruz(year)) year -= 1;
+  if (year < _breaks.first) {
+    throw ArgumentError.value(dayNumber, 'date', 'before the first Solar Hijri year this calendar covers');
   }
-  return SolarHijriDate(year, 7 + _div(k, 30), _mod(k, 30) + 1);
+  final k = dayNumber - _nowruz(year);
+  if (k >= (SolarHijriDate.isLeapYear(year) ? 366 : 365)) {
+    throw ArgumentError.value(dayNumber, 'date', 'after the last Solar Hijri year this calendar covers');
+  }
+  if (k <= 185) return SolarHijriDate(year, 1 + k ~/ 31, k % 31 + 1);
+  return SolarHijriDate(year, 7 + (k - 186) ~/ 30, (k - 186) % 30 + 1);
+}
+
+/// The day number of 1 Hamal of Solar Hijri [year].
+int _nowruz(int year) {
+  final start = _yearStart(year);
+  return _gregorianToDayNumber(start.gy, 3, start.march);
 }
 
 /// The Julian day number of a Gregorian date.

@@ -830,7 +830,7 @@ abstract class AppLocalizations {
   /// No description provided for @shiftClosed.
   ///
   /// In en, this message translates to:
-  /// **'Shift closed. Difference: {variance} AFN'**
+  /// **'Shift closed. Difference: {variance}'**
   String shiftClosed(String variance);
 
   /// No description provided for @errShiftNotOpen.
@@ -1978,6 +1978,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{amount} {currency}'**
   String moneyAmount(String amount, String currency);
+
+  /// No description provided for @shift.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get shift;
+
+  /// No description provided for @category.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get category;
+
+  /// No description provided for @syncIssueOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other data'**
+  String get syncIssueOther;
+
+  /// No description provided for @errAccountDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'This account is disabled. Ask the shop\'s owner.'**
+  String get errAccountDisabled;
+
+  /// No description provided for @timeZoneKarachi.
+  ///
+  /// In en, this message translates to:
+  /// **'Karachi time'**
+  String get timeZoneKarachi;
+
+  /// No description provided for @timeZoneTashkent.
+  ///
+  /// In en, this message translates to:
+  /// **'Tashkent time'**
+  String get timeZoneTashkent;
+
+  /// No description provided for @timeZoneDushanbe.
+  ///
+  /// In en, this message translates to:
+  /// **'Dushanbe time'**
+  String get timeZoneDushanbe;
+
+  /// No description provided for @timeZoneDubai.
+  ///
+  /// In en, this message translates to:
+  /// **'Dubai time'**
+  String get timeZoneDubai;
+
+  /// No description provided for @timeZoneTehran.
+  ///
+  /// In en, this message translates to:
+  /// **'Tehran time'**
+  String get timeZoneTehran;
+
+  /// No description provided for @timeZoneUtc.
+  ///
+  /// In en, this message translates to:
+  /// **'UTC'**
+  String get timeZoneUtc;
 }
 
 class _AppLocalizationsDelegate

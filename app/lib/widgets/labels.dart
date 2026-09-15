@@ -77,6 +77,12 @@ String unitLabel(AppLocalizations l, String id, String name) {
 /// A branch's time zone.
 String timeZoneLabel(AppLocalizations l, String zone) => switch (zone) {
       'Asia/Kabul' => l.timeZoneKabul,
+      'Asia/Karachi' => l.timeZoneKarachi,
+      'Asia/Tashkent' => l.timeZoneTashkent,
+      'Asia/Dushanbe' => l.timeZoneDushanbe,
+      'Asia/Dubai' => l.timeZoneDubai,
+      'Asia/Tehran' => l.timeZoneTehran,
+      'UTC' => l.timeZoneUtc,
       _ => zone,
     };
 

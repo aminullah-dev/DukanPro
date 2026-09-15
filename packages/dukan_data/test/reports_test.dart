@@ -76,7 +76,9 @@ void main() {
 
     final d = await reports.dashboard('B1');
     expect(d.lowStockCount, 1); // 2.5 kg of rice; the inactive product does not count
-    expect(d.topSellers.map((s) => (s.name, s.qtyLabel)), [('Soap', '3 piece'), ('Rice', '1.500 kg')]);
+    // Figures and unit ids: the app names the unit in the user's language.
+    expect(d.topSellers.map((s) => (s.name, formatQuantity(s.qtyMinor, s.decimalPlaces), s.unitId)),
+        [('Soap', '3', builtInUnits[0].id), ('Rice', '1.500', builtInUnits[1].id)]);
   });
 
   test("today is the branch's business day, not the device's", () async {

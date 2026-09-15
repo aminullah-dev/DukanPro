@@ -464,7 +464,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String shiftClosed(String variance) {
-    return 'Shift closed. Difference: $variance AFN';
+    return 'Shift closed. Difference: $variance';
   }
 
   @override
@@ -1095,4 +1095,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String moneyAmount(String amount, String currency) {
     return '$amount $currency';
   }
+
+  @override
+  String get shift => 'Shift';
+
+  @override
+  String get category => 'Category';
+
+  @override
+  String get syncIssueOther => 'Other data';
+
+  @override
+  String get errAccountDisabled =>
+      'This account is disabled. Ask the shop\'s owner.';
+
+  @override
+  String get timeZoneKarachi => 'Karachi time';
+
+  @override
+  String get timeZoneTashkent => 'Tashkent time';
+
+  @override
+  String get timeZoneDushanbe => 'Dushanbe time';
+
+  @override
+  String get timeZoneDubai => 'Dubai time';
+
+  @override
+  String get timeZoneTehran => 'Tehran time';
+
+  @override
+  String get timeZoneUtc => 'UTC';
 }
