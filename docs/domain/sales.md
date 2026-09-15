@@ -37,6 +37,18 @@
 12. **Payments** are cash, card or transfer (mobile money such as M-Paisa or HesabPay, or a bank transfer), one or several per sale. Change comes only from cash, and only cash counts toward a drawer.
 13. **Shifts.** A seller opens their own shift with the cash already in the drawer, one open shift per seller and branch (`SHIFT_ALREADY_OPEN`), and the POS sells only into it. A sale or a debt collection that names a shift must name the seller's own open shift in that branch (`SHIFT_NOT_OPEN`, `SHIFT_NOT_FOUND`). At the close the expected cash is the float, plus the cash of the shift's settled sales, plus the debts collected in it in cash; the variance is counted − expected (a shortage is negative). The till shows this as a shift report (Z-report). A till's shift syncs (insert to open, update to close), and the server works out its own expected cash from the rows that reached it.
 
+## Returns
+
+A return (refund) takes goods back from a settled sale. It is a new sale with negative lines and totals that names the original in `refund_of`; the original stays as it was. The till asks for it online (`POST /sales/{id}/refunds`), like a void.
+
+- It needs `sale.void` (owner, manager) in the sale's branch and a reason (`REFUND_REASON_REQUIRED`), recorded in the `sale.refunded` audit entry.
+- Of each product it takes back something, and no more than the sale sold less what earlier returns took back (`REFUND_EMPTY`, `REFUND_QTY_INVALID`).
+- It is worth each product's share of its line total (ROUND_HALF_UP), less the goods' share of the sale's discount. The return that takes the last of the goods takes exactly what is left of the sale's total, so the returns add up to the sale.
+- Stock comes back only for goods the sale took from stock.
+- What the customer still owes for the sale comes off their account first. The rest is paid out, in cash from the refunder's own open shift (`SHIFT_NOT_OPEN` without one) or by card or transfer (`REFUND_METHOD_INVALID` for anything else).
+- A voided sale or a return cannot be returned (`SALE_NOT_REFUNDABLE`). A return, and a sale that has returns, cannot be voided (`SALE_NOT_VOIDABLE`).
+- Reports count a return as the negative sale it is, and the drawer's expected cash counts its cash going out.
+
 ## Error codes
 
 | Code | When |

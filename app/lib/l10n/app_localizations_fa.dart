@@ -556,6 +556,58 @@ class AppLocalizationsFa extends AppLocalizations {
   String get saleVoidedOk => 'فروش باطل شد.';
 
   @override
+  String get returnItems => 'بازگشت کالا';
+
+  @override
+  String get returnTitle => 'پس گرفتن کالا';
+
+  @override
+  String returnUpTo(String qty) {
+    return 'تا $qty';
+  }
+
+  @override
+  String get returnPayBack => 'بازپرداخت با';
+
+  @override
+  String returnWorth(String amount) {
+    return 'ارزش: $amount';
+  }
+
+  @override
+  String get returnConfirm => 'پس گرفتن';
+
+  @override
+  String returnDoneGiveBack(String amount) {
+    return 'کالا پس گرفته شد. $amount پس بدهید.';
+  }
+
+  @override
+  String get returnDoneAccount => 'کالا پس گرفته شد و از حساب مشتری کم شد.';
+
+  @override
+  String get returnNothingLeft =>
+      'همهٔ کالاهای این فروش پیش‌تر پس گرفته شده است.';
+
+  @override
+  String get returnLabel => 'برگشتی';
+
+  @override
+  String returnOf(String number) {
+    return 'برگشتی از $number';
+  }
+
+  @override
+  String get errRefundQty =>
+      'این بیشتر از مقداری است که برای پس گرفتن مانده است.';
+
+  @override
+  String get errSaleNotRefundable => 'از این فروش کالا پس گرفته نمی‌شود.';
+
+  @override
+  String get errRefundReason => 'بنویسید کالا چرا پس گرفته می‌شود.';
+
+  @override
   String get errSaleNotSynced =>
       'این فروش هنوز به سرور نرسیده است. همگام‌سازی کنید و دوباره تلاش کنید.';
 
@@ -564,7 +616,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get errVoidShiftClosed =>
-      'شیفت این فروش بسته شده و این فروش پول نقد گرفته است، پس باطل نمی‌شود.';
+      'شیفت این فروش بسته شده و این فروش پول نقد گرفته است، پس باطل نمی‌شود. کالا را با «بازگشت کالا» پس بگیرید.';
 
   @override
   String get language => 'زبان';
@@ -1742,6 +1794,58 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   String get saleVoidedOk => 'فروش باطل شد.';
 
   @override
+  String get returnItems => 'بازگشت کالا';
+
+  @override
+  String get returnTitle => 'پس گرفتن کالا';
+
+  @override
+  String returnUpTo(String qty) {
+    return 'تا $qty';
+  }
+
+  @override
+  String get returnPayBack => 'بازپرداخت با';
+
+  @override
+  String returnWorth(String amount) {
+    return 'ارزش: $amount';
+  }
+
+  @override
+  String get returnConfirm => 'پس گرفتن';
+
+  @override
+  String returnDoneGiveBack(String amount) {
+    return 'کالا پس گرفته شد. $amount پس بدهید.';
+  }
+
+  @override
+  String get returnDoneAccount => 'کالا پس گرفته شد و از حساب مشتری کم شد.';
+
+  @override
+  String get returnNothingLeft =>
+      'همهٔ کالاهای این فروش پیش‌تر پس گرفته شده است.';
+
+  @override
+  String get returnLabel => 'برگشتی';
+
+  @override
+  String returnOf(String number) {
+    return 'برگشتی از $number';
+  }
+
+  @override
+  String get errRefundQty =>
+      'این بیشتر از مقداری است که برای پس گرفتن مانده است.';
+
+  @override
+  String get errSaleNotRefundable => 'از این فروش کالا پس گرفته نمی‌شود.';
+
+  @override
+  String get errRefundReason => 'بنویسید کالا چرا پس گرفته می‌شود.';
+
+  @override
   String get errSaleNotSynced =>
       'این فروش هنوز به سرور نرسیده است. همگام‌سازی کنید و دوباره تلاش کنید.';
 
@@ -1750,7 +1854,7 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get errVoidShiftClosed =>
-      'شیفت این فروش بسته شده و این فروش پول نقد گرفته است، پس باطل نمی‌شود.';
+      'شیفت این فروش بسته شده و این فروش پول نقد گرفته است، پس باطل نمی‌شود. کالا را با «بازگشت کالا» پس بگیرید.';
 
   @override
   String get language => 'زبان';

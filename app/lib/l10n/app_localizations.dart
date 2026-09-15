@@ -1001,6 +1001,90 @@ abstract class AppLocalizations {
   /// **'The sale was voided.'**
   String get saleVoidedOk;
 
+  /// No description provided for @returnItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Return items'**
+  String get returnItems;
+
+  /// No description provided for @returnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take goods back'**
+  String get returnTitle;
+
+  /// No description provided for @returnUpTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {qty}'**
+  String returnUpTo(String qty);
+
+  /// No description provided for @returnPayBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay back by'**
+  String get returnPayBack;
+
+  /// No description provided for @returnWorth.
+  ///
+  /// In en, this message translates to:
+  /// **'Worth {amount}'**
+  String returnWorth(String amount);
+
+  /// No description provided for @returnConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Take back'**
+  String get returnConfirm;
+
+  /// No description provided for @returnDoneGiveBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned. Give back {amount}.'**
+  String returnDoneGiveBack(String amount);
+
+  /// No description provided for @returnDoneAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned. It came off the customer\'s account.'**
+  String get returnDoneAccount;
+
+  /// No description provided for @returnNothingLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything from this sale has come back already.'**
+  String get returnNothingLeft;
+
+  /// No description provided for @returnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Return'**
+  String get returnLabel;
+
+  /// No description provided for @returnOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Return of {number}'**
+  String returnOf(String number);
+
+  /// No description provided for @errRefundQty.
+  ///
+  /// In en, this message translates to:
+  /// **'That is more than is left to take back.'**
+  String get errRefundQty;
+
+  /// No description provided for @errSaleNotRefundable.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods can\'t be taken back from this sale.'**
+  String get errSaleNotRefundable;
+
+  /// No description provided for @errRefundReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Write why the goods come back.'**
+  String get errRefundReason;
+
   /// No description provided for @errSaleNotSynced.
   ///
   /// In en, this message translates to:
@@ -1016,7 +1100,7 @@ abstract class AppLocalizations {
   /// No description provided for @errVoidShiftClosed.
   ///
   /// In en, this message translates to:
-  /// **'This sale\'s shift is already closed and the sale took cash, so it can\'t be voided.'**
+  /// **'This sale\'s shift is already closed and the sale took cash, so it can\'t be voided. Take the goods back with Return items instead.'**
   String get errVoidShiftClosed;
 
   /// No description provided for @language.

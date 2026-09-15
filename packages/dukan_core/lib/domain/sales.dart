@@ -172,3 +172,43 @@ void assertDiscountValid({required int discountMinor, required int subtotalMinor
 void assertShiftCashValid({required int amountMinor}) {
   if (amountMinor < 0) throw ValidationError('SHIFT_CASH_INVALID', {'amount': amountMinor});
 }
+
+/// [a] × [b] / [denominator], half away from zero, without a 64-bit product.
+int _mulDivRoundHalfUp(int a, int b, int denominator) {
+  final n = BigInt.from(a) * BigInt.from(b);
+  final d = BigInt.from(denominator);
+  final magnitude = (n.abs() * BigInt.two + d) ~/ (d * BigInt.two);
+  return (n.isNegative ? -magnitude : magnitude).toInt();
+}
+
+/// What [returnedQtyMinor] of goods sold as [soldQtyMinor] for [lineTotalMinor]
+/// is worth: the same share of the line's total, ROUND_HALF_UP. Mirrors
+/// returned_value_minor.
+int returnedValueMinor({required int lineTotalMinor, required int soldQtyMinor, required int returnedQtyMinor}) =>
+    soldQtyMinor <= 0 ? 0 : _mulDivRoundHalfUp(lineTotalMinor, returnedQtyMinor, soldQtyMinor);
+
+/// The money a return gives back: the returned goods' value less their share
+/// of the sale's discount. Mirrors refund_total_minor.
+int refundTotalMinor({required int grossMinor, required int saleSubtotalMinor, required int saleDiscountMinor}) =>
+    saleSubtotalMinor <= 0 || saleDiscountMinor == 0
+        ? grossMinor
+        : grossMinor - _mulDivRoundHalfUp(saleDiscountMinor, grossMinor, saleSubtotalMinor);
+
+/// A return says why and takes back at least one thing, and of each product no
+/// more than the sale sold less what earlier returns took back. Mirrors
+/// assert_refund_valid.
+void assertRefundValid({
+  required String reason,
+  required Map<String, int> wanted,
+  required Map<String, int> returnable,
+}) {
+  if (reason.trim().isEmpty) throw ValidationError('REFUND_REASON_REQUIRED');
+  if (wanted.isEmpty) throw ValidationError('REFUND_EMPTY');
+  for (final entry in wanted.entries) {
+    final left = returnable[entry.key] ?? 0;
+    if (entry.value <= 0 || entry.value > left) {
+      throw ValidationError('REFUND_QTY_INVALID', {'product_id': entry.key, 'returnable': left});
+    }
+  }
+}
+

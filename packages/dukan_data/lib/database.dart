@@ -123,6 +123,9 @@ class Sales extends Table with RecordColumns {
   IntColumn get paidMinor => integer().withDefault(const Constant(0))();
   IntColumn get changeMinor => integer().withDefault(const Constant(0))();
   DateTimeColumn get occurredAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// A return: the sale it takes goods back from. Only the server writes returns.
+  TextColumn get refundOf => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -262,7 +265,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -323,6 +326,9 @@ class AppDatabase extends _$AppDatabase {
                 await m.addColumn(syncStates, column);
               }
             }
+          }
+          if (from < 13 && !await _hasColumn('sales', 'refund_of')) {
+            await m.addColumn(sales, sales.refundOf);
           }
         },
       );

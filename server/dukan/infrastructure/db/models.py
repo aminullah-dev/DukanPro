@@ -163,6 +163,8 @@ class SaleModel(RecordMixin, Base):
     paid_minor: Mapped[int] = mapped_column(BigInteger, default=0)
     change_minor: Mapped[int] = mapped_column(BigInteger, default=0)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # A return: the sale it takes goods back from (docs/domain/sales.md).
+    refund_of: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
 
 
 class SaleLineModel(RecordMixin, Base):

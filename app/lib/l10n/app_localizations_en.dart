@@ -558,6 +558,59 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saleVoidedOk => 'The sale was voided.';
 
   @override
+  String get returnItems => 'Return items';
+
+  @override
+  String get returnTitle => 'Take goods back';
+
+  @override
+  String returnUpTo(String qty) {
+    return 'Up to $qty';
+  }
+
+  @override
+  String get returnPayBack => 'Pay back by';
+
+  @override
+  String returnWorth(String amount) {
+    return 'Worth $amount';
+  }
+
+  @override
+  String get returnConfirm => 'Take back';
+
+  @override
+  String returnDoneGiveBack(String amount) {
+    return 'Returned. Give back $amount.';
+  }
+
+  @override
+  String get returnDoneAccount =>
+      'Returned. It came off the customer\'s account.';
+
+  @override
+  String get returnNothingLeft =>
+      'Everything from this sale has come back already.';
+
+  @override
+  String get returnLabel => 'Return';
+
+  @override
+  String returnOf(String number) {
+    return 'Return of $number';
+  }
+
+  @override
+  String get errRefundQty => 'That is more than is left to take back.';
+
+  @override
+  String get errSaleNotRefundable =>
+      'Goods can\'t be taken back from this sale.';
+
+  @override
+  String get errRefundReason => 'Write why the goods come back.';
+
+  @override
   String get errSaleNotSynced =>
       'This sale hasn\'t reached the server yet. Sync, then try again.';
 
@@ -566,7 +619,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errVoidShiftClosed =>
-      'This sale\'s shift is already closed and the sale took cash, so it can\'t be voided.';
+      'This sale\'s shift is already closed and the sale took cash, so it can\'t be voided. Take the goods back with Return items instead.';
 
   @override
   String get language => 'Language';

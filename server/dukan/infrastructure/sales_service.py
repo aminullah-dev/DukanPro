@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from dukan.application.access import require_any_permission, require_permission
 from dukan.application.sales import (
     PaymentInput,
+    RefundLineInput,
     SaleLineInput,
     SaleLineView,
     SalesService,
@@ -29,11 +30,14 @@ from dukan.domain.sales import (
     SaleLine,
     assert_discount_valid,
     assert_payment_valid,
+    assert_refund_valid,
     assert_sale_lines_valid,
     assert_sale_not_overpaid,
     assert_settleable,
     assert_shift_cash_valid,
     compute_totals,
+    refund_total_minor,
+    returned_value_minor,
 )
 from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import (
@@ -54,6 +58,9 @@ from dukan.shared.errors import ConflictError, NotFoundError, ValidationError
 from dukan.shared.ids import new_id
 
 _POLICY = PermissionPolicy()
+
+# How money goes back on a return; only cash comes out of a drawer.
+_REFUND_METHODS = ("cash", "card", "transfer")
 
 
 class SqlSalesService(SalesService):
@@ -109,6 +116,13 @@ class SqlSalesService(SalesService):
             for r in rows
         )
 
+    def _has_refunds(self, sale_id: str) -> bool:
+        return self._s.scalar(
+            select(SaleModel.id)
+            .where(SaleModel.refund_of == sale_id, SaleModel.deleted_at.is_(None))
+            .limit(1)
+        ) is not None
+
     def _view(self, sale: SaleModel) -> SaleView:
         lines = self._s.scalars(
             select(SaleLineModel).where(SaleLineModel.sale_id == sale.id)
@@ -119,6 +133,7 @@ class SqlSalesService(SalesService):
             discount_minor=sale.discount_minor, total_minor=sale.total_minor,
             paid_minor=sale.paid_minor, change_minor=sale.change_minor,
             customer_id=sale.customer_id,
+            refund_of=sale.refund_of,
             lines=tuple(
                 SaleLineView(
                     product_id=l.product_id, name=l.name, qty_minor=l.qty_minor,
@@ -298,6 +313,12 @@ class SqlSalesService(SalesService):
             raise ValidationError("SALE_VOID_REASON_REQUIRED")
         if sale.status != "settled":
             raise ConflictError("SALE_NOT_VOIDABLE", status=sale.status)
+        # A return is not voided, and a sale with returns is past voiding: its
+        # goods and money have moved again since.
+        if sale.refund_of is not None:
+            raise ConflictError("SALE_NOT_VOIDABLE", status="refund")
+        if self._has_refunds(sale.id):
+            raise ConflictError("SALE_NOT_VOIDABLE", status="refunded")
         shift = (
             self._s.scalar(
                 select(ShiftModel).where(ShiftModel.id == sale.shift_id).with_for_update()
@@ -378,6 +399,176 @@ class SqlSalesService(SalesService):
         )
         self._s.commit()
         return self._view(sale)
+
+    def refund_sale(
+        self, *, actor: User, sale_id: str, lines: list[RefundLineInput], reason: str,
+        method: str, shift_id: str | None,
+    ) -> SaleView:
+        # Locked: two returns of one sale, or a return racing a void, take turns.
+        sale = self._s.scalar(select(SaleModel).where(SaleModel.id == sale_id).with_for_update())
+        if sale is None or sale.deleted_at is not None:
+            raise NotFoundError("SALE_NOT_FOUND", sale_id=sale_id)
+        # Money leaves the shop: a manager's call, in the sale's own branch.
+        require_permission(_POLICY, actor, Permission.SALE_VOID, sale.branch_id)
+        require_active_branch(self._s, sale.branch_id)
+        if sale.status != "settled" or sale.refund_of is not None:
+            raise ConflictError("SALE_NOT_REFUNDABLE", status=sale.status)
+        if method not in _REFUND_METHODS:
+            raise ValidationError("REFUND_METHOD_INVALID", method=method)
+
+        # What the sale sold of each product, and what earlier returns took back.
+        sold_qty: dict[str, int] = {}
+        sold_value: dict[str, int] = {}
+        source: dict[str, SaleLineModel] = {}
+        for line in self._s.scalars(
+            select(SaleLineModel).where(
+                SaleLineModel.sale_id == sale.id, SaleLineModel.deleted_at.is_(None)
+            )
+        ):
+            sold_qty[line.product_id] = sold_qty.get(line.product_id, 0) + line.qty_minor
+            sold_value[line.product_id] = (
+                sold_value.get(line.product_id, 0) + line.line_total_minor
+            )
+            source.setdefault(line.product_id, line)
+        earlier = self._s.scalars(
+            select(SaleModel).where(SaleModel.refund_of == sale.id, SaleModel.deleted_at.is_(None))
+        ).all()
+        earlier_ids = [r.id for r in earlier]
+        returned: dict[str, int] = {}
+        if earlier_ids:
+            for line in self._s.scalars(
+                select(SaleLineModel).where(
+                    SaleLineModel.sale_id.in_(earlier_ids), SaleLineModel.deleted_at.is_(None)
+                )
+            ):
+                returned[line.product_id] = returned.get(line.product_id, 0) - line.qty_minor
+        returnable = {p: q - returned.get(p, 0) for p, q in sold_qty.items()}
+        wanted: dict[str, int] = {}
+        for item in lines:
+            wanted[item.product_id] = wanted.get(item.product_id, 0) + item.qty_minor
+        assert_refund_valid(reason=reason, wanted=wanted, returnable=returnable)
+
+        values = {
+            p: returned_value_minor(
+                line_total_minor=sold_value[p], sold_qty_minor=sold_qty[p], returned_qty_minor=q
+            )
+            for p, q in wanted.items()
+        }
+        gross = sum(values.values())
+        left_of_total = sale.total_minor + sum(r.total_minor for r in earlier)  # returns are < 0
+        if all(returnable[p] == wanted.get(p, 0) for p in returnable):
+            # The last return takes what is left, so rounding never strands a coin.
+            total = left_of_total
+        else:
+            total = min(
+                refund_total_minor(
+                    gross_minor=gross, sale_subtotal_minor=sale.subtotal_minor,
+                    sale_discount_minor=sale.discount_minor,
+                ),
+                left_of_total,
+            )
+
+        # Row locks before the feed lock, in the void's order: the sale, the drawer,
+        # the customer (docs/sync-protocol.md).
+        shift = (
+            require_open_shift(
+                self._s, shift_id=shift_id, user_id=actor.id, branch_id=sale.branch_id
+            )
+            if shift_id is not None else None
+        )
+        # What the customer still owes for this sale comes off first: a return
+        # never pays out money the shop has not been paid.
+        debt_back = 0
+        if sale.customer_id is not None:
+            charged = int(self._s.scalar(
+                select(func.coalesce(func.sum(CustomerLedgerModel.amount_minor), 0)).where(
+                    CustomerLedgerModel.type == "charge", CustomerLedgerModel.ref_type == "sale",
+                    CustomerLedgerModel.ref_id == sale.id, CustomerLedgerModel.deleted_at.is_(None),
+                )
+            ) or 0)
+            taken_back = 0
+            if earlier_ids:
+                taken_back = -int(self._s.scalar(
+                    select(func.coalesce(func.sum(CustomerLedgerModel.amount_minor), 0)).where(
+                        CustomerLedgerModel.ref_type == "refund",
+                        CustomerLedgerModel.ref_id.in_(earlier_ids),
+                        CustomerLedgerModel.deleted_at.is_(None),
+                    )
+                ) or 0)
+            if charged > taken_back:
+                self._s.scalar(
+                    select(CustomerModel.id)
+                    .where(CustomerModel.id == sale.customer_id)
+                    .with_for_update()
+                )
+                owed = self._customer_balance(sale.customer_id)
+                debt_back = max(0, min(total, charged - taken_back, owed))
+        money_back = total - debt_back
+        if money_back > 0 and method == "cash" and shift is None:
+            # Cash comes out of a drawer: the refunder's own open shift on this till.
+            raise ConflictError("SHIFT_NOT_OPEN", shift_id=None)
+
+        refund = SaleModel(
+            id=new_id(), number=self._next_number(), branch_id=sale.branch_id,
+            shift_id=shift.id if shift is not None else None, customer_id=sale.customer_id,
+            status="settled", currency=sale.currency, discount_minor=-(gross - total),
+            subtotal_minor=-gross, tax_minor=0, total_minor=-total, paid_minor=-money_back,
+            change_minor=0, refund_of=sale.id, created_by=actor.id, updated_by=actor.id,
+        )
+        self._s.add(refund)
+        record_change(self._s, "sales", refund, op="insert", branch_id=sale.branch_id)
+        for product_id, qty in wanted.items():
+            src = source[product_id]
+            line_row = SaleLineModel(
+                id=new_id(), sale_id=refund.id, product_id=product_id, name=src.name,
+                qty_minor=-qty, decimal_places=src.decimal_places,
+                unit_price_minor=src.unit_price_minor, unit_cost_minor=src.unit_cost_minor,
+                line_total_minor=-values[product_id], currency=src.currency, created_by=actor.id,
+            )
+            self._s.add(line_row)
+            record_change(self._s, "sale_lines", line_row, op="insert", branch_id=sale.branch_id)
+        # Goods come back to stock only if the sale took them from stock.
+        moved = set(self._s.scalars(
+            select(StockMovementModel.product_id).where(
+                StockMovementModel.ref_type == "sale", StockMovementModel.ref_id == sale.id,
+                StockMovementModel.deleted_at.is_(None),
+            )
+        ))
+        for product_id, qty in wanted.items():
+            if product_id not in moved:
+                continue
+            back = StockMovementModel(
+                id=new_id(), product_id=product_id, branch_id=sale.branch_id, qty_delta=qty,
+                reason="returned", ref_type="refund", ref_id=refund.id, created_by=actor.id,
+            )
+            self._s.add(back)
+            record_change(self._s, "stock_movements", back, op="insert", branch_id=sale.branch_id)
+        if debt_back > 0 and sale.customer_id is not None:
+            undo = CustomerLedgerModel(
+                id=new_id(), customer_id=sale.customer_id, type="adjustment",
+                amount_minor=-debt_back, currency=sale.currency, ref_type="refund",
+                ref_id=refund.id, created_by=actor.id,
+            )
+            self._s.add(undo)
+            record_change(self._s, "customer_ledger", undo, op="insert", branch_id=None)
+        if money_back > 0:
+            payment = PaymentModel(
+                id=new_id(), sale_id=refund.id, method=method, amount_minor=-money_back,
+                currency=sale.currency, created_by=actor.id,
+            )
+            self._s.add(payment)
+            record_change(self._s, "payments", payment, op="insert", branch_id=sale.branch_id)
+        self._audit(
+            "sale.refunded", actor.id, sale.id,
+            {
+                "refund_id": refund.id, "number": refund.number, "total": total,
+                "method": method, "reason": reason.strip(),
+                **({"debt_reversed": debt_back} if debt_back else {}),
+                **({"money_back": money_back} if money_back else {}),
+            },
+        )
+        self._s.commit()
+        return self._view(refund)
 
     def get_sale(self, *, actor: User, sale_id: str) -> SaleView:
         sale = self._s.get(SaleModel, sale_id)

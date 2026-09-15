@@ -200,6 +200,28 @@ final class LocalSales {
   Future<List<SaleLineRow>> saleLinesFor(String saleId) =>
       (_db.select(_db.saleLines)..where((t) => t.saleId.equals(saleId))).get();
 
+  /// The sale with [id], such as the one a return takes goods back from.
+  Future<SaleRow?> byId(String id) => (_db.select(_db.sales)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  /// The returns this device knows of for [saleId]: sales that name it in refund_of.
+  Future<List<SaleRow>> returnsOf(String saleId) => (_db.select(_db.sales)
+        ..where((t) => t.refundOf.equals(saleId) & t.deletedAt.isNull()))
+      .get();
+
+  /// What of each product [saleId] can still take back: what it sold, less what
+  /// its returns took back (their lines are negative).
+  Future<Map<String, int>> returnable(String saleId) async {
+    final ids = [saleId, for (final r in await returnsOf(saleId)) r.id];
+    final lines = await (_db.select(_db.saleLines)
+          ..where((t) => t.saleId.isIn(ids) & t.deletedAt.isNull()))
+        .get();
+    final left = <String, int>{};
+    for (final line in lines) {
+      left[line.productId] = (left[line.productId] ?? 0) + line.qtyMinor;
+    }
+    return left;
+  }
+
   Future<int> _customerBalance(String customerId) async {
     final rows = await (_db.select(_db.customerLedger)
           ..where((t) => t.customerId.equals(customerId) & t.deletedAt.isNull()))

@@ -4164,6 +4164,12 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _refundOfMeta =
+      const VerificationMeta('refundOf');
+  @override
+  late final GeneratedColumn<String> refundOf = GeneratedColumn<String>(
+      'refund_of', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4185,7 +4191,8 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
         totalMinor,
         paidMinor,
         changeMinor,
-        occurredAt
+        occurredAt,
+        refundOf
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4294,6 +4301,10 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
           occurredAt.isAcceptableOrUnknown(
               data['occurred_at']!, _occurredAtMeta));
     }
+    if (data.containsKey('refund_of')) {
+      context.handle(_refundOfMeta,
+          refundOf.isAcceptableOrUnknown(data['refund_of']!, _refundOfMeta));
+    }
     return context;
   }
 
@@ -4343,6 +4354,8 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
           .read(DriftSqlType.int, data['${effectivePrefix}change_minor'])!,
       occurredAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}occurred_at'])!,
+      refundOf: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}refund_of']),
     );
   }
 
@@ -4373,6 +4386,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
   final int paidMinor;
   final int changeMinor;
   final DateTime occurredAt;
+
+  /// A return: the sale it takes goods back from. Only the server writes returns.
+  final String? refundOf;
   const SaleRow(
       {required this.id,
       required this.createdAt,
@@ -4393,7 +4409,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       required this.totalMinor,
       required this.paidMinor,
       required this.changeMinor,
-      required this.occurredAt});
+      required this.occurredAt,
+      this.refundOf});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4427,6 +4444,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
     map['paid_minor'] = Variable<int>(paidMinor);
     map['change_minor'] = Variable<int>(changeMinor);
     map['occurred_at'] = Variable<DateTime>(occurredAt);
+    if (!nullToAbsent || refundOf != null) {
+      map['refund_of'] = Variable<String>(refundOf);
+    }
     return map;
   }
 
@@ -4462,6 +4482,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       paidMinor: Value(paidMinor),
       changeMinor: Value(changeMinor),
       occurredAt: Value(occurredAt),
+      refundOf: refundOf == null && nullToAbsent
+          ? const Value.absent()
+          : Value(refundOf),
     );
   }
 
@@ -4489,6 +4512,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       paidMinor: serializer.fromJson<int>(json['paidMinor']),
       changeMinor: serializer.fromJson<int>(json['changeMinor']),
       occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
+      refundOf: serializer.fromJson<String?>(json['refundOf']),
     );
   }
   @override
@@ -4515,6 +4539,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       'paidMinor': serializer.toJson<int>(paidMinor),
       'changeMinor': serializer.toJson<int>(changeMinor),
       'occurredAt': serializer.toJson<DateTime>(occurredAt),
+      'refundOf': serializer.toJson<String?>(refundOf),
     };
   }
 
@@ -4538,7 +4563,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           int? totalMinor,
           int? paidMinor,
           int? changeMinor,
-          DateTime? occurredAt}) =>
+          DateTime? occurredAt,
+          Value<String?> refundOf = const Value.absent()}) =>
       SaleRow(
         id: id ?? this.id,
         createdAt: createdAt ?? this.createdAt,
@@ -4560,6 +4586,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
         paidMinor: paidMinor ?? this.paidMinor,
         changeMinor: changeMinor ?? this.changeMinor,
         occurredAt: occurredAt ?? this.occurredAt,
+        refundOf: refundOf.present ? refundOf.value : this.refundOf,
       );
   SaleRow copyWithCompanion(SalesCompanion data) {
     return SaleRow(
@@ -4591,6 +4618,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           data.changeMinor.present ? data.changeMinor.value : this.changeMinor,
       occurredAt:
           data.occurredAt.present ? data.occurredAt.value : this.occurredAt,
+      refundOf: data.refundOf.present ? data.refundOf.value : this.refundOf,
     );
   }
 
@@ -4616,33 +4644,36 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           ..write('totalMinor: $totalMinor, ')
           ..write('paidMinor: $paidMinor, ')
           ..write('changeMinor: $changeMinor, ')
-          ..write('occurredAt: $occurredAt')
+          ..write('occurredAt: $occurredAt, ')
+          ..write('refundOf: $refundOf')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      createdAt,
-      updatedAt,
-      deletedAt,
-      createdBy,
-      updatedBy,
-      version,
-      number,
-      branchId,
-      shiftId,
-      customerId,
-      status,
-      currency,
-      discountMinor,
-      subtotalMinor,
-      taxMinor,
-      totalMinor,
-      paidMinor,
-      changeMinor,
-      occurredAt);
+  int get hashCode => Object.hashAll([
+        id,
+        createdAt,
+        updatedAt,
+        deletedAt,
+        createdBy,
+        updatedBy,
+        version,
+        number,
+        branchId,
+        shiftId,
+        customerId,
+        status,
+        currency,
+        discountMinor,
+        subtotalMinor,
+        taxMinor,
+        totalMinor,
+        paidMinor,
+        changeMinor,
+        occurredAt,
+        refundOf
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4666,7 +4697,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           other.totalMinor == this.totalMinor &&
           other.paidMinor == this.paidMinor &&
           other.changeMinor == this.changeMinor &&
-          other.occurredAt == this.occurredAt);
+          other.occurredAt == this.occurredAt &&
+          other.refundOf == this.refundOf);
 }
 
 class SalesCompanion extends UpdateCompanion<SaleRow> {
@@ -4690,6 +4722,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
   final Value<int> paidMinor;
   final Value<int> changeMinor;
   final Value<DateTime> occurredAt;
+  final Value<String?> refundOf;
   final Value<int> rowid;
   const SalesCompanion({
     this.id = const Value.absent(),
@@ -4712,6 +4745,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     this.paidMinor = const Value.absent(),
     this.changeMinor = const Value.absent(),
     this.occurredAt = const Value.absent(),
+    this.refundOf = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SalesCompanion.insert({
@@ -4735,6 +4769,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     this.paidMinor = const Value.absent(),
     this.changeMinor = const Value.absent(),
     this.occurredAt = const Value.absent(),
+    this.refundOf = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         number = Value(number),
@@ -4760,6 +4795,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     Expression<int>? paidMinor,
     Expression<int>? changeMinor,
     Expression<DateTime>? occurredAt,
+    Expression<String>? refundOf,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4783,6 +4819,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       if (paidMinor != null) 'paid_minor': paidMinor,
       if (changeMinor != null) 'change_minor': changeMinor,
       if (occurredAt != null) 'occurred_at': occurredAt,
+      if (refundOf != null) 'refund_of': refundOf,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4808,6 +4845,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       Value<int>? paidMinor,
       Value<int>? changeMinor,
       Value<DateTime>? occurredAt,
+      Value<String?>? refundOf,
       Value<int>? rowid}) {
     return SalesCompanion(
       id: id ?? this.id,
@@ -4830,6 +4868,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       paidMinor: paidMinor ?? this.paidMinor,
       changeMinor: changeMinor ?? this.changeMinor,
       occurredAt: occurredAt ?? this.occurredAt,
+      refundOf: refundOf ?? this.refundOf,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4897,6 +4936,9 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     if (occurredAt.present) {
       map['occurred_at'] = Variable<DateTime>(occurredAt.value);
     }
+    if (refundOf.present) {
+      map['refund_of'] = Variable<String>(refundOf.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4926,6 +4968,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
           ..write('paidMinor: $paidMinor, ')
           ..write('changeMinor: $changeMinor, ')
           ..write('occurredAt: $occurredAt, ')
+          ..write('refundOf: $refundOf, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12124,6 +12167,7 @@ typedef $$SalesTableCreateCompanionBuilder = SalesCompanion Function({
   Value<int> paidMinor,
   Value<int> changeMinor,
   Value<DateTime> occurredAt,
+  Value<String?> refundOf,
   Value<int> rowid,
 });
 typedef $$SalesTableUpdateCompanionBuilder = SalesCompanion Function({
@@ -12147,6 +12191,7 @@ typedef $$SalesTableUpdateCompanionBuilder = SalesCompanion Function({
   Value<int> paidMinor,
   Value<int> changeMinor,
   Value<DateTime> occurredAt,
+  Value<String?> refundOf,
   Value<int> rowid,
 });
 
@@ -12217,6 +12262,9 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
 
   ColumnFilters<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get refundOf => $composableBuilder(
+      column: $table.refundOf, builder: (column) => ColumnFilters(column));
 }
 
 class $$SalesTableOrderingComposer
@@ -12289,6 +12337,9 @@ class $$SalesTableOrderingComposer
 
   ColumnOrderings<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get refundOf => $composableBuilder(
+      column: $table.refundOf, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SalesTableAnnotationComposer
@@ -12359,6 +12410,9 @@ class $$SalesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => column);
+
+  GeneratedColumn<String> get refundOf =>
+      $composableBuilder(column: $table.refundOf, builder: (column) => column);
 }
 
 class $$SalesTableTableManager extends RootTableManager<
@@ -12404,6 +12458,7 @@ class $$SalesTableTableManager extends RootTableManager<
             Value<int> paidMinor = const Value.absent(),
             Value<int> changeMinor = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
+            Value<String?> refundOf = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SalesCompanion(
@@ -12427,6 +12482,7 @@ class $$SalesTableTableManager extends RootTableManager<
             paidMinor: paidMinor,
             changeMinor: changeMinor,
             occurredAt: occurredAt,
+            refundOf: refundOf,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -12450,6 +12506,7 @@ class $$SalesTableTableManager extends RootTableManager<
             Value<int> paidMinor = const Value.absent(),
             Value<int> changeMinor = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
+            Value<String?> refundOf = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SalesCompanion.insert(
@@ -12473,6 +12530,7 @@ class $$SalesTableTableManager extends RootTableManager<
             paidMinor: paidMinor,
             changeMinor: changeMinor,
             occurredAt: occurredAt,
+            refundOf: refundOf,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

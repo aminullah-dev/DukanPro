@@ -410,7 +410,7 @@ final class SyncEngine {
           discountMinor: _opt(d, 'discount_minor', _i), subtotalMinor: _opt(d, 'subtotal_minor', _i),
           taxMinor: _opt(d, 'tax_minor', _i), totalMinor: _opt(d, 'total_minor', _i),
           paidMinor: _opt(d, 'paid_minor', _i), changeMinor: _opt(d, 'change_minor', _i),
-          occurredAt: _opt(d, 'occurred_at', _t),
+          occurredAt: _opt(d, 'occurred_at', _t), refundOf: _opt(d, 'refund_of', _sN),
         ));
       case 'sale_lines':
         await _write(_db.saleLines, id, exists, SaleLinesCompanion(

@@ -21,6 +21,16 @@ class _Api implements SalesApi {
     calls.add('$saleId: $reason');
     if (refusal != null) throw refusal!;
   }
+
+  @override
+  Future<RefundDone> refundSale(
+    String saleId, {
+    required Map<String, int> lines,
+    required String reason,
+    required String method,
+    String? shiftId,
+  }) =>
+      throw UnimplementedError('a void test takes nothing back');
 }
 
 SessionActor _actor(String role) => SessionActor(

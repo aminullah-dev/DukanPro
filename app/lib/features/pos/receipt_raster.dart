@@ -21,6 +21,7 @@ Future<RasterImage> rasterReceipt({
   required String zone,
   required int paperMm,
   bool voided = false,
+  String? heading,
 }) async {
   final width = paperDots(paperMm);
   final solar = l.localeName.startsWith('fa') || l.localeName.startsWith('ps');
@@ -38,6 +39,7 @@ Future<RasterImage> rasterReceipt({
   final rows = <_Row>[
     _Centered(data.shopName, strong.copyWith(fontSize: size * 1.3), direction, inner),
     _Centered(ltr(data.number), base, direction, inner),
+    if (heading != null) _Centered(heading, strong, direction, inner),
     if (voided) _Centered(l.voided, strong, direction, inner),
     _Centered(formatDateTime(l, occurredAt, zone), base, direction, inner),
     // A paper that leaves the shop carries both calendars.

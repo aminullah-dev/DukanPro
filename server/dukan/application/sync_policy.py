@@ -86,7 +86,7 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
     "sales": (
         "number", "branch_id", "shift_id", "customer_id", "status", "currency",
         "discount_minor", "subtotal_minor", "tax_minor", "total_minor", "paid_minor",
-        "change_minor", "occurred_at",
+        "change_minor", "occurred_at", "refund_of",
     ),
     "sale_lines": (
         "sale_id", "product_id", "name", "qty_minor", "decimal_places", "unit_price_minor",

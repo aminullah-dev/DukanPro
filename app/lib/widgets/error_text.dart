@@ -61,6 +61,9 @@ String errorCodeText(AppLocalizations l, String code) =>
       // Asked of the server by a till: the sale has not synced there yet.
       'SALE_NOT_FOUND' => l.errSaleNotSynced,
       'SALE_VOID_REASON_REQUIRED' => l.errVoidReasonRequired,
+      'REFUND_QTY_INVALID' => l.errRefundQty,
+      'SALE_NOT_REFUNDABLE' => l.errSaleNotRefundable,
+      'REFUND_REASON_REQUIRED' => l.errRefundReason,
       _ when code.endsWith('_NOT_FOUND') => l.errNotFound,
       _ when code.endsWith('_VERSION_CONFLICT') || code == 'SYNC_ROW_EXISTS' => l.errConflict,
       _ when code.endsWith('_INVALID') || code.startsWith('SYNC_') || code == 'ROLE_UNKNOWN' => l.errInvalid,

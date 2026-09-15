@@ -41,6 +41,37 @@ final tillVoidProvider = Provider<TillVoid>((ref) => TillVoid(
       synced: () => !ref.read(syncControllerProvider).failed,
     ));
 
+/// Takes goods back from a sale at the till: online, like a void. The sale is
+/// pushed first, the return asked for, and the new negative sale pulled back.
+class TillRefund {
+  TillRefund({required this.api, required this.sync, required this.synced});
+  final SalesApi api;
+  final Future<void> Function() sync;
+
+  /// Whether the last [sync] reached the server.
+  final bool Function() synced;
+
+  Future<RefundDone> call(
+    String saleId, {
+    required Map<String, int> lines,
+    required String reason,
+    required String method,
+    String? shiftId,
+  }) async {
+    await sync();
+    if (!synced()) throw const NetworkException();
+    final done = await api.refundSale(saleId, lines: lines, reason: reason, method: method, shiftId: shiftId);
+    await sync();
+    return done;
+  }
+}
+
+final tillRefundProvider = Provider<TillRefund>((ref) => TillRefund(
+      api: ref.watch(salesApiProvider),
+      sync: () => ref.read(syncControllerProvider.notifier).syncNow(),
+      synced: () => !ref.read(syncControllerProvider).failed,
+    ));
+
 final localShiftsProvider = Provider<LocalShifts>((ref) => LocalShifts(ref.watch(databaseProvider)));
 
 /// The signed-in seller's open shift in their branch, or null: the POS sells

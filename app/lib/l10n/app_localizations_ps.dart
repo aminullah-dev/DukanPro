@@ -554,6 +554,60 @@ class AppLocalizationsPs extends AppLocalizations {
   String get saleVoidedOk => 'پلور باطل شو.';
 
   @override
+  String get returnItems => 'توکي ستنول';
+
+  @override
+  String get returnTitle => 'توکي بېرته اخیستل';
+
+  @override
+  String returnUpTo(String qty) {
+    return 'تر $qty پورې';
+  }
+
+  @override
+  String get returnPayBack => 'بېرته ورکړه په';
+
+  @override
+  String returnWorth(String amount) {
+    return 'ارزښت: $amount';
+  }
+
+  @override
+  String get returnConfirm => 'بېرته اخیستل';
+
+  @override
+  String returnDoneGiveBack(String amount) {
+    return 'توکي بېرته واخیستل شول. $amount بېرته ورکړئ.';
+  }
+
+  @override
+  String get returnDoneAccount =>
+      'توکي بېرته واخیستل شول او د پېرودونکي له حساب کم شول.';
+
+  @override
+  String get returnNothingLeft =>
+      'د دې پلور ټول توکي مخکې بېرته اخیستل شوي دي.';
+
+  @override
+  String get returnLabel => 'ستنول شوی';
+
+  @override
+  String returnOf(String number) {
+    return 'د $number ستنول';
+  }
+
+  @override
+  String get errRefundQty =>
+      'دا له هغه څه ډېر دی چې د بېرته اخیستلو لپاره پاتې دي.';
+
+  @override
+  String get errSaleNotRefundable =>
+      'له دې پلور څخه توکي نه شي بېرته اخیستل کېدای.';
+
+  @override
+  String get errRefundReason => 'ولیکئ چې توکي ولې بېرته اخیستل کېږي.';
+
+  @override
   String get errSaleNotSynced =>
       'دا پلور لا سرور ته نه دی رسېدلی. همغږي یې کړئ او بیا هڅه وکړئ.';
 
@@ -562,7 +616,7 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get errVoidShiftClosed =>
-      'د دې پلور شفټ تړل شوی او دې پلور نغدې پیسې اخیستې، نو نه باطلېږي.';
+      'د دې پلور شفټ تړل شوی او دې پلور نغدې پیسې اخیستې، نو نه باطلېږي. توکي د «توکي ستنول» له لارې بېرته واخلئ.';
 
   @override
   String get language => 'ژبه';

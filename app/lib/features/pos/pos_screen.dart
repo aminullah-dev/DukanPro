@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../widgets/digits.dart';
+import '../../widgets/bidi.dart';
 import '../../widgets/money.dart';
 import '../../widgets/dates.dart';
 import '../../widgets/labels.dart';
@@ -24,6 +25,7 @@ import '../read_models.dart';
 import 'pos_providers.dart';
 import 'receipt_builder.dart';
 import 'receipt_raster.dart';
+import 'return_sale.dart';
 import 'void_sale.dart';
 
 String _afn(int minor) => formatQuantity(minor, 2);
@@ -977,6 +979,27 @@ class _ReceiptDialog extends ConsumerStatefulWidget {
 class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
   bool _printing = false;
   late String _status = widget.sale.status; // voided from here, too
+  bool _hasReturns = false; // a sale with returns is past voiding
+  String? _returnOfNumber; // for a return: the sale it takes goods back from
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadReturns());
+  }
+
+  Future<void> _loadReturns() async {
+    final sales = ref.read(localSalesProvider);
+    final hasReturns = (await sales.returnsOf(widget.sale.id)).isNotEmpty;
+    final of = widget.sale.refundOf;
+    final original = of == null ? null : await sales.byId(of);
+    if (mounted) {
+      setState(() {
+        _hasReturns = hasReturns;
+        _returnOfNumber = original?.number;
+      });
+    }
+  }
 
   void _say(String message) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -991,12 +1014,16 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
     setState(() => _printing = true);
     try {
       final zone = ref.read(branchZoneProvider);
-      final data = buildReceipt(shopName: ref.read(shopNameProvider), sale: widget.sale, lines: widget.lines, zone: zone);
+      final data = buildReceipt(
+        shopName: ref.read(shopNameProvider), sale: widget.sale, lines: widget.lines, zone: zone,
+        footer: _returnOfNumber == null ? null : l.returnOf(ltr(_returnOfNumber!)),
+      );
       // Drawn in the reader's language: the printer has no Persian letters of its own.
       final image = await rasterReceipt(
         l: l, data: data, occurredAt: widget.sale.occurredAt, zone: zone,
         paperMm: ref.read(printerSettingsControllerProvider).asData?.value.paperMm ?? 80,
         voided: _status == 'voided',
+        heading: widget.sale.refundOf == null ? null : l.returnLabel,
       );
       // A printer that stops answering must not hold the till.
       await printer.printRaw(const EscPosEncoder().encodeRaster(image)).timeout(const Duration(seconds: 10));
@@ -1024,8 +1051,10 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
     return AlertDialog(
       scrollable: true,
       title: Column(children: [
-        Text(l.receipt),
+        Text(sale.refundOf == null ? l.receipt : l.returnLabel),
         Text(sale.number, style: Theme.of(context).textTheme.bodySmall),
+        if (_returnOfNumber != null)
+          Text(l.returnOf(ltr(_returnOfNumber!)), style: Theme.of(context).textTheme.bodySmall),
         if (_status == 'voided')
           Text(l.voided, style: TextStyle(color: Theme.of(context).colorScheme.error)),
       ]),
@@ -1056,9 +1085,17 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
         ),
       ),
       actions: [
+        ReturnItemsButton(
+          sale: sale,
+          lines: widget.lines,
+          settled: _status == 'settled',
+          onReturned: (_) {
+            if (mounted) setState(() => _hasReturns = true);
+          },
+        ),
         VoidSaleButton(
           saleId: sale.id,
-          settled: _status == 'settled',
+          settled: _status == 'settled' && widget.sale.refundOf == null && !_hasReturns,
           onVoided: () {
             if (mounted) setState(() => _status = 'voided');
           },
@@ -1101,7 +1138,7 @@ class _RecentSalesDialog extends StatelessWidget {
                   return ListTile(
                     dense: true,
                     title: Text(s.number, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(s.status == 'voided' ? '$time · ${l.voided}' : time),
+                    subtitle: Text([time, if (s.status == 'voided') l.voided, if (s.refundOf != null) l.returnLabel].join(' · ')),
                     trailing: Text(formatMoney(l, s.totalMinor, s.currency)),
                     onTap: () => Navigator.pop(context, s),
                   );
