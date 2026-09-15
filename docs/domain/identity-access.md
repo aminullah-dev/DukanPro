@@ -102,6 +102,7 @@ The server is authoritative; the device keeps just enough to work offline.
 
 - `DUKAN_SECRET_KEY` signs access tokens: at least 32 random characters, or the server refuses to start. Placeholder text such as `change-me` is refused too; `server/.env.example` leaves the key empty and shows how to generate one.
 - The first owner account needs the server's **setup code**: `DUKAN_BOOTSTRAP_TOKEN` (12+ characters) or, when unset, a code the server logs at startup. Nobody who cannot read the server's console can claim a fresh server.
+  - The logged code comes from `DUKAN_SECRET_KEY`, so every server worker and every restart shows the same one.
 
 ## Sync class
 

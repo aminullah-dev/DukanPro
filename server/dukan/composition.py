@@ -8,8 +8,10 @@ uvicorn entrypoint: `dukan.composition:app`.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
-import secrets
 from collections.abc import Awaitable, Callable, Iterator
 
 from fastapi import FastAPI, Request, Response
@@ -68,6 +70,14 @@ from dukan.ui.routers import (
 )
 
 
+def first_run_code(secret_key: str) -> str:
+    """The setup code a fresh server asks for when DUKAN_BOOTSTRAP_TOKEN is unset.
+    It comes from the secret key, so every worker and every restart logs the same
+    code: a random one per worker would fail the setup whenever it reached another."""
+    digest = hmac.new(secret_key.encode(), b"dukan first-run setup code", hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode()[:16]
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
@@ -79,7 +89,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_factory = session_factory
     # Only whoever can read this server's console (or set DUKAN_BOOTSTRAP_TOKEN)
     # can claim a fresh server as its owner.
-    setup_token = settings.bootstrap_token or secrets.token_urlsafe(12)
+    setup_token = settings.bootstrap_token or first_run_code(settings.secret_key)
     if settings.bootstrap_token is None:
         logging.getLogger("dukan").warning(
             "First-run setup code: %s (enter it in the app to create the owner account;"
