@@ -20,7 +20,12 @@ jobs:
           dart pub get
           dart analyze
           dart test
-          ! dart pub deps --style=compact | grep -qiE '(^| )flutter( |$)'
+          # A dependency named flutter, not the "Flutter SDK" banner pub prints.
+          deps="$(dart pub deps --style=compact)"
+          grep -q '^dukan_core ' <<<"$deps"
+          if grep -qE '^- flutter( |$)' <<<"$deps"; then
+            echo "flutter leaked into dukan_core"; exit 1
+          fi
       - name: dukan_data (Drift codegen) + sync + hardware
         run: |
           (cd packages/dukan_data && dart pub get && dart run build_runner build && dart analyze && dart test)

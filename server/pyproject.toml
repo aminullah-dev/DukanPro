@@ -18,6 +18,12 @@ dependencies = [
 postgres = ["psycopg[binary]>=3"]
 dev = ["pytest", "httpx", "ruff", "mypy", "import-linter"]
 
+# Only the application is a package. migrations/ is Alembic's script folder, read
+# by path; without this, setuptools finds two top-level packages and refuses
+# to build (`pip install -e .` fails in CI).
+[tool.setuptools.packages.find]
+include = ["dukan*"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
