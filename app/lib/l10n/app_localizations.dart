@@ -599,6 +599,30 @@ abstract class AppLocalizations {
   /// **'Shown in the server console when the server starts'**
   String get setupCodeHelp;
 
+  /// No description provided for @standaloneSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up without a server'**
+  String get standaloneSetup;
+
+  /// No description provided for @standaloneSetupHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything stays on this device. No server to install, no internet needed. One account: yours.'**
+  String get standaloneSetupHelp;
+
+  /// No description provided for @standalonePasswordWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody can recover this password, not even us. Write it down and keep it somewhere safe.'**
+  String get standalonePasswordWarning;
+
+  /// No description provided for @standaloneMode.
+  ///
+  /// In en, this message translates to:
+  /// **'This device only'**
+  String get standaloneMode;
+
   /// No description provided for @errSetupCode.
   ///
   /// In en, this message translates to:

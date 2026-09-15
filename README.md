@@ -14,6 +14,10 @@ phone/tablet · macOS (Windows next).
 - **Local store:** SQLite via Drift (wired Phase 1).
 - **Sync:** offline-first operation queue + idempotent push/pull ([`docs/sync-protocol.md`](docs/sync-protocol.md)).
 - **Backend:** Python 3.12 + FastAPI + SQLAlchemy + Alembic, **PostgreSQL**.
+- **Two ways to run a shop:** with a server behind it (staff, branches, audit
+  trail, several devices syncing), or **one device on its own** — no server to
+  install and no internet at all. Chosen when the shop is first set up
+  ([`docs/domain/identity-access.md`](docs/domain/identity-access.md)).
 
 ## Layout
 

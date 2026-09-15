@@ -55,8 +55,9 @@ class SyncStatus {
 }
 
 /// Whether the device syncs on its own (after local writes and every few
-/// minutes while someone is signed in). Tests turn it off.
-final autoSyncProvider = Provider<bool>((ref) => true);
+/// minutes while someone is signed in). A shop with no server never does, and
+/// tests turn it off.
+final autoSyncProvider = Provider<bool>((ref) => !ref.watch(standaloneProvider));
 
 /// Drives the Sync control. The pending, conflict and rejected counts follow the
 /// outbox live, so the badge is right after every sale; [syncNow] pushes then

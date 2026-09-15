@@ -322,6 +322,20 @@ class AppLocalizationsFa extends AppLocalizations {
       'هنگام روشن شدن سرور، در کنسول سرور نشان داده می‌شود';
 
   @override
+  String get standaloneSetup => 'راه‌اندازی بدون سرور';
+
+  @override
+  String get standaloneSetupHelp =>
+      'همه چیز در همین دستگاه می‌ماند. نه سروری نصب می‌شود و نه به اینترنت نیاز است. یک حساب: حساب شما.';
+
+  @override
+  String get standalonePasswordWarning =>
+      'این رمز را هیچ‌کس بازیابی کرده نمی‌تواند، حتی ما. آن را بنویسید و در جای امن نگه دارید.';
+
+  @override
+  String get standaloneMode => 'فقط همین دستگاه';
+
+  @override
   String get errSetupCode => 'کد راه‌اندازی درست نیست. کنسول سرور را ببینید.';
 
   @override
@@ -1567,6 +1581,20 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String get setupCodeHelp =>
       'هنگام روشن شدن سرور، در کنسول سرور نشان داده می‌شود';
+
+  @override
+  String get standaloneSetup => 'راه‌اندازی بدون سرور';
+
+  @override
+  String get standaloneSetupHelp =>
+      'همه چیز در همین دستگاه می‌ماند. نه سروری نصب می‌شود و نه به اینترنت نیاز است. یک حساب: حساب شما.';
+
+  @override
+  String get standalonePasswordWarning =>
+      'این رمز را هیچ‌کس بازیابی کرده نمی‌تواند، حتی ما. آن را بنویسید و در جای امن نگه دارید.';
+
+  @override
+  String get standaloneMode => 'فقط همین دستگاه';
 
   @override
   String get errSetupCode => 'کد راه‌اندازی درست نیست. کنسول سرور را ببینید.';

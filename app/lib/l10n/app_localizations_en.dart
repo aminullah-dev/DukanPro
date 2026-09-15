@@ -321,6 +321,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Shown in the server console when the server starts';
 
   @override
+  String get standaloneSetup => 'Set up without a server';
+
+  @override
+  String get standaloneSetupHelp =>
+      'Everything stays on this device. No server to install, no internet needed. One account: yours.';
+
+  @override
+  String get standalonePasswordWarning =>
+      'Nobody can recover this password, not even us. Write it down and keep it somewhere safe.';
+
+  @override
+  String get standaloneMode => 'This device only';
+
+  @override
   String get errSetupCode => 'Wrong setup code. Check the server console.';
 
   @override

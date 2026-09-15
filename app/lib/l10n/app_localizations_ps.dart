@@ -320,6 +320,20 @@ class AppLocalizationsPs extends AppLocalizations {
       'کله چې سرور پیلېږي، د سرور په کنسول کې ښودل کېږي';
 
   @override
+  String get standaloneSetup => 'پرته له سرور چمتو کول';
+
+  @override
+  String get standaloneSetupHelp =>
+      'هر څه پر همدې وسیله پاتې کېږي. نه سرور نصبولو ته اړتیا شته او نه انټرنټ ته. یو حساب: ستاسو حساب.';
+
+  @override
+  String get standalonePasswordWarning =>
+      'دا پټنوم هیڅوک بېرته ترلاسه کولی نشي، حتی موږ. ولیکئ یې او په خوندي ځای کې یې وساتئ.';
+
+  @override
+  String get standaloneMode => 'یوازې همدا وسیله';
+
+  @override
   String get errSetupCode => 'د تنظیم کوډ سم نه دی. د سرور کنسول وګورئ.';
 
   @override

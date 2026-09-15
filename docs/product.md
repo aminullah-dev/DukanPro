@@ -31,6 +31,8 @@ A fast, offline-first point-of-sale and shop-management app that an Afghan retai
 
 A feature gated by a flag checks it at the **application layer** (use case), not in the UI, so every surface enforces it identically. Demo/unlicensed state watermarks printed documents (see `licensing`).
 
+**Base is a whole shop on one device.** Setup offers "without a server" beside first-run setup; the device then keeps its own owner account and its own books and never calls anywhere — nothing to install, no internet, nothing to reach. What a server would own (staff, branches, the audit trail, insights, sync) is not offered there. See [`docs/domain/identity-access.md`](domain/identity-access.md).
+
 ## Success criteria for Phase 0
 
 1. The architecture is decided, recorded (ADR-0001), and its domain-isolation contract is machine-enforced on both client and server.

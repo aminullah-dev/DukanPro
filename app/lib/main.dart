@@ -48,6 +48,8 @@ Future<void> main() async {
   // The language chosen last on this device, from the first frame on.
   final settings = SettingsStore(db);
   final savedLocale = localeFromTag(await settings.get(localeSettingKey), AppLocalizations.supportedLocales);
+  // Whether this shop has a server behind it, chosen when it was set up.
+  final savedMode = appModeFromTag(await settings.get(appModeSettingKey));
   const apiBase = String.fromEnvironment('DUKAN_API', defaultValue: 'http://localhost:8088');
   final secureStore = FlutterSecureStore();
   final authApi = DioAuthApi(baseUrl: apiBase);
@@ -63,6 +65,9 @@ Future<void> main() async {
       savedLocaleProvider.overrideWithValue(savedLocale),
       saveLocaleProvider.overrideWithValue(
           (locale) => unawaited(settings.set(localeSettingKey, localeTag(locale)).catchError((Object _) {}))),
+      savedAppModeProvider.overrideWithValue(savedMode),
+      saveAppModeProvider.overrideWithValue(
+          (mode) => unawaited(settings.set(appModeSettingKey, mode.name).catchError((Object _) {}))),
       secureStoreProvider.overrideWithValue(secureStore),
       authApiProvider.overrideWithValue(authApi),
       tokenRefresherProvider.overrideWithValue(refresher),
