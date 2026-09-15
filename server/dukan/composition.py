@@ -8,10 +8,14 @@ uvicorn entrypoint: `dukan.composition:app`.
 
 from __future__ import annotations
 
+import logging
+import secrets
 from collections.abc import Awaitable, Callable, Iterator
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from dukan.application.audit import AuditService
 from dukan.application.auth import AuthService
@@ -73,6 +77,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+    # Only whoever can read this server's console (or set DUKAN_BOOTSTRAP_TOKEN)
+    # can claim a fresh server as its owner.
+    setup_token = settings.bootstrap_token or secrets.token_urlsafe(12)
+    if settings.bootstrap_token is None:
+        logging.getLogger("dukan").warning(
+            "First-run setup code: %s (enter it in the app to create the owner account;"
+            " set DUKAN_BOOTSTRAP_TOKEN to choose it yourself)",
+            setup_token,
+        )
 
     app.include_router(health.router)
     app.include_router(auth.router)
@@ -90,7 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def provide_auth_service() -> Iterator[AuthService]:
         session = session_factory()
         try:
-            yield SqlAuthService(session, settings)
+            yield SqlAuthService(session, settings, setup_token=setup_token)
         finally:
             session.close()
 
@@ -174,6 +187,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status_code=exc.http_status,
             content={"error": {"code": exc.code, "context": exc.context}},
         )
+
+    @app.exception_handler(RequestValidationError)
+    async def _request_validation_handler(
+        _request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        fields = [".".join(str(p) for p in e.get("loc", ())) for e in exc.errors()]
+        return JSONResponse(
+            status_code=422,
+            content={"error": {"code": "REQUEST_INVALID", "context": {"fields": fields[:20]}}},
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_error_handler(
+        _request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        # An unknown route or method answers in the error contract too, so a
+        # client never reads a 404 or 405 as being offline.
+        code = {404: "NOT_FOUND", 405: "METHOD_NOT_ALLOWED"}.get(
+            exc.status_code, f"HTTP_{exc.status_code}"
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": {"code": code, "context": {}}},
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(Exception)
+    async def _unexpected_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+        # Anything unexpected still answers in the error contract, so the app
+        # never mistakes it for being offline. The traceback stays in the log.
+        logging.getLogger("dukan").error("unhandled error", exc_info=exc)
+        return JSONResponse(status_code=500, content={"error": {"code": "INTERNAL", "context": {}}})
 
     @app.middleware("http")
     async def _security_headers(

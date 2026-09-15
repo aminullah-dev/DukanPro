@@ -23,3 +23,8 @@ final customerBalanceProvider = FutureProvider.family<int, String>(
 final suppliersProvider = FutureProvider<List<Supplier>>(
   (ref) => ref.watch(localPurchasingProvider).listSuppliers(),
 );
+
+/// What the shop owes a supplier: bills less payments.
+final supplierBalanceProvider = FutureProvider.family<int, String>(
+  (ref, id) => ref.watch(localPurchasingProvider).supplierBalance(id),
+);

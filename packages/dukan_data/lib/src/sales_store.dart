@@ -13,7 +13,8 @@ final class LocalSales {
   final AppDatabase _db;
   final SyncRecorder _rec;
 
-  /// Cash-only settle (no customer).
+  /// Cash-only settle (no customer): one cash tender with what was handed over,
+  /// toward the total (less than the total is `SALE_UNDERPAID`).
   Future<SaleRow> settleCash({
     required List<SaleLine> lines,
     int discountMinor = 0,
@@ -24,48 +25,68 @@ final class LocalSales {
     String? shiftId,
   }) {
     final total = computeTotals(lines, discountMinor: discountMinor).totalMinor;
+    final paid = tenderedMinor < total ? tenderedMinor : total;
     return settle(
-      lines: lines, discountMinor: discountMinor, cashMinor: total, tenderedMinor: tenderedMinor,
+      lines: lines, discountMinor: discountMinor,
+      tenders: [if (paid > 0) Tender(PaymentMethod.cash, paid, tenderedMinor: tenderedMinor)],
       branchId: branchId, actorId: actorId, deviceId: deviceId, shiftId: shiftId,
     );
   }
 
-  /// General settle. When [customerId] is set, the remainder (total − cashMinor)
-  /// posts to the customer ledger, enforcing [customerCreditLimitMinor].
+  /// General settle. [tenders] are the payments taken now: cash (with what was
+  /// handed over), card or transfer, one or several. With a [customerId] the
+  /// rest of the total posts to the customer ledger: the customer must be
+  /// active, owe in the sale's currency and stay within their credit limit.
+  /// With a [shiftId] the sale goes into that shift's drawer: the seller's own
+  /// open shift in this branch (`SHIFT_NOT_OPEN`).
   Future<SaleRow> settle({
     required List<SaleLine> lines,
     int discountMinor = 0,
-    required int cashMinor,
-    int? tenderedMinor,
+    required List<Tender> tenders,
     String? customerId,
-    int? customerCreditLimitMinor,
     required String branchId,
     required String actorId,
     required String deviceId,
     String? shiftId,
   }) async {
     final currency = lines.isEmpty ? 'AFN' : lines.first.currency;
+    assertSaleLinesValid(lines, currency: currency);
     final totals = computeTotals(lines, discountMinor: discountMinor);
-    final tendered = tenderedMinor ?? cashMinor;
-    final onCredit = customerId != null;
+    assertDiscountValid(discountMinor: discountMinor, subtotalMinor: totals.subtotalMinor);
+    for (final t in tenders) {
+      assertPaymentValid(method: t.method, amountMinor: t.amountMinor, tenderedMinor: t.tenderedMinor);
+    }
+    final paid = tenders.fold<int>(0, (sum, t) => sum + t.amountMinor);
     assertSettleable(
-      lines: lines, totalMinor: totals.totalMinor,
-      paidMinor: onCredit ? cashMinor : tendered, currency: currency, allowCredit: onCredit,
+      lines: lines, totalMinor: totals.totalMinor, paidMinor: paid, currency: currency,
+      allowCredit: customerId != null,
     );
-    final remainder = onCredit ? (totals.totalMinor - cashMinor) : 0;
-    if (onCredit && remainder > 0) {
+    assertSaleNotOverpaid(paidMinor: paid, totalMinor: totals.totalMinor);
+    // Change is cash handed back over a cash tender.
+    final change = tenders.fold<int>(0, (sum, t) => sum + (t.tenderedMinor ?? t.amountMinor) - t.amountMinor);
+    final remainder = totals.totalMinor - paid;
+    final creditId = customerId;
+    if (creditId != null && remainder > 0) {
+      // The customer's own row decides, not what the screen showed.
+      final customer = await (_db.select(_db.customers)
+            ..where((t) => t.id.equals(creditId) & t.deletedAt.isNull()))
+          .getSingleOrNull();
+      if (customer == null) throw NotFoundError('CUSTOMER_NOT_FOUND', {'customer_id': creditId});
+      assertCustomerCanBuyOnCredit(
+        isActive: customer.isActive, customerCurrency: customer.currency, saleCurrency: currency,
+      );
       assertWithinCreditLimit(
-        balanceMinor: await _customerBalance(customerId),
-        chargeMinor: remainder, creditLimitMinor: customerCreditLimitMinor,
+        balanceMinor: await _customerBalance(creditId),
+        chargeMinor: remainder, creditLimitMinor: customer.creditLimitMinor,
       );
     }
-    final paid = onCredit ? cashMinor : totals.totalMinor;
-    final change = onCredit ? 0 : (tendered - totals.totalMinor);
+    if (shiftId != null) await _requireOpenShift(shiftId, branchId: branchId, userId: actorId);
+    await _requireStock(lines, branchId: branchId);
     final saleId = newId();
-    final number = await _nextNumber();
     late SaleRow saved;
 
     await _db.transaction(() async {
+      final number = await _nextNumber(deviceId);
       await _db.into(_db.sales).insert(SalesCompanion.insert(
             id: saleId, number: number, branchId: branchId, customerId: Value(customerId),
             status: const Value('settled'), currency: Value(currency),
@@ -94,6 +115,7 @@ final class LocalSales {
           'unit_cost_minor': l.unitCostMinor, 'line_total_minor': l.lineTotal, 'currency': l.currency,
         }, actorId: actorId, deviceId: deviceId);
 
+        if (!l.trackStock) continue; // an untracked product (a service) moves no stock
         final movementId = newId();
         await _db.into(_db.stockMovements).insert(StockMovementsCompanion.insert(
               id: movementId, productId: l.productId, branchId: branchId,
@@ -101,24 +123,27 @@ final class LocalSales {
             ));
         await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
           'product_id': l.productId, 'branch_id': branchId, 'qty_delta': -l.qtyMinor, 'reason': 'sale',
+          // The server accepts a sale movement only against the sale it belongs to.
+          'ref_type': 'sale', 'ref_id': saleId,
         }, actorId: actorId, deviceId: deviceId);
       }
-      if (paid > 0) {
+      for (final t in tenders) {
         final paymentId = newId();
+        final tenderChange = t.tenderedMinor == null ? null : t.tenderedMinor! - t.amountMinor;
         await _db.into(_db.payments).insert(PaymentsCompanion.insert(
-              id: paymentId, saleId: saleId, method: 'cash', amountMinor: paid, currency: Value(currency),
-              tenderedMinor: Value(onCredit ? null : tendered), changeMinor: Value(change),
-              createdBy: Value(actorId),
+              id: paymentId, saleId: saleId, method: t.method.name, amountMinor: t.amountMinor,
+              currency: Value(currency), tenderedMinor: Value(t.tenderedMinor),
+              changeMinor: Value(tenderChange), createdBy: Value(actorId),
             ));
         await _rec.record(table: 'payments', rowId: paymentId, op: 'insert', data: {
-          'sale_id': saleId, 'method': 'cash', 'amount_minor': paid, 'currency': currency,
-          'tendered_minor': onCredit ? null : tendered, 'change_minor': change,
+          'sale_id': saleId, 'method': t.method.name, 'amount_minor': t.amountMinor,
+          'currency': currency, 'tendered_minor': t.tenderedMinor, 'change_minor': tenderChange,
         }, actorId: actorId, deviceId: deviceId);
       }
-      if (onCredit && remainder > 0) {
+      if (creditId != null && remainder > 0) {
         final ledgerId = newId();
         await _db.into(_db.customerLedger).insert(CustomerLedgerCompanion.insert(
-              id: ledgerId, customerId: customerId, type: 'charge', amountMinor: remainder,
+              id: ledgerId, customerId: creditId, type: 'charge', amountMinor: remainder,
               currency: Value(currency), refType: const Value('sale'), refId: Value(saleId),
               createdBy: Value(actorId),
             ));
@@ -132,6 +157,45 @@ final class LocalSales {
     });
     return saved;
   }
+
+  /// A single till sells no more of a stock-tracked product than it holds, as
+  /// far as it knows (docs/sync-protocol.md: two offline tills can still oversell
+  /// together, which the server flags). `STOCK_INSUFFICIENT` names the SKU.
+  Future<void> _requireStock(List<SaleLine> lines, {required String branchId}) async {
+    final wanted = <String, int>{};
+    for (final l in lines) {
+      if (l.trackStock) wanted[l.productId] = (wanted[l.productId] ?? 0) + l.qtyMinor;
+    }
+    for (final MapEntry(key: productId, value: qty) in wanted.entries) {
+      final sum = _db.stockMovements.qtyDelta.sum();
+      final row = await (_db.selectOnly(_db.stockMovements)
+            ..addColumns([sum])
+            ..where(_db.stockMovements.productId.equals(productId) &
+                _db.stockMovements.branchId.equals(branchId) &
+                _db.stockMovements.deletedAt.isNull()))
+          .getSingle();
+      final available = row.read(sum) ?? 0;
+      if (qty > available) {
+        final product = await (_db.select(_db.products)..where((t) => t.id.equals(productId))).getSingleOrNull();
+        throw ConflictError('STOCK_INSUFFICIENT', {'sku': product?.sku, 'requested': qty, 'available': available});
+      }
+    }
+  }
+
+  Future<void> _requireOpenShift(String shiftId, {required String branchId, required String userId}) async {
+    final shift = await (_db.select(_db.shifts)..where((t) => t.id.equals(shiftId))).getSingleOrNull();
+    if (shift == null || shift.status != 'open' || shift.branchId != branchId || shift.userId != userId) {
+      throw ConflictError('SHIFT_NOT_OPEN', {'shift_id': shiftId});
+    }
+  }
+
+  /// The latest sales on this device in [branchId], newest first: to reprint a
+  /// receipt.
+  Future<List<SaleRow>> recent({required String branchId, int limit = 30}) => (_db.select(_db.sales)
+        ..where((t) => t.branchId.equals(branchId) & t.deletedAt.isNull())
+        ..orderBy([(t) => OrderingTerm.desc(t.occurredAt)])
+        ..limit(limit))
+      .get();
 
   Future<List<SaleLineRow>> saleLinesFor(String saleId) =>
       (_db.select(_db.saleLines)..where((t) => t.saleId.equals(saleId))).get();
@@ -147,12 +211,21 @@ final class LocalSales {
     return ledgerBalance(entries);
   }
 
-  Future<String> _nextNumber() async {
-    final countCol = _db.sales.id.count();
-    final row = await (_db.selectOnly(_db.sales)..addColumns([countCol])).getSingle();
-    final n = (row.read(countCol) ?? 0) + 1;
+  /// A sale number no other device can issue: `INV-<device>-<local date>-<n>`.
+  /// Counted inside the settle transaction, so two settles on one till never
+  /// share one either.
+  Future<String> _nextNumber(String deviceId) async {
     final now = DateTime.now();
     String two(int x) => x.toString().padLeft(2, '0');
-    return 'INV-${now.year}${two(now.month)}${two(now.day)}-${n.toString().padLeft(4, '0')}';
+    final device = deviceId.replaceAll(RegExp('[^A-Za-z0-9]'), '');
+    final tag = (device.length > 6 ? device.substring(device.length - 6) : device).toUpperCase();
+    final prefix = 'INV-$tag-${now.year}${two(now.month)}${two(now.day)}-';
+    final countCol = _db.sales.id.count();
+    final row = await (_db.selectOnly(_db.sales)
+          ..addColumns([countCol])
+          ..where(_db.sales.number.like('$prefix%')))
+        .getSingle();
+    final n = (row.read(countCol) ?? 0) + 1;
+    return '$prefix${n.toString().padLeft(4, '0')}';
   }
 }

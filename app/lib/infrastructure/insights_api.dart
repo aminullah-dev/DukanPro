@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'auth_api.dart' show AuthApiException, NetworkException;
+import 'http.dart' show newDio;
 import 'secure_store.dart';
 
 /// Typed client for AI insights + the notification feed (Phase 9). Insights are
@@ -66,7 +67,7 @@ abstract interface class InsightsApi {
 /// fresh from secure storage; sends the active branch as `X-Branch-Id`.
 class DioInsightsApi implements InsightsApi {
   DioInsightsApi({required String baseUrl, required this.store, this.branchId, Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(baseUrl: baseUrl));
+      : _dio = dio ?? newDio(baseUrl);
   final Dio _dio;
   final SecureStore store;
   final String? branchId;

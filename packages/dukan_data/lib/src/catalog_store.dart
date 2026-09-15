@@ -53,10 +53,12 @@ final class ProductDao implements ProductRepository {
   Future<void> update(Product product) async {
     await (_db.update(_db.products)..where((t) => t.id.equals(product.id))).write(
       ProductsCompanion(
+        sku: Value(product.sku),
         name: Value(product.name),
         sellPriceMinor: Value(product.sellPrice.amountMinor),
         sellCurrency: Value(product.sellPrice.currency),
         isActive: Value(product.isActive),
+        trackStock: Value(product.trackStock),
         updatedAt: Value(DateTime.now().toUtc()),
         version: Value(product.version + 1),
       ),
@@ -71,12 +73,25 @@ final class ProductDao implements ProductRepository {
     return r == null ? null : _toProduct(r);
   }
 
+  /// The sellable product a scan names: the oldest live barcode with that code on
+  /// an active product. Rows another till synced before codes were unique may
+  /// repeat a code; they never make a scan throw.
   @override
   Future<Product?> findByBarcode(String code) async {
-    final bc = await (_db.select(_db.barcodes)
-          ..where((t) => t.code.equals(code) & t.deletedAt.isNull()))
-        .getSingleOrNull();
-    return bc == null ? null : findById(bc.productId);
+    final query = _db.select(_db.barcodes).join([
+      innerJoin(_db.products, _db.products.id.equalsExp(_db.barcodes.productId)),
+    ])
+      ..where(_db.barcodes.code.equals(code) &
+          _db.barcodes.deletedAt.isNull() &
+          _db.products.deletedAt.isNull() &
+          _db.products.isActive.equals(true))
+      ..orderBy([
+        OrderingTerm(expression: _db.barcodes.createdAt),
+        OrderingTerm(expression: _db.barcodes.id),
+      ])
+      ..limit(1);
+    final row = await query.getSingleOrNull();
+    return row == null ? null : _toProduct(row.readTable(_db.products));
   }
 
   @override
@@ -108,18 +123,18 @@ final class ProductDao implements ProductRepository {
   }
 
   @override
-  Future<bool> skuTaken(String sku) async =>
-      (await (_db.select(_db.products)
-                ..where((t) => t.sku.equals(sku) & t.deletedAt.isNull()))
-              .getSingleOrNull()) !=
-      null;
+  Future<bool> skuTaken(String sku) async => (await (_db.select(_db.products)
+            ..where((t) => t.sku.equals(sku) & t.deletedAt.isNull())
+            ..limit(1))
+          .get())
+      .isNotEmpty;
 
   @override
-  Future<bool> barcodeTaken(String code) async =>
-      (await (_db.select(_db.barcodes)
-                ..where((t) => t.code.equals(code) & t.deletedAt.isNull()))
-              .getSingleOrNull()) !=
-      null;
+  Future<bool> barcodeTaken(String code) async => (await (_db.select(_db.barcodes)
+            ..where((t) => t.code.equals(code) & t.deletedAt.isNull())
+            ..limit(1))
+          .get())
+      .isNotEmpty;
 }
 
 /// Drift-backed [StockMovementRepository] with on-hand derivation.
@@ -170,25 +185,27 @@ final class LocalCatalog {
   final DriftStockRepository stock;
   final SyncRecorder _rec;
 
-  Future<List<UnitRow>> listUnits({String actorId = 'system', String deviceId = 'app'}) async {
-    var rows = await (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
-    if (rows.isEmpty) {
-      const defaults = [('piece', 0), ('kg', 3), ('litre', 3), ('dozen', 0), ('meter', 2)];
-      await _db.transaction(() async {
-        for (final u in defaults) {
-          final id = newId();
-          await _db.into(_db.units).insert(
-                UnitsCompanion.insert(id: id, name: u.$1, decimalPlaces: Value(u.$2)),
-              );
-          await _rec.record(
-            table: 'units', rowId: id, op: 'insert',
-            data: {'name': u.$1, 'decimal_places': u.$2}, actorId: actorId, deviceId: deviceId,
-          );
-        }
-      });
-      rows = await (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
+  /// The units. The built-in ones carry the same fixed ids as on the server and
+  /// every other device, so they are never queued for sync. Any that are
+  /// missing are added on every read, not only on a first one: a product made
+  /// elsewhere in a built-in unit must resolve here too.
+  Future<List<UnitRow>> listUnits() async {
+    final ids = [for (final u in builtInUnits) u.id];
+    final have = {
+      for (final r in await (_db.select(_db.units)..where((t) => t.id.isIn(ids))).get()) r.id,
+    };
+    final missing = [for (final u in builtInUnits) if (!have.contains(u.id)) u];
+    if (missing.isNotEmpty) {
+      await _db.batch((b) => b.insertAll(
+            _db.units,
+            [
+              for (final u in missing)
+                UnitsCompanion.insert(id: u.id, name: u.name, decimalPlaces: Value(u.decimalPlaces)),
+            ],
+            mode: InsertMode.insertOrIgnore,
+          ));
     }
-    return rows;
+    return (_db.select(_db.units)..where((t) => t.deletedAt.isNull())).get();
   }
 
   Map<String, Object?> _productData(Product p) => {
@@ -210,7 +227,15 @@ final class LocalCatalog {
     required String actorId,
     required String deviceId,
   }) async {
+    assertPriceValid(sellPriceMinor: product.sellPrice.amountMinor);
     await _db.transaction(() async {
+      // Unique among live products and barcodes on this device, as on the server.
+      if (await products.skuTaken(product.sku)) {
+        throw ConflictError('PRODUCT_DUPLICATE_SKU', {'sku': product.sku});
+      }
+      for (final b in barcodes) {
+        if (await products.barcodeTaken(b.code)) throw ConflictError('BARCODE_DUPLICATE', {'barcode': b.code});
+      }
       await products.create(product, barcodes: barcodes);
       await _rec.record(
         table: 'products', rowId: product.id, op: 'insert',
@@ -226,22 +251,72 @@ final class LocalCatalog {
     });
   }
 
+  /// Saves an edit, queued with only the fields that changed (the edit's intent)
+  /// against the version it was made on. When nothing changed, nothing is queued.
   Future<void> updateProduct(
     Product product, {
     required String actorId,
     required String deviceId,
   }) async {
+    assertPriceValid(sellPriceMinor: product.sellPrice.amountMinor);
     await _db.transaction(() async {
+      final before = await (_db.select(_db.products)..where((t) => t.id.equals(product.id))).getSingle();
+      if (before.sku != product.sku && await products.skuTaken(product.sku)) {
+        throw ConflictError('PRODUCT_DUPLICATE_SKU', {'sku': product.sku}); // a mistyped SKU is corrected
+      }
+      final changed = <String, Object?>{
+        if (before.sku != product.sku) 'sku': product.sku,
+        if (before.name != product.name) 'name': product.name,
+        if (before.sellPriceMinor != product.sellPrice.amountMinor)
+          'sell_price_minor': product.sellPrice.amountMinor,
+        if (before.sellCurrency != product.sellPrice.currency) 'sell_currency': product.sellPrice.currency,
+        if (before.isActive != product.isActive) 'is_active': product.isActive,
+        if (before.trackStock != product.trackStock) 'track_stock': product.trackStock,
+      };
+      if (changed.isEmpty) return;
       await products.update(product);
       await _rec.record(
         table: 'products', rowId: product.id, op: 'update', baseVersion: product.version,
-        data: {
-          'name': product.name,
-          'sell_price_minor': product.sellPrice.amountMinor,
-          'sell_currency': product.sellPrice.currency,
-          'is_active': product.isActive,
-        },
+        data: changed, actorId: actorId, deviceId: deviceId,
+      );
+    });
+  }
+
+  /// Adds [code] to a product: unique among live barcodes (`BARCODE_DUPLICATE`).
+  Future<Barcode> addBarcode(
+    String productId,
+    String code, {
+    required String actorId,
+    required String deviceId,
+  }) async {
+    final barcode = Barcode(id: newId(), productId: productId, code: code);
+    await _db.transaction(() async {
+      if (await products.barcodeTaken(code)) throw ConflictError('BARCODE_DUPLICATE', {'barcode': code});
+      await products.addBarcode(barcode);
+      await _rec.record(
+        table: 'barcodes', rowId: barcode.id, op: 'insert',
+        data: {'product_id': productId, 'code': code, 'symbology': barcode.symbology},
         actorId: actorId, deviceId: deviceId,
+      );
+    });
+    return barcode;
+  }
+
+  /// Takes a barcode off its product, so the code can go on another one: a
+  /// synced edit of the barcode row, which the server soft-deletes everywhere.
+  Future<void> removeBarcode(String barcodeId, {required String actorId, required String deviceId}) async {
+    await _db.transaction(() async {
+      final row = await (_db.select(_db.barcodes)
+            ..where((t) => t.id.equals(barcodeId) & t.deletedAt.isNull()))
+          .getSingleOrNull();
+      if (row == null) return;
+      final now = DateTime.now().toUtc();
+      await (_db.update(_db.barcodes)..where((t) => t.id.equals(barcodeId))).write(
+        BarcodesCompanion(deletedAt: Value(now), updatedAt: Value(now), version: Value(row.version + 1)),
+      );
+      await _rec.record(
+        table: 'barcodes', rowId: barcodeId, op: 'update', baseVersion: row.version,
+        data: {'deleted': true}, actorId: actorId, deviceId: deviceId,
       );
     });
   }
@@ -253,6 +328,10 @@ final class LocalCatalog {
     required String actorId,
     required String deviceId,
   }) async {
+    final product = await products.findById(productId);
+    if (product == null) throw NotFoundError('PRODUCT_NOT_FOUND', {'product_id': productId});
+    // An untracked product (a service) has no stock to adjust, as on the server.
+    if (!product.trackStock) throw ValidationError('PRODUCT_NOT_STOCK_TRACKED', {'product_id': productId});
     final movement = adjustStock(
       id: newId(), productId: productId, branchId: branchId,
       qtyDelta: qtyDelta, at: DateTime.now().toUtc(),

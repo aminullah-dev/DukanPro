@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from dukan.shared.errors import ConflictError, ValidationError
+from dukan.shared.limits import MONEY_MAX
 
 
 class SaleStatus(StrEnum):
@@ -19,6 +20,7 @@ class SaleStatus(StrEnum):
 class PaymentMethod(StrEnum):
     CASH = "cash"
     CARD = "card"
+    TRANSFER = "transfer"  # mobile money or a bank transfer (M-Paisa, HesabPay)
     CREDIT = "credit"
 
 
@@ -36,6 +38,13 @@ def line_total_minor(unit_price_minor: int, qty_minor: int, decimal_places: int)
     return -rounded if negative else rounded
 
 
+def line_total_fits(unit_price_minor: int, qty_minor: int, decimal_places: int) -> bool:
+    """Whether a line's money value stays within MONEY_MAX, the most a money
+    column or a client's JSON number holds. (The device asks before it
+    multiplies: a 64-bit product wraps.)"""
+    return abs(unit_price_minor * qty_minor) <= MONEY_MAX * _scale(decimal_places)
+
+
 @dataclass(frozen=True, slots=True)
 class SaleLine:
     product_id: str
@@ -45,6 +54,7 @@ class SaleLine:
     unit_price_minor: int
     unit_cost_minor: int
     currency: str
+    track_stock: bool = True  # an untracked product (a service) moves no stock
 
     @property
     def line_total(self) -> int:
@@ -66,6 +76,30 @@ def compute_totals(lines: Sequence[SaleLine], discount_minor: int = 0) -> SaleTo
     )
 
 
+def assert_sale_lines_valid(lines: Sequence[SaleLine], *, currency: str) -> None:
+    """Every line sells a positive quantity at a price of zero or more, in the
+    sale's currency, and the sale's total stays within MONEY_MAX. Raises
+    ValidationError SALE_EMPTY, SALE_LINE_INVALID_QTY, SALE_LINE_INVALID_PRICE or
+    SALE_TOTAL_TOO_LARGE, or ConflictError SALE_CURRENCY_MISMATCH."""
+    if not lines:
+        raise ValidationError("SALE_EMPTY")
+    total = 0
+    for l in lines:
+        if l.qty_minor <= 0:
+            raise ValidationError("SALE_LINE_INVALID_QTY", product_id=l.product_id, qty=l.qty_minor)
+        if l.unit_price_minor < 0:
+            raise ValidationError(
+                "SALE_LINE_INVALID_PRICE", product_id=l.product_id, price=l.unit_price_minor
+            )
+        if l.currency != currency:
+            raise ConflictError("SALE_CURRENCY_MISMATCH", expected=currency, got=l.currency)
+        if not line_total_fits(l.unit_price_minor, l.qty_minor, l.decimal_places):
+            raise ValidationError("SALE_TOTAL_TOO_LARGE", product_id=l.product_id)
+        total += l.line_total
+    if total > MONEY_MAX:
+        raise ValidationError("SALE_TOTAL_TOO_LARGE")
+
+
 def assert_settleable(
     *,
     lines: Sequence[SaleLine],
@@ -74,10 +108,57 @@ def assert_settleable(
     currency: str,
     allow_credit: bool,
 ) -> None:
-    if not lines:
-        raise ValidationError("SALE_EMPTY")
-    for l in lines:
-        if l.currency != currency:
-            raise ConflictError("SALE_CURRENCY_MISMATCH", expected=currency, got=l.currency)
+    """paid_minor is the amount offered toward the balance. Raises what
+    assert_sale_lines_valid raises, SALE_PAYMENT_INVALID for a negative amount,
+    or (cash-only) SALE_UNDERPAID."""
+    assert_sale_lines_valid(lines, currency=currency)
+    if paid_minor < 0:
+        raise ValidationError("SALE_PAYMENT_INVALID", reason="amount", paid=paid_minor)
     if not allow_credit and paid_minor < total_minor:
         raise ConflictError("SALE_UNDERPAID", total=total_minor, paid=paid_minor)
+
+
+_TENDERS = frozenset({PaymentMethod.CASH, PaymentMethod.CARD, PaymentMethod.TRANSFER})
+
+
+def assert_payment_valid(
+    *, method: str, amount_minor: int, tendered_minor: int | None = None
+) -> None:
+    """A payment is a positive amount by cash, card or transfer: credit is the unpaid
+    remainder, never a payment. Cash handed over is at least the amount, and only
+    cash is handed over. Raises ValidationError SALE_PAYMENT_INVALID."""
+    if method not in _TENDERS:
+        raise ValidationError("SALE_PAYMENT_INVALID", reason="method", method=method[:16])
+    if amount_minor <= 0:
+        raise ValidationError("SALE_PAYMENT_INVALID", reason="amount", amount=amount_minor)
+    if tendered_minor is not None and (
+        method != PaymentMethod.CASH or tendered_minor < amount_minor
+    ):
+        raise ValidationError(
+            "SALE_PAYMENT_INVALID", reason="tendered", amount=amount_minor, tendered=tendered_minor
+        )
+
+
+def assert_sale_not_overpaid(*, paid_minor: int, total_minor: int) -> None:
+    """The payments applied to a sale never add up to more than its total: cash
+    over the total is change handed back, not a payment. Raises ConflictError
+    SALE_OVERPAID."""
+    if paid_minor > total_minor:
+        raise ConflictError("SALE_OVERPAID", paid=paid_minor, total=total_minor)
+
+
+def assert_discount_valid(*, discount_minor: int, subtotal_minor: int) -> None:
+    """A discount lies between 0 and the subtotal: a negative one is a hidden
+    surcharge, a larger one a negative total. Raises ValidationError
+    SALE_DISCOUNT_INVALID."""
+    if not 0 <= discount_minor <= subtotal_minor:
+        raise ValidationError(
+            "SALE_DISCOUNT_INVALID", discount=discount_minor, subtotal=subtotal_minor
+        )
+
+
+def assert_shift_cash_valid(*, amount_minor: int) -> None:
+    """Cash in a drawer (a shift's opening float, the count at its close) is zero
+    or more. Raises ValidationError SHIFT_CASH_INVALID."""
+    if amount_minor < 0:
+        raise ValidationError("SHIFT_CASH_INVALID", amount=amount_minor)

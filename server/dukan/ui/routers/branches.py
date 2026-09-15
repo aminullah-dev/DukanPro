@@ -13,6 +13,7 @@ from dukan.application.iam import IamService
 from dukan.domain.identity import Permission, User
 from dukan.shared.errors import ValidationError
 from dukan.ui.deps import get_current_actor, get_iam_service, requires
+from dukan.ui.fields import Currency, Str48, Str128
 from dukan.ui.serializers import branch_dict
 
 router = APIRouter(prefix="/branches", tags=["branches"])
@@ -29,13 +30,13 @@ def _active_branch(actor: User, x_branch_id: str | None) -> str:
 
 
 class CreateBranchRequest(BaseModel):
-    name: str
-    timezone: str = "Asia/Kabul"
-    currency_default: str = "AFN"
+    name: Str128
+    timezone: Str48 = "Asia/Kabul"
+    currency_default: Currency = "AFN"
 
 
 class UpdateBranchRequest(BaseModel):
-    name: str | None = None
+    name: Str128 | None = None
     active: bool | None = None
 
 

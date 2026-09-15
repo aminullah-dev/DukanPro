@@ -30,6 +30,8 @@ class OutboxEntries extends Table with RecordColumns {
   TextColumn get actorId => text()();
   TextColumn get status => text().withDefault(const Constant('pending'))();
   IntColumn get baseVersion => integer().nullable()();
+  /// The server's code for an op it conflicted or rejected (shown for review).
+  TextColumn get lastError => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -183,6 +185,9 @@ class Customers extends Table with RecordColumns {
 @DataClassName('CustomerLedgerRow')
 class CustomerLedger extends Table with RecordColumns {
   TextColumn get customerId => text()();
+  /// A debt payment: how it was paid, and the shift whose drawer it went into.
+  TextColumn get method => text().nullable()();
+  TextColumn get shiftId => text().nullable()();
   TextColumn get type => text()();
   IntColumn get amountMinor => integer()();
   TextColumn get currency => text().withDefault(const Constant('AFN'))();
@@ -206,6 +211,9 @@ class Suppliers extends Table with RecordColumns {
 @DataClassName('SupplierLedgerRow')
 class SupplierLedger extends Table with RecordColumns {
   TextColumn get supplierId => text()();
+  /// A payment: how it was paid, and the shift whose drawer it came out of.
+  TextColumn get method => text().nullable()();
+  TextColumn get shiftId => text().nullable()();
   TextColumn get type => text()();
   IntColumn get amountMinor => integer()();
   TextColumn get currency => text().withDefault(const Constant('AFN'))();
@@ -220,6 +228,14 @@ class SupplierLedger extends Table with RecordColumns {
 class SyncStates extends Table {
   TextColumn get deviceId => text()();
   IntColumn get lastPulledSeq => integer().withDefault(const Constant(0))();
+
+  /// The server's name for the change at the cursor: another change there means
+  /// the server was restored from a backup (docs/sync-protocol.md, "Pull").
+  TextColumn get watermarkToken => text().nullable()();
+
+  /// The read scope the cursor was pulled in: a new one (a role or a branch
+  /// granted) reads the feed again, for the rows the old scope hid.
+  TextColumn get scope => text().nullable()();
   @override
   Set<Column> get primaryKey => {deviceId};
 }
@@ -246,7 +262,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -277,8 +293,123 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             await m.createTable(appSettings);
           }
+          if (from < 8 && !await _hasColumn('outbox_entries', 'last_error')) {
+            // First: the v7 step reads the outbox through today's table definition.
+            await m.addColumn(outboxEntries, outboxEntries.lastError);
+          }
+          if (from < 7) {
+            await _refLegacySaleMovements();
+          }
+          if (from < 9) {
+            await _mergeUnitCopies();
+          }
+          if (from < 10) {
+            for (final column in [customerLedger.method, customerLedger.shiftId]) {
+              if (!await _hasColumn('customer_ledger', column.$name)) {
+                await m.addColumn(customerLedger, column);
+              }
+            }
+          }
+          if (from < 11) {
+            for (final column in [supplierLedger.method, supplierLedger.shiftId]) {
+              if (!await _hasColumn('supplier_ledger', column.$name)) {
+                await m.addColumn(supplierLedger, column);
+              }
+            }
+          }
+          if (from < 12) {
+            for (final column in [syncStates.watermarkToken, syncStates.scope]) {
+              if (!await _hasColumn('sync_states', column.$name)) {
+                await m.addColumn(syncStates, column);
+              }
+            }
+          }
         },
       );
+
+  /// Before the built-in units had fixed ids (dukan_core `builtInUnits`), every
+  /// device seeded the five with ids of its own and queued them, so a device
+  /// that synced held several "kg". Products move to the fixed unit and the
+  /// copies are set aside; queued ops follow (a copy's own insert is set aside,
+  /// a product op names the fixed unit). The server merges its copies the same
+  /// way (migration 0012).
+  Future<void> _mergeUnitCopies() async {
+    final now = DateTime.now().toUtc();
+    final fixedOf = <String, String>{}; // copy id -> fixed id
+    for (final u in builtInUnits) {
+      await into(units).insert(
+        UnitsCompanion.insert(id: u.id, name: u.name, decimalPlaces: Value(u.decimalPlaces)),
+        mode: InsertMode.insertOrIgnore,
+      );
+      final copies = await (select(units)
+            ..where((t) =>
+                t.name.equals(u.name) &
+                t.decimalPlaces.equals(u.decimalPlaces) &
+                t.id.equals(u.id).not() &
+                t.deletedAt.isNull()))
+          .get();
+      for (final c in copies) {
+        fixedOf[c.id] = u.id;
+      }
+    }
+    if (fixedOf.isEmpty) return;
+    for (final MapEntry(key: copy, value: fixed) in fixedOf.entries) {
+      await (update(products)..where((t) => t.unitId.equals(copy)))
+          .write(ProductsCompanion(unitId: Value(fixed)));
+    }
+    await (update(units)..where((t) => t.id.isIn(fixedOf.keys)))
+        .write(UnitsCompanion(deletedAt: Value(now), updatedAt: Value(now)));
+    final queued = await (select(outboxEntries)
+          ..where((t) =>
+              t.status.equals(OutboxStatus.pending.name) &
+              t.aggregateType.isIn(const ['units', 'products'])))
+        .get();
+    for (final op in queued) {
+      if (op.aggregateType == 'units') {
+        if (fixedOf.containsKey(op.aggregateId)) {
+          await (update(outboxEntries)..where((t) => t.id.equals(op.id)))
+              .write(const OutboxEntriesCompanion(status: Value('dismissed')));
+        }
+        continue;
+      }
+      final data = (jsonDecode(op.payload) as Map).cast<String, Object?>();
+      final fixed = fixedOf[data['unit_id']];
+      if (fixed != null) {
+        await (update(outboxEntries)..where((t) => t.id.equals(op.id)))
+            .write(OutboxEntriesCompanion(payload: Value(jsonEncode({...data, 'unit_id': fixed}))));
+      }
+    }
+  }
+
+  Future<bool> _hasColumn(String table, String column) async {
+    final rows = await customSelect('PRAGMA table_info("$table")').get();
+    return rows.any((r) => r.read<String>('name') == column);
+  }
+
+  /// Sale stock movements the app recorded before v7 carry no ref to their
+  /// sale, and the hardened server rejects them (docs/sync-protocol.md,
+  /// "Rollout"). LocalSales.settle records a sale's ops contiguously in one
+  /// transaction, so a movement's sale is the nearest earlier `sales` op in the
+  /// same branch. Ops already sent are left as they are.
+  Future<void> _refLegacySaleMovements() async {
+    final ops = await (select(outboxEntries)..orderBy([(t) => OrderingTerm(expression: t.localSeq)])).get();
+    String? saleId;
+    String? saleBranch;
+    for (final op in ops) {
+      if (op.aggregateType == 'sales') {
+        saleId = op.aggregateId;
+        saleBranch = (jsonDecode(op.payload) as Map<String, Object?>)['branch_id'] as String?;
+        continue;
+      }
+      if (op.aggregateType != 'stock_movements' || op.status != OutboxStatus.pending.name) continue;
+      final data = jsonDecode(op.payload) as Map<String, Object?>;
+      if (data['reason'] != 'sale' || data['ref_id'] != null) continue;
+      if (saleId == null || data['branch_id'] != saleBranch) continue;
+      await (update(outboxEntries)..where((t) => t.id.equals(op.id))).write(OutboxEntriesCompanion(
+        payload: Value(jsonEncode({...data, 'ref_type': 'sale', 'ref_id': saleId})),
+      ));
+    }
+  }
 }
 
 /// Drift-backed implementation of the dukan_core [SyncOutbox] port.
@@ -357,6 +488,23 @@ final class ProfileStore {
           ),
         );
   }
+
+  /// The one signed-in user's profile: replaces whatever was cached, in one
+  /// transaction, so the device never answers with another user's role.
+  Future<void> replace({
+    required String userId,
+    required String username,
+    required String displayName,
+    String? defaultBranchId,
+    required List<Map<String, Object?>> branches,
+  }) =>
+      _db.transaction(() async {
+        await clear();
+        await save(
+          userId: userId, username: username, displayName: displayName,
+          defaultBranchId: defaultBranchId, branches: branches,
+        );
+      });
 
   Future<CachedProfileRow?> current() async {
     final rows = await _db.select(_db.cachedProfiles).get();

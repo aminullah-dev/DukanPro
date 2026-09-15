@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 ReceiptData _sample({String name = 'Rice'}) => ReceiptData(
       shopName: 'Dukan',
       number: 'INV-2026-00001',
-      dateTime: DateTime(2026, 9, 11, 14, 30),
+      stamp: '1405-06-20 14:30 (2026-09-11)',
       lines: [ReceiptLineData(name: name, qtyLabel: '×2', lineTotalMinor: 10400)],
       subtotalMinor: 10400,
       totalMinor: 10400,
@@ -33,6 +33,7 @@ void main() {
     // "TOTAL" label and "104.00 AFN" value on a 32-char line.
     expect(text, contains('TOTAL'));
     expect(text, contains('104.00 AFN'));
+    expect(text, contains('1405-06-20 14:30 (2026-09-11)'));
   });
 
   test('non-Latin-1 characters are replaced with ?', () {

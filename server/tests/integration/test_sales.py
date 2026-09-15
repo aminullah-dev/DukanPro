@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 def _setup(client: TestClient) -> tuple[dict, str]:
     token = client.post(
         "/auth/bootstrap",
-        json={"username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
     ).json()["tokens"]["access_token"]
     h = {"Authorization": f"Bearer {token}"}
     units = {u["name"]: u["id"] for u in client.get("/units", headers=h).json()}
@@ -60,7 +60,7 @@ def test_void_reverses_stock(client: TestClient) -> None:
         },
     ).json()
     assert client.get(f"/products/{pid}", headers=h).json()["on_hand"] == 35
-    voided = client.post(f"/sales/{sale['id']}/void", headers=h)
+    voided = client.post(f"/sales/{sale['id']}/void", headers=h, json={"reason": "Returned"})
     assert voided.status_code == 200 and voided.json()["status"] == "voided"
     assert client.get(f"/products/{pid}", headers=h).json()["on_hand"] == 40
 

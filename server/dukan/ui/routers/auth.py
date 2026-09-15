@@ -10,31 +10,33 @@ from pydantic import BaseModel
 from dukan.application.auth import AuthService
 from dukan.domain.identity import User
 from dukan.ui.deps import get_auth_service, get_current_actor
+from dukan.ui.fields import Name128, Secret, Str64, Str128
 from dukan.ui.serializers import auth_result, profile_dict, tokens_dict
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class BootstrapRequest(BaseModel):
-    username: str
-    password: str
-    display_name: str
-    shop_name: str = "My Shop"
-    device_id: str = "unknown"
+    username: Str64
+    password: Secret
+    display_name: Str128
+    shop_name: Name128  # no English default: it names the first branch and heads its receipts
+    device_id: Str128 = "unknown"
+    setup_token: Secret  # the server's first-run setup code
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
-    device_id: str = "unknown"
+    username: Str64
+    password: Secret
+    device_id: Str128 = "unknown"
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: Secret
 
 
 class LogoutRequest(BaseModel):
-    refresh_token: str
+    refresh_token: Secret
 
 
 @router.post("/bootstrap")
@@ -48,6 +50,7 @@ def bootstrap(
             display_name=body.display_name,
             shop_name=body.shop_name,
             device_id=body.device_id,
+            setup_token=body.setup_token,
         )
     )
 

@@ -40,6 +40,10 @@ void main() {
     expect(ops.where((o) => o.aggregateType == 'sale_lines').length, 1);
     expect(ops.where((o) => o.aggregateType == 'payments').length, 1);
     expect(ops.where((o) => o.aggregateType == 'stock_movements').length, 2); // adjust + sale
+    // The server accepts a sale movement only against the sale it belongs to.
+    final sold = ops.singleWhere((o) => o.aggregateType == 'stock_movements' && o.payload['reason'] == 'sale');
+    expect(sold.payload['ref_type'], 'sale');
+    expect(sold.payload['ref_id'], sale.id);
   });
 
   test('underpaid cash throws SALE_UNDERPAID', () async {

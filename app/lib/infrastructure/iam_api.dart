@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'auth_api.dart' show AuthApiException, BranchRoleDto, NetworkException;
+import 'http.dart' show newDio;
 import 'secure_store.dart';
 
 /// Typed client for employee & branch administration. Server-authoritative and
@@ -83,7 +84,7 @@ abstract interface class IamApi {
 /// sends the actor's active branch as `X-Branch-Id` on each call.
 class DioIamApi implements IamApi {
   DioIamApi({required String baseUrl, required this.store, this.branchId, Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(baseUrl: baseUrl));
+      : _dio = dio ?? newDio(baseUrl);
   final Dio _dio;
   final SecureStore store;
 

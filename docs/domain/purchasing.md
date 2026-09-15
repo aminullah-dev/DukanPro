@@ -18,6 +18,10 @@
 4. Cost valuation method (last cost vs weighted average) is **configuration**, applied consistently; historical movements keep the cost they were received at (never retro-repriced).
 5. Supplier balance is **derived** from the append-only supplier ledger.
 6. Currencies: a PO/receipt/bill carries its own currency; supplier balance is per-currency; no implicit conversion.
+7. Receiving stock needs `stock.adjust`; a receipt that **bills a supplier or carries a cost** also needs `purchase.cost` (owner, manager). Without it a receipt only moves stock and leaves the product's last cost alone.
+8. A receipt's supplier must exist (`SUPPLIER_NOT_FOUND`).
+9. **Paying a supplier** is money out: it needs `purchase.cost`, is a positive amount of at most what the shop owes (`SUPPLIER_PAYMENT_INVALID`, `SUPPLIER_OVERPAYMENT`), in the supplier's currency, and records its method (cash, card, transfer) and the shift it came out of. Cash paid from a till's shift comes off that shift's expected cash. The suppliers screen records it offline and syncs it; `POST /suppliers/{id}/payments` (`{amount_minor, method, shift_id}`) does it online. A synced payment past the balance (another till paid meanwhile) is flagged in the audit, not refused.
+10. A receipt of a product whose stock is not tracked bills the supplier and sets the cost, but moves no stock.
 
 ## Error codes
 
@@ -25,18 +29,23 @@
 |---|---|
 | `PO_OVER_RECEIPT` | received qty exceeds ordered (when disallowed) — context `sku, ordered, received, attempted` |
 | `PO_ILLEGAL_TRANSITION` | invalid status change |
-| `PURCHASE_CURRENCY_MISMATCH` | payment currency has no matching bills |
+| `PURCHASE_CURRENCY_MISMATCH` | a bill or payment in a currency other than the supplier's (a receipt at a cost bills in the supplier's currency) |
 | `GRN_EMPTY` | receiving with no lines |
+| `SUPPLIER_NOT_FOUND` | receiving against an unknown supplier |
+| `GRN_LINE_INVALID` | a received line with a quantity of zero or less, or a negative cost |
+| `SUPPLIER_PAYMENT_INVALID` / `SUPPLIER_OVERPAYMENT` | a supplier payment of zero or less / of more than the shop owes |
 
 ## Test table
 
 | Case | Given | Action | Expect |
 |---|---|---|---|
+| fractional receipt | kg unit (3 decimal places), cost 40.00 per kg | receive 2.500 kg | bill 100.00, not 100,000.00 (qty × cost at the unit's scale, half-up) |
 | receipt adds stock | PO line qty 10 @ cost 40 | receive 10 | stock +10, cost valuation updated |
 | over-receipt | ordered 10, received 8 | receive 5 | `PO_OVER_RECEIPT` (ordered 10, received 8) |
 | partial then full | ordered 10 | receive 6 then 4 | status partially_received → received |
 | supplier balance | bill 4000, payment 1500 | read balance | `2500` owed to supplier |
 | weighted avg cost | on_hand 10 @ 40, receive 10 @ 50 | valuation | avg 45 (if config=weighted_avg) |
+| stock keeper bills | stock_keeper | receive with a supplier or a cost | `ACCESS_DENIED`; quantity only is allowed |
 
 ## Audit
 

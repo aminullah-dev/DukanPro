@@ -40,6 +40,18 @@ final sessionActorProvider = Provider<SessionActor?>((ref) {
   return SessionActor(user, branchId);
 });
 
+/// The signed-in user's id, kept while the app is locked or another account is
+/// being tried. Session state (the POS cart, admin lists, the notification
+/// feed) watches it, so it resets when another user signs in on this device but
+/// survives a lock.
+final sessionUserIdProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider.select((s) => switch (s) {
+        AuthLoggedIn(:final profile) || AuthLocked(:final profile) => profile.userId,
+        AuthLoggedOut(:final returnTo?) => returnTo.userId,
+        _ => null,
+      })),
+);
+
 /// The active branch's name — used as the receipt header. The bootstrap owner's
 /// default branch is the shop itself. Falls back to the app name.
 final shopNameProvider = Provider<String>((ref) {
@@ -59,3 +71,27 @@ final shopNameProvider = Provider<String>((ref) {
     return 'DukanPro';
   }
 });
+
+/// The active branch's entry in the cached profile (its default branch), or null.
+Map<String, dynamic>? _activeBranchOf(Ref ref) {
+  final profile = switch (ref.watch(authControllerProvider)) {
+    AuthLoggedIn(:final profile) || AuthLocked(:final profile) => profile,
+    _ => null,
+  };
+  if (profile == null) return null;
+  try {
+    final branches = (jsonDecode(profile.branches) as List).cast<Map<String, dynamic>>();
+    if (branches.isEmpty) return null;
+    return branches.firstWhere((b) => b['branch_id'] == profile.defaultBranchId, orElse: () => branches.first);
+  } on Object {
+    return null;
+  }
+}
+
+/// The active branch's time zone: its business day, and the clock every time
+/// on screen and on receipts is read in. Kabul's until a profile names one.
+final branchZoneProvider =
+    Provider<String>((ref) => _activeBranchOf(ref)?['timezone'] as String? ?? defaultBranchZone);
+
+/// The active branch's currency: new prices and typed amounts are in it.
+final shopCurrencyProvider = Provider<String>((ref) => _activeBranchOf(ref)?['currency'] as String? ?? 'AFN');

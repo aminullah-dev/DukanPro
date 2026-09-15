@@ -24,6 +24,8 @@ def profile_dict(p: AuthenticatedUser) -> dict:
                 "branch_id": b.branch_id,
                 "branch_name": b.branch_name,
                 "role_name": b.role_name,
+                "timezone": b.timezone,
+                "currency": b.currency,
             }
             for b in p.branches
         ],
@@ -79,6 +81,7 @@ def product_view_dict(v: ProductView) -> dict:
         "is_active": v.is_active,
         "on_hand": v.on_hand,
         "barcodes": list(v.barcodes),
+        "version": v.version,
     }
 
 
@@ -127,6 +130,8 @@ def customer_view_dict(v: CustomerView) -> dict:
         "credit_limit_minor": v.credit_limit_minor,
         "currency": v.currency,
         "balance_minor": v.balance_minor,
+        "version": v.version,
+        "is_active": v.is_active,
     }
 
 
@@ -154,6 +159,7 @@ def audit_entry_dict(v: AuditEntryView) -> dict:
         "id": v.id,
         "occurred_at": v.occurred_at.isoformat(),
         "actor_id": v.actor_id,
+        "actor_name": v.actor_name,
         "action": v.action,
         "entity_type": v.entity_type,
         "entity_id": v.entity_id,
@@ -188,5 +194,12 @@ def dashboard_view_dict(v: DashboardView) -> dict:
         "profit_today_minor": v.profit_today_minor,
         "outstanding_debt_minor": v.outstanding_debt_minor,
         "low_stock_count": v.low_stock_count,
-        "top_sellers": [{"name": t.name, "qty_minor": t.qty_minor} for t in v.top_sellers],
+        "unknown_cost_lines": v.unknown_cost_lines,
+        "top_sellers": [
+            {
+                "name": t.name, "qty_minor": t.qty_minor, "decimal_places": t.decimal_places,
+                "unit_name": t.unit_name, "revenue_minor": t.revenue_minor,
+            }
+            for t in v.top_sellers
+        ],
     }

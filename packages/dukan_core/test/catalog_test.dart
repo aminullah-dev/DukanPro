@@ -46,4 +46,20 @@ void main() {
     expect(p.sellPrice, Money(52000, 'AFN'));
     expect(p.trackStock, isTrue);
   });
+
+  test('a price is zero or more', () {
+    expect(() => assertPriceValid(sellPriceMinor: -1),
+        throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'CATALOG_PRICE_INVALID')));
+    assertPriceValid(sellPriceMinor: 0);
+  });
+
+  test('built-in units have the same ids everywhere', () {
+    expect({for (final u in builtInUnits) u.name: (u.id, u.decimalPlaces)}, {
+      'piece': ('00000000-0000-7000-8000-000000000001', 0),
+      'kg': ('00000000-0000-7000-8000-000000000002', 3),
+      'litre': ('00000000-0000-7000-8000-000000000003', 3),
+      'dozen': ('00000000-0000-7000-8000-000000000004', 0),
+      'meter': ('00000000-0000-7000-8000-000000000005', 2),
+    });
+  });
 }

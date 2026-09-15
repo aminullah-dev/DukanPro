@@ -14,11 +14,22 @@
 
 ## Invariants
 
-1. **`sku` is unique** among active products; **`barcode.code` is unique** among active barcodes (a scan must resolve to exactly one sellable item).
+1. **`sku` is unique** among live products and **`barcode.code` among live barcodes** (a scan must resolve to exactly one sellable item). The server holds barcodes to it with a partial unique index (0014 kept the oldest of any duplicates there already); REST and the device check both codes before a write (`PRODUCT_DUPLICATE_SKU`, `BARCODE_DUPLICATE`). A synced barcode whose code is taken is refused. A synced product whose SKU is taken is kept and flagged in the audit (`sku_taken`): two tills offline made two real products, and their sales depend on them.
+6. **A barcode can be taken off** its product (`DELETE /products/{id}/barcodes/{code}`, or from the product screen as a synced edit of the barcode row); the row is soft-deleted and devices drop it on their next pull, so the code can go on another product. A deactivated product keeps its barcodes but is not sold: a scan skips it.
+7. `track_stock` and `is_active` are editable (REST and synced); a device's edit carries only the fields that changed.
 2. A Price/Cost is always a `Money` with a currency; a product's default selling currency is the shop currency unless a PriceList overrides it.
 3. A unit's `decimal_places` governs quantity precision: selling 1.5 of a 0-dp unit (piece) is a `ValidationError`.
 4. Deactivating a product (`is_active=false`) hides it from new sales but never deletes history (soft delete / flag).
 5. Selling price below cost is **allowed but flagged** (owner may sell at loss); it raises no error, but the sale records the margin for reporting.
+
+## Built-in units
+
+`piece` (0 decimal places), `kg` (3), `litre` (3), `dozen` (0) and `meter` (2) have fixed ids, the same on the server and on every device (`builtInUnits` / `BUILTIN_UNITS`).
+- The server seeds them at bootstrap and in migration 0011, and they are in the change feed like any unit (0012 logs them for databases made before). Reading units on the server never writes.
+- A device adds any that are missing whenever it reads units, and never queues them for sync.
+- Before the ids were fixed, every device seeded its own copies and pushed them. Server migration 0012 and device schema 9 merge each copy into its built-in unit: products move to it (a product edit in the feed), the copy is soft-deleted, and a device's queued ops for it follow.
+- Custom units are ordinary synced rows.
+- A quantity is always read in its product's unit. A screen that cannot find the unit says so (it never assumes 0 decimal places), and the server answers `UNIT_NOT_FOUND`.
 
 ## Error codes
 
@@ -27,7 +38,10 @@
 | `PRODUCT_DUPLICATE_SKU` | sku collides with an active product |
 | `BARCODE_DUPLICATE` | barcode collides with an active barcode |
 | `CATALOG_UNIT_PRECISION` | quantity has more decimals than the unit allows |
-| `PRICE_CURRENCY_INVALID` | price currency not a configured shop currency |
+| `PRICE_CURRENCY_INVALID` | price currency is not the currency of any branch |
+| `CATALOG_PRICE_INVALID` | a negative selling price |
+| `CATEGORY_NOT_FOUND` | a product in a category that does not exist |
+| `CATALOG_QTY_INVALID` | a typed quantity that is not a number |
 
 ## Test table
 

@@ -17,7 +17,7 @@ final class ReceiptData {
   const ReceiptData({
     required this.shopName,
     required this.number,
-    required this.dateTime,
+    required this.stamp,
     required this.lines,
     required this.subtotalMinor,
     required this.totalMinor,
@@ -29,7 +29,9 @@ final class ReceiptData {
 
   final String shopName;
   final String number; // business invoice number, e.g. INV-2026-00417
-  final DateTime dateTime;
+  /// When, as printed: the branch's wall time in both calendars, in ASCII
+  /// (text mode prints Latin-1 only), e.g. "1405-06-20 14:30 (2026-09-11)".
+  final String stamp;
   final List<ReceiptLineData> lines;
   final int subtotalMinor;
   final int totalMinor;

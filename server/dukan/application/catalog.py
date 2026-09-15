@@ -21,6 +21,7 @@ class ProductView:
     is_active: bool
     on_hand: int
     barcodes: tuple[str, ...]
+    version: int = 1
 
 
 class CatalogService(Protocol):
@@ -50,15 +51,24 @@ class CatalogService(Protocol):
         name: str | None,
         sell_price_minor: int | None,
         is_active: bool | None,
+        version: int | None = None,
+        track_stock: bool | None = None,
+        sku: str | None = None,
     ) -> ProductView: ...
 
     def add_barcode(
         self, *, actor: User, branch_id: str, product_id: str, code: str
     ) -> ProductView: ...
 
-    def list_products(self, *, branch_id: str, search: str | None) -> list[ProductView]: ...
+    def remove_barcode(
+        self, *, actor: User, branch_id: str, product_id: str, code: str
+    ) -> ProductView: ...
 
-    def get_product(self, *, branch_id: str, product_id: str) -> ProductView: ...
+    def list_products(
+        self, *, actor: User, branch_id: str, search: str | None
+    ) -> list[ProductView]: ...
+
+    def get_product(self, *, actor: User, branch_id: str, product_id: str) -> ProductView: ...
 
     def adjust_stock(
         self, *, actor: User, branch_id: str, product_id: str, qty_delta: int

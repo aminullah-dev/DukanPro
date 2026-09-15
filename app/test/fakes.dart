@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_sync/dukan_sync.dart';
 import 'package:dukanpro/infrastructure/audit_api.dart';
@@ -28,13 +30,29 @@ class FakeVerifier implements PasswordVerifier {
 }
 
 /// Canned auth API. Password "correct" succeeds; anything else is rejected.
+/// Each username is its own user ('owner' is u1).
 class FakeAuthApi implements AuthApi {
-  static ApiProfile _profile(String username) => ApiProfile(
-        id: 'u1',
+  /// The role /auth/me reports for the owner (a change made on the server).
+  String meRole = 'owner';
+
+  /// Error codes /auth/me throws, one per call, before it answers normally.
+  final List<String> meErrors = [];
+
+  int refreshCalls = 0;
+  int loginCalls = 0;
+
+  /// The password the server accepts (a reset on the server changes it).
+  String password = 'correct';
+
+  /// Holds the server's answer to a sign-out; null answers at once.
+  Completer<void>? logoutGate;
+
+  static ApiProfile _profile(String username, {String role = 'owner'}) => ApiProfile(
+        id: username == 'owner' ? 'u1' : 'u-$username',
         username: username,
         displayName: 'Owner',
         defaultBranchId: 'b1',
-        branches: const [BranchRoleDto(branchId: 'b1', branchName: 'Main', roleName: 'owner')],
+        branches: [BranchRoleDto(branchId: 'b1', branchName: 'Main', roleName: role)],
       );
 
   static ApiAuthResult _result(String username) => ApiAuthResult(
@@ -48,7 +66,8 @@ class FakeAuthApi implements AuthApi {
     required String password,
     required String deviceId,
   }) async {
-    if (password != 'correct') {
+    loginCalls++;
+    if (password != this.password) {
       throw const AuthApiException('INVALID_CREDENTIALS', statusCode: 401);
     }
     return _result(username);
@@ -61,32 +80,41 @@ class FakeAuthApi implements AuthApi {
     required String displayName,
     required String shopName,
     required String deviceId,
+    required String setupToken,
   }) async =>
       _result(username);
 
   @override
-  Future<ApiTokens> refresh(String refreshToken) async =>
-      const ApiTokens(accessToken: 'a2', refreshToken: 'r2');
+  Future<ApiTokens> refresh(String refreshToken) async {
+    refreshCalls++;
+    return const ApiTokens(accessToken: 'a2', refreshToken: 'r2');
+  }
 
   @override
-  Future<void> logout(String refreshToken) async {}
+  Future<void> logout(String refreshToken) => logoutGate?.future ?? Future.value();
 
   @override
-  Future<ApiProfile> me(String accessToken) async => _profile('owner');
+  Future<ApiProfile> me(String accessToken) async {
+    if (meErrors.isNotEmpty) throw AuthApiException(meErrors.removeAt(0), statusCode: 401);
+    return _profile('owner', role: meRole);
+  }
 }
 
-/// In-memory [SyncClient]: records pushed ops (all applied) and pulls nothing.
+/// In-memory [SyncClient]: records pushed ops and pulls nothing. Every op is
+/// applied unless [outcome] decides otherwise.
 class FakeSyncClient implements SyncClient {
+  FakeSyncClient({this.outcome});
+  final PushResult Function(OutboxOp op)? outcome;
   final List<OutboxOp> pushed = [];
 
   @override
   Future<List<PushResult>> push(List<OutboxOp> ops) async {
     pushed.addAll(ops);
-    return [for (final o in ops) PushResult(o.opId, OpOutcome.applied)];
+    return [for (final o in ops) outcome?.call(o) ?? PushResult(o.opId, OpOutcome.applied)];
   }
 
   @override
-  Future<PullResult> pull({required int sinceWatermark}) async =>
+  Future<PullResult> pull({required int sinceWatermark, String? sinceToken}) async =>
       const PullResult(watermark: 0, changed: [], tombstones: []);
 }
 
@@ -101,6 +129,10 @@ class FakeIamApi implements IamApi {
   final List<EmployeeDto> _employees;
   final List<BranchDto> _branches;
   int _seq = 0;
+  int listCalls = 0;
+
+  /// Thrown by [listEmployees] once set: a list reload that fails.
+  Exception? listError;
 
   EmployeeDto _replace(EmployeeDto updated) {
     final i = _employees.indexWhere((e) => e.id == updated.id);
@@ -109,7 +141,11 @@ class FakeIamApi implements IamApi {
   }
 
   @override
-  Future<List<EmployeeDto>> listEmployees() async => List.of(_employees);
+  Future<List<EmployeeDto>> listEmployees() async {
+    listCalls++;
+    if (listError case final e?) throw e;
+    return List.of(_employees);
+  }
 
   @override
   Future<EmployeeDto> createEmployee({

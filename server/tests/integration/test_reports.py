@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 def test_dashboard_reflects_today_sales_profit_and_debt(client: TestClient) -> None:
     token = client.post(
         "/auth/bootstrap",
-        json={"username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
     ).json()["tokens"]["access_token"]
     h = {"Authorization": f"Bearer {token}"}
     units = {u["name"]: u["id"] for u in client.get("/units", headers=h).json()}
@@ -46,7 +46,7 @@ def test_dashboard_reflects_today_sales_profit_and_debt(client: TestClient) -> N
 def test_dashboard_requires_report_view(client: TestClient) -> None:
     token = client.post(
         "/auth/bootstrap",
-        json={"username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
     ).json()["tokens"]["access_token"]
     h = {"Authorization": f"Bearer {token}"}
     client.post(

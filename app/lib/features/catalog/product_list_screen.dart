@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/digits.dart';
+import '../../widgets/bidi.dart';
+import '../../widgets/money.dart';
+import '../../widgets/labels.dart';
+import '../../widgets/error_text.dart';
+import '../../widgets/shell_scope.dart';
 import '../auth/session.dart';
 import 'catalog_providers.dart';
 import 'product_edit_screen.dart';
@@ -23,7 +29,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
   }
 
   Future<void> _onScan(String code) async {
-    final product = await ref.read(localCatalogProvider).products.findByBarcode(code.trim());
+    final product = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(code));
     if (!mounted || product == null) return;
     await _open(ProductEditScreen(product: product));
   }
@@ -36,9 +42,9 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
     final async = ref.watch(productsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l.products)),
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.products)),
       floatingActionButton: canManage
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton.extended(heroTag: null,
               onPressed: () => _open(const ProductEditScreen()),
               icon: const Icon(Icons.add),
               label: Text(l.addProduct),
@@ -61,14 +67,12 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
           Expanded(
             child: async.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) => ErrorMessage(e),
               data: (products) {
-                final q = _query.toLowerCase();
-                final items = q.isEmpty
-                    ? products
-                    : products
-                        .where((p) => p.name.toLowerCase().contains(q) || p.sku.toLowerCase().contains(q))
-                        .toList();
+                // A Dari keyboard's digits find what Latin ones do.
+                final q = latinDigits(_query.trim()).toLowerCase();
+                bool hit(String s) => latinDigits(s).toLowerCase().contains(q);
+                final items = q.isEmpty ? products : products.where((p) => hit(p.name) || hit(p.sku)).toList();
                 if (items.isEmpty) return Center(child: Text(l.noProducts));
                 return ListView.separated(
                   itemCount: items.length,
@@ -77,15 +81,15 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                     final p = items[i];
                     return ListTile(
                       title: Text(p.name),
-                      subtitle: Text(p.sku),
+                      subtitle: Text(ltr(p.sku)),
                       onTap: canManage ? () => _open(ProductEditScreen(product: p)) : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (p.trackStock) _OnHandBadge(productId: p.id, branchId: actor?.branchId ?? ''),
+                          if (p.trackStock) _OnHandBadge(productId: p.id, branchId: actor?.branchId ?? '', unitId: p.unitId),
                           const SizedBox(width: 10),
                           Text(
-                            '${(p.sellPrice.amountMinor / 100).toStringAsFixed(2)} ${p.sellPrice.currency}',
+                            formatMoney(AppLocalizations.of(context), p.sellPrice.amountMinor, p.sellPrice.currency),
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           if (p.trackStock && (actor?.can(Permission.stockAdjust) ?? false))
@@ -109,18 +113,21 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
 }
 
 class _OnHandBadge extends ConsumerWidget {
-  const _OnHandBadge({required this.productId, required this.branchId});
+  const _OnHandBadge({required this.productId, required this.branchId, required this.unitId});
   final String productId;
   final String branchId;
+  final String unitId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final async = ref.watch(onHandProvider((productId, branchId)));
+    final unit = ref.watch(unitsByIdProvider).value?[unitId];
     return async.maybeWhen(
+      // In the product's unit: 2.500 kg, not 2500.
       data: (n) => Chip(
         visualDensity: VisualDensity.compact,
-        label: Text('${l.onHand}: $n'),
+        label: Text('${l.onHand}: ${unit == null ? '…' : '${formatQuantity(n, unit.decimalPlaces)} ${unitLabel(l, unit.id, unit.name)}'}'),
       ),
       orElse: () => const SizedBox.shrink(),
     );

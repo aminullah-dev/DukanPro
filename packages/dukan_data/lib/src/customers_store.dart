@@ -30,6 +30,76 @@ final class LocalCustomers {
     });
   }
 
+  /// Change a customer's credit limit (null: no limit). A manager's decision:
+  /// the screen offers it only with customer.credit, and the server checks again.
+  Future<void> setCreditLimit(
+    Customer c,
+    int? creditLimitMinor, {
+    required String actorId,
+    required String deviceId,
+  }) async {
+    assertCreditLimitValid(creditLimitMinor: creditLimitMinor);
+    await _db.transaction(() async {
+      await (_db.update(_db.customers)..where((t) => t.id.equals(c.id))).write(CustomersCompanion(
+            creditLimitMinor: Value(creditLimitMinor),
+            updatedBy: Value(actorId),
+            updatedAt: Value(DateTime.now().toUtc()),
+            // The next edit chains on this one; a pull of an older image leaves it.
+            version: Value(c.version + 1),
+          ));
+      await _rec.record(
+        table: 'customers', rowId: c.id, op: 'update', baseVersion: c.version,
+        data: {'credit_limit_minor': creditLimitMinor}, actorId: actorId, deviceId: deviceId,
+      );
+    });
+  }
+
+  /// Close a customer's account to credit, or reopen it: a manager's decision,
+  /// offered with customer.credit and checked again by the server.
+  Future<void> setActive(
+    Customer c,
+    bool isActive, {
+    required String actorId,
+    required String deviceId,
+  }) async {
+    await _db.transaction(() async {
+      await (_db.update(_db.customers)..where((t) => t.id.equals(c.id))).write(CustomersCompanion(
+            isActive: Value(isActive),
+            updatedBy: Value(actorId),
+            updatedAt: Value(DateTime.now().toUtc()),
+            version: Value(c.version + 1),
+          ));
+      await _rec.record(
+        table: 'customers', rowId: c.id, op: 'update', baseVersion: c.version,
+        data: {'is_active': isActive}, actorId: actorId, deviceId: deviceId,
+      );
+    });
+  }
+
+  /// Forgive part or all of what a customer owes: a negative adjustment on the
+  /// append-only ledger, never more than the balance. Offered with
+  /// debt.write_off; the server checks again.
+  Future<void> writeOff({
+    required Customer customer,
+    required int amountMinor,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    assertWriteOffValid(amountMinor: amountMinor, balanceMinor: await balance(customer.id));
+    final ledgerId = newId();
+    await _db.transaction(() async {
+      await _db.into(_db.customerLedger).insert(CustomerLedgerCompanion.insert(
+            id: ledgerId, customerId: customer.id, type: 'adjustment', amountMinor: -amountMinor,
+            currency: Value(customer.currency), refType: const Value('write_off'),
+            createdBy: Value(actorId),
+          ));
+      await _rec.record(table: 'customer_ledger', rowId: ledgerId, op: 'insert', data: {
+        'customer_id': customer.id, 'type': 'adjustment', 'amount_minor': -amountMinor,
+        'currency': customer.currency, 'ref_type': 'write_off',
+      }, actorId: actorId, deviceId: deviceId);
+    });
+  }
+
   Future<List<Customer>> list({String? search}) async {
     final q = _db.select(_db.customers)..where((t) => t.deletedAt.isNull());
     if (search != null && search.isNotEmpty) {
@@ -61,23 +131,30 @@ final class LocalCustomers {
 
   Future<int> balance(String customerId) async => ledgerBalance(await entries(customerId));
 
+  /// A debt payment, by [method]. With a [shiftId] (the till's open shift),
+  /// cash collected counts in that shift's drawer.
   Future<void> recordPayment({
     required String customerId,
     required int amountMinor,
     String currency = 'AFN',
+    PaymentMethod method = PaymentMethod.cash,
+    String? shiftId,
     required String actorId,
     required String deviceId,
   }) async {
+    assertDebtPaymentValid(amountMinor: amountMinor);
+    assertPaymentValid(method: method, amountMinor: amountMinor);
     assertNotOverpaid(balanceMinor: await balance(customerId), paymentMinor: amountMinor);
     final ledgerId = newId();
     await _db.transaction(() async {
       await _db.into(_db.customerLedger).insert(CustomerLedgerCompanion.insert(
             id: ledgerId, customerId: customerId, type: 'payment', amountMinor: amountMinor,
-            currency: Value(currency), refType: const Value('manual'), createdBy: Value(actorId),
+            currency: Value(currency), refType: const Value('manual'), method: Value(method.name),
+            shiftId: Value(shiftId), createdBy: Value(actorId),
           ));
       await _rec.record(table: 'customer_ledger', rowId: ledgerId, op: 'insert', data: {
         'customer_id': customerId, 'type': 'payment', 'amount_minor': amountMinor,
-        'currency': currency, 'ref_type': 'manual',
+        'currency': currency, 'ref_type': 'manual', 'method': method.name, 'shift_id': shiftId,
       }, actorId: actorId, deviceId: deviceId);
     });
   }
@@ -124,6 +201,48 @@ final class LocalPurchasing {
       0, (sum, r) => sum + (r.type == 'payment' ? -r.amountMinor : r.amountMinor));
   }
 
+  /// Pays a supplier what the shop owes them: never more (`SUPPLIER_OVERPAYMENT`),
+  /// in their currency. With a [shiftId] (the till's open shift), cash comes out
+  /// of that shift's drawer.
+  Future<void> paySupplier({
+    required Supplier supplier,
+    required int amountMinor,
+    PaymentMethod method = PaymentMethod.cash,
+    String? shiftId,
+    required String actorId,
+    required String deviceId,
+  }) async {
+    assertSupplierPaymentValid(amountMinor: amountMinor, balanceMinor: await supplierBalance(supplier.id));
+    assertPaymentValid(method: method, amountMinor: amountMinor);
+    final ledgerId = newId();
+    await _db.transaction(() async {
+      await _db.into(_db.supplierLedger).insert(SupplierLedgerCompanion.insert(
+            id: ledgerId, supplierId: supplier.id, type: 'payment', amountMinor: amountMinor,
+            currency: Value(supplier.currency), method: Value(method.name), shiftId: Value(shiftId),
+            createdBy: Value(actorId),
+          ));
+      await _rec.record(table: 'supplier_ledger', rowId: ledgerId, op: 'insert', data: {
+        'supplier_id': supplier.id, 'type': 'payment', 'amount_minor': amountMinor,
+        'currency': supplier.currency, 'method': method.name, 'shift_id': shiftId,
+      }, actorId: actorId, deviceId: deviceId);
+    });
+  }
+
+  /// A received cost is a versioned product edit, so it reaches the server and
+  /// every other device, in the product's selling currency.
+  Future<void> _recordCost(ReceiptLine l, {required String actorId, required String deviceId}) async {
+    final p = await (_db.select(_db.products)..where((t) => t.id.equals(l.productId))).getSingleOrNull();
+    if (p == null || p.costMinor == l.unitCostMinor) return;
+    await (_db.update(_db.products)..where((t) => t.id.equals(p.id))).write(ProductsCompanion(
+      costMinor: Value(l.unitCostMinor), costCurrency: Value(p.sellCurrency),
+      updatedAt: Value(DateTime.now().toUtc()), version: Value(p.version + 1),
+    ));
+    await _rec.record(
+      table: 'products', rowId: p.id, op: 'update', baseVersion: p.version,
+      data: {'cost_minor': l.unitCostMinor}, actorId: actorId, deviceId: deviceId,
+    );
+  }
+
   Future<void> receiveGoods({
     String? supplierId,
     required List<ReceiptLine> lines,
@@ -131,25 +250,28 @@ final class LocalPurchasing {
     required String actorId,
     required String deviceId,
   }) async {
-    final total = lines.fold<int>(0, (s, l) => s + l.lineCost);
+    lines.forEach(assertReceivable);
+    final total = receiptTotal(lines);
     await _db.transaction(() async {
       for (final l in lines) {
+        // A receipt without a cost (a stock keeper's) says nothing about the price
+        // paid: the product keeps its cost, as on the server.
+        if (l.unitCostMinor > 0) await _recordCost(l, actorId: actorId, deviceId: deviceId);
+        final product = await (_db.select(_db.products)..where((t) => t.id.equals(l.productId))).getSingleOrNull();
+        // An untracked product (a service) is billed and costed but moves no stock.
+        if (product != null && !product.trackStock) continue;
         final movementId = newId();
         await _db.into(_db.stockMovements).insert(StockMovementsCompanion.insert(
               id: movementId, productId: l.productId, branchId: branchId,
               qtyDelta: l.qtyMinor, reason: 'purchase', createdBy: Value(actorId),
             ));
-        await (_db.update(_db.products)..where((t) => t.id.equals(l.productId))).write(
-          ProductsCompanion(
-            costMinor: Value(l.unitCostMinor), costCurrency: const Value('AFN'),
-            updatedAt: Value(DateTime.now().toUtc()),
-          ),
-        );
         await _rec.record(table: 'stock_movements', rowId: movementId, op: 'insert', data: {
           'product_id': l.productId, 'branch_id': branchId, 'qty_delta': l.qtyMinor, 'reason': 'purchase',
         }, actorId: actorId, deviceId: deviceId);
       }
-      if (supplierId != null) {
+      // A zero-cost receipt owes the supplier nothing (and the server rejects a
+      // zero bill), so it only moves stock.
+      if (supplierId != null && total > 0) {
         final ledgerId = newId();
         await _db.into(_db.supplierLedger).insert(SupplierLedgerCompanion.insert(
               id: ledgerId, supplierId: supplierId, type: 'bill', amountMinor: total,

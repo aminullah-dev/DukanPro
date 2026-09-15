@@ -13,6 +13,7 @@ from dukan.application.iam import IamService
 from dukan.domain.identity import Permission, User
 from dukan.shared.errors import ValidationError
 from dukan.ui.deps import get_iam_service, requires
+from dukan.ui.fields import Id, Secret, Str32, Str64, Str128
 from dukan.ui.serializers import employee_dict
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -29,11 +30,11 @@ def _active_branch(actor: User, x_branch_id: str | None) -> str:
 
 
 class CreateUserRequest(BaseModel):
-    username: str
-    password: str
-    display_name: str
-    role_name: str = "cashier"
-    branch_id: str | None = None
+    username: Str64
+    password: Secret
+    display_name: Str128
+    role_name: Str32 = "cashier"
+    branch_id: Id | None = None
 
 
 class StatusRequest(BaseModel):
@@ -41,12 +42,12 @@ class StatusRequest(BaseModel):
 
 
 class RoleRequest(BaseModel):
-    branch_id: str
-    role_name: str
+    branch_id: Id
+    role_name: Str32
 
 
 class PasswordRequest(BaseModel):
-    new_password: str
+    new_password: Secret
 
 
 @router.get("")

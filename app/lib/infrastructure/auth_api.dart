@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import 'http.dart' show newDio;
+
 /// Typed client for the DukanPro auth API. DTOs mirror the server's JSON.
 
 class ApiTokens {
@@ -67,7 +69,11 @@ class AuthApiException implements Exception {
 
 /// Could not reach the server (the caller may fall back to offline unlock).
 class NetworkException implements Exception {
-  const NetworkException();
+  const NetworkException({this.maybeDelivered = false});
+
+  /// The request may have reached the server before the connection failed (no
+  /// answer in time): what it asked for may have happened.
+  final bool maybeDelivered;
 }
 
 abstract interface class AuthApi {
@@ -77,6 +83,7 @@ abstract interface class AuthApi {
     required String displayName,
     required String shopName,
     required String deviceId,
+    required String setupToken,
   });
   Future<ApiAuthResult> login({
     required String username,
@@ -89,8 +96,11 @@ abstract interface class AuthApi {
 }
 
 class DioAuthApi implements AuthApi {
+  /// Sign-out has already wiped the device; the server only hears about it.
+  static const _quick = Duration(seconds: 5);
+
   DioAuthApi({required String baseUrl, Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(baseUrl: baseUrl));
+      : _dio = dio ?? newDio(baseUrl);
   final Dio _dio;
 
   Future<T> _wrap<T>(
@@ -106,7 +116,12 @@ class DioAuthApi implements AuthApi {
         final err = (data['error'] as Map).cast<String, dynamic>();
         throw AuthApiException((err['code'] as String?) ?? 'UNKNOWN', statusCode: e.response?.statusCode);
       }
-      throw const NetworkException();
+      throw NetworkException(
+        maybeDelivered: switch (e.type) {
+          DioExceptionType.sendTimeout || DioExceptionType.receiveTimeout || DioExceptionType.unknown => true,
+          _ => false,
+        },
+      );
     }
   }
 
@@ -117,6 +132,7 @@ class DioAuthApi implements AuthApi {
     required String displayName,
     required String shopName,
     required String deviceId,
+    required String setupToken,
   }) =>
       _wrap(
         () => _dio.post('/auth/bootstrap', data: {
@@ -125,6 +141,7 @@ class DioAuthApi implements AuthApi {
           'display_name': displayName,
           'shop_name': shopName,
           'device_id': deviceId,
+          'setup_token': setupToken,
         }),
         ApiAuthResult.fromJson,
       );
@@ -153,7 +170,11 @@ class DioAuthApi implements AuthApi {
   @override
   Future<void> logout(String refreshToken) async {
     try {
-      await _dio.post('/auth/logout', data: {'refresh_token': refreshToken});
+      await _dio.post(
+        '/auth/logout',
+        data: {'refresh_token': refreshToken},
+        options: Options(sendTimeout: _quick, receiveTimeout: _quick),
+      );
     } on DioException {
       // Best-effort; local credentials are cleared regardless.
     }

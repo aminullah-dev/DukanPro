@@ -39,6 +39,27 @@ void main() {
   });
 
   test('receipt line cost', () {
-    expect(const ReceiptLine(productId: 'p', qtyMinor: 10, unitCostMinor: 40000).lineCost, 400000);
+    expect(const ReceiptLine(productId: 'p', qtyMinor: 10, unitCostMinor: 40000, decimalPlaces: 0).lineCost, 400000);
+    // 2.500 kg at 40.00 AFN/kg is a 100.00 AFN bill (server/tests/unit/test_money_rules.py).
+    expect(const ReceiptLine(productId: 'p', qtyMinor: 2500, unitCostMinor: 4000, decimalPlaces: 3).lineCost, 10000);
+  });
+
+  test('a debt payment is a positive amount', () {
+    for (final amount in [0, -500]) {
+      expect(() => assertDebtPaymentValid(amountMinor: amount),
+          throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'DEBT_PAYMENT_INVALID')));
+    }
+    assertDebtPaymentValid(amountMinor: 1);
+  });
+
+  test('write-offs and who may buy on credit', () {
+    Matcher code(String c) => throwsA(isA<AppError>().having((e) => e.code, 'code', c));
+    expect(() => assertWriteOffValid(amountMinor: 0, balanceMinor: 300), code('DEBT_WRITE_OFF_INVALID'));
+    expect(() => assertWriteOffValid(amountMinor: 301, balanceMinor: 300), code('DEBT_WRITE_OFF_EXCEEDS_BALANCE'));
+    assertWriteOffValid(amountMinor: 300, balanceMinor: 300);
+    expect(() => assertCustomerCanBuyOnCredit(isActive: false, customerCurrency: 'AFN', saleCurrency: 'AFN'),
+        code('CUSTOMER_INACTIVE'));
+    expect(() => assertCustomerCanBuyOnCredit(isActive: true, customerCurrency: 'AFN', saleCurrency: 'USD'),
+        code('DEBT_CURRENCY_MISMATCH'));
   });
 }

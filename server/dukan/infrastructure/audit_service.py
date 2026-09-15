@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from dukan.application.access import require_permission
 from dukan.application.audit import AuditEntryView, AuditService
 from dukan.domain.identity import Permission, PermissionPolicy, User
-from dukan.infrastructure.db.models import AuditEntryModel
+from dukan.infrastructure.db.models import AuditEntryModel, UserModel
+from dukan.infrastructure.scope import require_everywhere
 
 _POLICY = PermissionPolicy()
 
@@ -37,7 +38,13 @@ class SqlAuditService(AuditService):
             q = q.where(AuditEntryModel.actor_id == actor_id)
         return q.order_by(AuditEntryModel.occurred_at.desc()).limit(max(1, min(limit, 5000)))
 
-    def _view(self, m: AuditEntryModel) -> AuditEntryView:
+    def _require_reader(self, actor: User, branch_id: str) -> None:
+        # Entries carry no branch, so the trail is shop-wide: only an actor with
+        # audit.view in every branch (an owner of the whole shop) reads it.
+        require_permission(_POLICY, actor, Permission.AUDIT_VIEW, branch_id)
+        require_everywhere(self._s, actor, Permission.AUDIT_VIEW)
+
+    def _view(self, m: AuditEntryModel, names: dict[str, str]) -> AuditEntryView:
         return AuditEntryView(
             id=m.id,
             occurred_at=m.occurred_at,
@@ -46,6 +53,7 @@ class SqlAuditService(AuditService):
             entity_type=m.entity_type,
             entity_id=m.entity_id,
             after=m.after,
+            actor_name=names.get(m.actor_id) if m.actor_id else None,
         )
 
     def query(
@@ -58,9 +66,16 @@ class SqlAuditService(AuditService):
         actor_id: str | None = None,
         limit: int = 100,
     ) -> list[AuditEntryView]:
-        require_permission(_POLICY, actor, Permission.AUDIT_VIEW, branch_id)
+        self._require_reader(actor, branch_id)
         rows = self._s.scalars(self._filtered(action, entity_type, actor_id, limit)).all()
-        return [self._view(m) for m in rows]
+        # Who did it, by name: the app shows people, not ids.
+        ids = {m.actor_id for m in rows if m.actor_id}
+        names: dict[str, str] = {}
+        if ids:
+            by_id = select(UserModel.id, UserModel.display_name).where(UserModel.id.in_(ids))
+            found = self._s.execute(by_id)
+            names = dict(found.tuples().all())
+        return [self._view(m, names) for m in rows]
 
     def export_csv(
         self,
@@ -72,7 +87,7 @@ class SqlAuditService(AuditService):
         actor_id: str | None = None,
         limit: int = 1000,
     ) -> str:
-        require_permission(_POLICY, actor, Permission.AUDIT_VIEW, branch_id)
+        self._require_reader(actor, branch_id)
         rows = self._s.scalars(self._filtered(action, entity_type, actor_id, limit)).all()
         buf = io.StringIO()
         writer = csv.writer(buf)

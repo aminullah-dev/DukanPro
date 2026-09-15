@@ -17,6 +17,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _password = TextEditingController();
   final _displayName = TextEditingController();
   final _shopName = TextEditingController();
+  final _setupCode = TextEditingController();
   bool _setup = false;
   bool _busy = false;
 
@@ -26,24 +27,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _password.dispose();
     _displayName.dispose();
     _shopName.dispose();
+    _setupCode.dispose();
     super.dispose();
   }
 
+  String? _shopError; // the shop name heads every receipt: setup asks for one
+
   Future<void> _submit() async {
+    if (_setup && _shopName.text.trim().isEmpty) {
+      setState(() => _shopError = AppLocalizations.of(context).errRequired);
+      return;
+    }
     setState(() => _busy = true);
     final controller = ref.read(authControllerProvider.notifier);
     final username = _username.text.trim();
-    if (_setup) {
-      await controller.bootstrap(
-        username: username,
-        password: _password.text,
-        displayName: _displayName.text.trim().isEmpty ? username : _displayName.text.trim(),
-        shopName: _shopName.text.trim().isEmpty ? 'My Shop' : _shopName.text.trim(),
-      );
-    } else {
-      await controller.loginOnline(username: username, password: _password.text);
+    try {
+      if (_setup) {
+        await controller.bootstrap(
+          username: username,
+          password: _password.text,
+          displayName: _displayName.text.trim().isEmpty ? username : _displayName.text.trim(),
+          shopName: _shopName.text.trim(),
+          setupCode: _setupCode.text.trim(),
+        );
+      } else {
+        await controller.loginOnline(username: username, password: _password.text);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    if (mounted) setState(() => _busy = false);
   }
 
   void _toggleMode() {
@@ -56,6 +68,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         'NETWORK' => l.errNetwork,
         'INVALID_CREDENTIALS' => l.loginFailed,
         'BOOTSTRAP_ALREADY_DONE' => l.errBootstrapDone,
+        'SETUP_TOKEN_INVALID' => l.errSetupCode,
+        'OFFLINE_EXPIRED' => l.errOfflineExpired,
+        'STORAGE_UNAVAILABLE' => l.errStorage,
+        'USER_DISABLED' => l.errAccountDisabled, // signing in again cannot help
+        'SESSION_REVOKED' || 'REFRESH_INVALID' || 'TOKEN_INVALID' => l.errSessionEnded,
         _ => _setup ? l.setupFailed : l.loginFailed,
       };
 
@@ -96,7 +113,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _shopName,
-                  decoration: InputDecoration(labelText: l.shopName, border: const OutlineInputBorder()),
+                  onChanged: (_) {
+                    if (_shopError != null) setState(() => _shopError = null);
+                  },
+                  decoration: InputDecoration(
+                    labelText: l.shopName, errorText: _shopError, border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _setupCode,
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                    labelText: l.setupCode,
+                    helperText: l.setupCodeHelp,
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
               ],
               if (error != null) ...[
@@ -117,6 +149,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: _busy ? null : _toggleMode,
                 child: Text(_setup ? l.signIn : l.firstRunSetup),
               ),
+              if (state is AuthLoggedOut && state.canReturn)
+                TextButton(
+                  onPressed: _busy ? null : () => ref.read(authControllerProvider.notifier).restore(),
+                  child: Text(l.backToUnlock),
+                ),
             ],
           ),
         ),

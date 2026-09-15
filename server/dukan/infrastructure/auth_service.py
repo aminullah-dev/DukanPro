@@ -4,14 +4,19 @@ the domain, and writes an audit entry in the same transaction as each change."""
 
 from __future__ import annotations
 
+import hmac
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import or_, select, update
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from dukan.application.auth import AuthService
 from dukan.application.dto import AuthenticatedUser, AuthResult, AuthTokens, BranchRole
 from dukan.config import Settings
+from dukan.domain.catalog import BUILTIN_UNITS
 from dukan.domain.identity import (
     BUILTIN_ROLE_PERMISSIONS,
     BranchAssignment,
@@ -19,12 +24,14 @@ from dukan.domain.identity import (
     UserStatus,
     assert_password_strong,
 )
+from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import (
     AuditEntryModel,
     BranchAssignmentModel,
     BranchModel,
     RoleModel,
     SessionModel,
+    UnitModel,
     UserModel,
 )
 from dukan.infrastructure.security import passwords, tokens
@@ -36,10 +43,15 @@ def _as_utc(dt: datetime) -> datetime:
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
+# A device whose refresh answer was lost retries with the token it still holds.
+# Within this window that retry rotates again instead of counting as theft.
+REFRESH_RETRY_GRACE = timedelta(seconds=60)
+
 class SqlAuthService(AuthService):
-    def __init__(self, session: Session, settings: Settings) -> None:
+    def __init__(self, session: Session, settings: Settings, *, setup_token: str) -> None:
         self._s = session
         self._cfg = settings
+        self._setup_token = setup_token
 
     # ---- helpers ----------------------------------------------------------
     def _assignments(self, user_id: str) -> tuple[BranchAssignment, ...]:
@@ -106,13 +118,29 @@ class SqlAuthService(AuthService):
 
     # ---- AuthService ------------------------------------------------------
     def bootstrap_owner(
-        self, *, username: str, password: str, display_name: str, shop_name: str, device_id: str
+        self,
+        *,
+        username: str,
+        password: str,
+        display_name: str,
+        shop_name: str,
+        device_id: str,
+        setup_token: str,
     ) -> AuthResult:
+        # Only whoever holds the server's setup code may claim a fresh server.
+        if not hmac.compare_digest(setup_token.encode(), self._setup_token.encode()):
+            raise AuthError("SETUP_TOKEN_INVALID")
         if self._s.scalar(select(UserModel).limit(1)) is not None:
             raise ConflictError("BOOTSTRAP_ALREADY_DONE")
         assert_password_strong(password=password)
         for name, perms in BUILTIN_ROLE_PERMISSIONS.items():
             self._s.add(RoleModel(id=new_id(), name=name, permissions=[p.value for p in perms]))
+        for unit in BUILTIN_UNITS:  # the same ids as on every device
+            if self._s.get(UnitModel, unit.id) is None:
+                row = UnitModel(id=unit.id, name=unit.name, decimal_places=unit.decimal_places)
+                self._s.add(row)
+                # In the feed like any other unit, so every device pulls them.
+                record_change(self._s, "units", row, op="insert", branch_id=None)
         branch = BranchModel(id=new_id(), name=shop_name)
         self._s.add(branch)
         owner = UserModel(
@@ -129,11 +157,17 @@ class SqlAuthService(AuthService):
                 id=new_id(), user_id=owner.id, branch_id=branch.id, role_name="owner"
             )
         )
-        self._s.flush()
-        user = self._domain_user(owner)
-        toks = self._issue_session(user, device_id)
-        self._audit("owner.bootstrapped", actor_id=owner.id, entity_type="user", entity_id=owner.id)
-        self._s.commit()
+        try:
+            self._s.flush()
+            user = self._domain_user(owner)
+            toks = self._issue_session(user, device_id)
+            self._audit(
+                "owner.bootstrapped", actor_id=owner.id, entity_type="user", entity_id=owner.id
+            )
+            self._s.commit()
+        except IntegrityError as e:  # a concurrent bootstrap won the race
+            self._s.rollback()
+            raise ConflictError("BOOTSTRAP_ALREADY_DONE") from e
         return AuthResult(user=self.profile(user), tokens=toks)
 
     def authenticate(self, *, username: str, password: str, device_id: str) -> AuthResult:
@@ -162,26 +196,74 @@ class SqlAuthService(AuthService):
         return AuthResult(user=self.profile(user), tokens=toks)
 
     def refresh(self, *, refresh_token: str) -> AuthTokens:
-        sess = self._s.scalar(
-            select(SessionModel).where(
-                SessionModel.refresh_hash == tokens.hash_refresh(refresh_token)
-            )
-        )
+        presented = tokens.hash_refresh(refresh_token)
         now = datetime.now(UTC)
-        if sess is None or sess.revoked_at is not None or _as_utc(sess.expires_at) <= now:
+        replacing = presented  # the refresh hash this rotation replaces
+        sess = self._s.scalar(select(SessionModel).where(SessionModel.refresh_hash == presented))
+        if sess is None:
+            sess = self._s.scalar(
+                select(SessionModel).where(SessionModel.prev_refresh_hash == presented)
+            )
+            if sess is None or sess.revoked_at is not None:
+                raise AuthError("REFRESH_INVALID")
+            if now - _as_utc(sess.updated_at) > REFRESH_RETRY_GRACE:
+                # A refresh token that was already rotated came back, so it was
+                # copied: revoke the session so neither holder keeps it.
+                sess.revoked_at = now
+                self._audit(
+                    "session.reuse_detected", actor_id=sess.user_id,
+                    entity_type="session", entity_id=sess.id,
+                )
+                self._s.commit()
+                raise AuthError("REFRESH_INVALID")
+            # The answer to the last refresh was lost and the device retries: rotate
+            # again. The token that answer carried becomes the rotated-out one, so it
+            # cannot be used later either.
+            replacing = sess.refresh_hash
+        if sess.revoked_at is not None or _as_utc(sess.expires_at) <= now:
             raise AuthError("REFRESH_INVALID")
         m = self._s.get(UserModel, sess.user_id)
         if m is None or m.status != "active":
             raise AuthError("USER_DISABLED")
-        sess.revoked_at = now  # rotate: invalidate the presented refresh token
-        toks = self._issue_session(self._domain_user(m), sess.device_id)
+        raw = tokens.new_refresh_token()
+        # Rotate in place and atomically: a concurrent refresh with the same token
+        # finds the hash already changed. The session's absolute expiry stays.
+        rotated = cast(
+            "CursorResult[Any]",
+            self._s.execute(
+                update(SessionModel)
+                .where(
+                    SessionModel.id == sess.id,
+                    SessionModel.refresh_hash == replacing,
+                    SessionModel.revoked_at.is_(None),
+                )
+                .values(
+                    refresh_hash=tokens.hash_refresh(raw), prev_refresh_hash=replacing,
+                    updated_at=now,
+                )
+                .execution_options(synchronize_session=False)
+            ),
+        )
+        if rotated.rowcount != 1:
+            self._s.rollback()
+            raise AuthError("REFRESH_INVALID")
+        access = tokens.issue_access(
+            secret=self._cfg.secret_key, user_id=m.id, session_id=sess.id,
+            ttl_minutes=self._cfg.access_ttl_minutes,
+        )
         self._s.commit()
-        return toks
+        return AuthTokens(access_token=access, refresh_token=raw)
 
     def logout(self, *, refresh_token: str) -> None:
+        presented = tokens.hash_refresh(refresh_token)
+        # A sign-out may carry the token that a renewal still in flight has just
+        # rotated out: it ends the session all the same.
         sess = self._s.scalar(
             select(SessionModel).where(
-                SessionModel.refresh_hash == tokens.hash_refresh(refresh_token)
+                or_(
+                    SessionModel.refresh_hash == presented,
+                    SessionModel.prev_refresh_hash == presented,
+                )
             )
         )
         if sess is not None and sess.revoked_at is None:
@@ -190,29 +272,49 @@ class SqlAuthService(AuthService):
             self._s.commit()
 
     def authenticated_user(self, *, access_token: str) -> User:
+        try:
+            return self._authenticated_user(access_token)
+        finally:
+            # Hand the connection back before the endpoint runs: otherwise every
+            # request holds two pooled connections, and a shop whose devices all
+            # start at once exhausts the pool.
+            self._s.rollback()
+
+    def _authenticated_user(self, access_token: str) -> User:
         claims = tokens.decode_access(secret=self._cfg.secret_key, token=access_token)
-        sess = self._s.get(SessionModel, claims.get("sid", ""))
-        if sess is None or sess.revoked_at is not None:
+        sess = self._s.get(SessionModel, str(claims["sid"]))
+        if (
+            sess is None
+            or sess.revoked_at is not None
+            or sess.deleted_at is not None
+            or _as_utc(sess.expires_at) <= datetime.now(UTC)
+        ):
             raise AuthError("SESSION_REVOKED")
-        m = self._s.get(UserModel, claims.get("sub", ""))
+        if sess.user_id != claims["sub"]:
+            # The session belongs to someone else: we never issued this token.
+            raise AuthError("TOKEN_INVALID")
+        m = self._s.get(UserModel, sess.user_id)
         if m is None or m.status != "active":
             raise AuthError("USER_DISABLED")
         return self._domain_user(m)
 
     def profile(self, user: User) -> AuthenticatedUser:
         branch_ids = {a.branch_id for a in user.assignments}
-        names: dict[str, str] = {}
+        rows: dict[str, BranchModel] = {}
         if branch_ids:
             for b in self._s.scalars(select(BranchModel).where(BranchModel.id.in_(branch_ids))):
-                names[b.id] = b.name
-        branches = tuple(
-            BranchRole(
-                branch_id=a.branch_id,
-                branch_name=names.get(a.branch_id, ""),
-                role_name=a.role_name,
+                rows[b.id] = b
+
+        def role(branch_id: str, role_name: str) -> BranchRole:
+            b = rows.get(branch_id)
+            if b is None:
+                return BranchRole(branch_id=branch_id, branch_name="", role_name=role_name)
+            return BranchRole(
+                branch_id=branch_id, branch_name=b.name, role_name=role_name,
+                timezone=b.timezone, currency=b.currency_default,
             )
-            for a in user.assignments
-        )
+
+        branches = tuple(role(a.branch_id, a.role_name) for a in user.assignments)
         return AuthenticatedUser(
             id=user.id,
             username=user.username,

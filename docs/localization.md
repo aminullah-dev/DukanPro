@@ -32,7 +32,7 @@ A first-class requirement, not a post-launch pass. Three locales, two directions
 
 ## Money
 
-- AFN, 2 minor digits, integer minor units. Also support USD/PKR/EUR (common in Afghan trade). Currency symbol/placement is locale-formatted, never hardcoded.
+- AFN, 2 minor digits, integer minor units. Every branch trades in AFN for now (decided 2026-09-14): another branch currency is refused with `BRANCH_CURRENCY_INVALID`. USD, PKR and EUR amounts that already exist still display with their own sign. Currency symbol and placement are locale-formatted, never hardcoded.
 
 ## Typography
 
@@ -48,3 +48,24 @@ A first-class requirement, not a post-launch pass. Three locales, two directions
 - PDF export **always embeds fonts**. Demo/unlicensed state watermarks the document.
 
 See [`docs/glossary.md`](glossary.md) for the bilingual domain vocabulary that seeds the i18n keys.
+
+## Numbers people type
+
+Money and quantity fields accept Persian (۰-۹) and Arabic-Indic (٠-٩) digits as well as Latin ones, `٫` or `.` as the decimal separator, and `٬` or `,` between thousands (in groups of three).
+- The value becomes integer minor units without passing through a floating-point number: `numbers.dart` and `numbers.py`, checked against one shared table of examples.
+- Anything else is refused with a translated message, never read as 0 or as "no limit": `MONEY_AMOUNT_INVALID`, `CATALOG_QTY_INVALID`, or `CATALOG_UNIT_PRECISION` (more decimals than the unit allows).
+
+## In the app
+
+- **A failure reads as a sentence.** `appErrorText` (`app/lib/widgets/error_text.dart`) maps every error code from the device or the server to a sentence. A code with no sentence of its own reads as its family (gone, changed meanwhile, not accepted), and anything else as a generic failure. Screens show `ErrorMessage(e)`, never `'$e'` or a code, and `tools/check_ui_literals.py` fails the build on either. It also refuses an exception's text in any label, a fixed currency code, money through a float and a time put together by hand. `tools/check_l10n_parity.py` refuses a currency written into a message: an amount carries its own through `formatMoney`.
+- **Codes stored as data get labels** (`app/lib/widgets/labels.dart`, roles in `iam_ui.dart`): roles, audit actions (with the actor's name), time zones and currencies. The built-in units are labelled by their fixed ids; a shop's own units keep the name the shop gave them.
+- **Numbers inside sentences are placeholders** formatted in the locale's digits (`"format": "decimalPattern"`), so one sentence never mixes ۱ and 2. Translations type no digits of their own, except the two input examples.
+- **`app_fa.arb` copies `app_fa_AF.arb`** (it serves a device set to Persian). `tools/check_l10n_parity.py` keeps the two identical. It also checks placeholders against the English template, `@@locale`, and that no English is left in a translation.
+- **The chosen language is saved** on the device and used from the next launch, the sign-in screen included.
+- **Pashto borrows the Persian Cupertino strings.** Flutter ships none for Pashto, so this is what keeps the copy and paste menu working on iOS and macOS.
+- **No English defaults:** first-run setup requires a shop name (the server refuses a blank one), and the biometric prompt is translated.
+- **Dates and times are read on the branch's clock**, never the device's: the zone comes from the branch in the profile. Dari and Pashto show the Solar Hijri date with Persian digits ("۲۰ سنبله ۱۴۰۵، ۱۴:۳۰"), English the Gregorian one (`app/lib/widgets/dates.dart`). The calendar is `SolarHijriDate` in dukan_core, tested against known dates and day by day for 1390–1420. A receipt prints both calendars in ASCII: `1405-06-20 14:30 (2026-09-11)`.
+- **Money reads as a figure:** from integer minor units, grouped by thousands in Latin digits (figures stay Latin), and isolated so a minus stays in front in a right-to-left line. The currency follows as the locale writes it (`formatMoney` in `app/lib/widgets/money.dart`). A price keeps its product's currency when edited; a new one, a cart total, a balance or a typed amount takes the branch's.
+- **Latin tokens are isolated** left to right inside Dari and Pashto lines (`ltr()`): phone numbers, usernames, SKUs, amounts. Phone fields are typed left to right.
+- **Barcode scans are layout-proof:** a keyboard-wedge scanner's keys are read from their physical position, so a Dari or Pashto keyboard layout cannot turn a code into Persian digits or Arabic letters. Codes typed with Persian digits are normalized before lookup.
+- **Counts that mean something:** an insight about a product never sold counts the days since it was added, not a placeholder, and a disabled account is told so instead of "sign in again".

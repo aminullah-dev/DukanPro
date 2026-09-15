@@ -55,14 +55,47 @@ void main() {
   });
 
   group('invariants', () {
-    test('last owner is protected', () {
-      final owner = userWith([const BranchAssignment(branchId: 'B1', roleName: 'owner')]);
+    test('every branch keeps an owner', () {
       expect(
-        () => assertNotLastOwner(target: owner, activeOwnerCount: 1),
+        () => assertBranchKeepsOwner(branchId: 'B1', ownersAfter: 0),
         throwsA(isA<ConflictError>().having((e) => e.code, 'code', 'USER_LAST_OWNER')),
       );
-      // With another owner present, disabling one is allowed.
-      assertNotLastOwner(target: owner, activeOwnerCount: 2);
+      assertBranchKeepsOwner(branchId: 'B1', ownersAfter: 1); // no throw
+    });
+
+    test('the shop keeps an owner of every branch', () {
+      expect(
+        () => assertShopKeepsOwner(ownersAfter: 0),
+        throwsA(isA<ConflictError>().having((e) => e.code, 'code', 'USER_LAST_OWNER')),
+      );
+      assertShopKeepsOwner(ownersAfter: 1); // no throw
+    });
+
+    test('a user keeps an assignment', () {
+      expect(
+        () => assertKeepsAnAssignment(userId: 'u', remaining: 0),
+        throwsA(isA<ConflictError>().having((e) => e.code, 'code', 'USER_LAST_ASSIGNMENT')),
+      );
+      assertKeepsAnAssignment(userId: 'u', remaining: 1); // no throw
+    });
+
+    test('only built-in roles are assignable', () {
+      expect(
+        () => assertRoleKnown(roleName: 'admin'),
+        throwsA(isA<ValidationError>().having((e) => e.code, 'code', 'ROLE_UNKNOWN')),
+      );
+      assertRoleKnown(roleName: 'stock_keeper'); // no throw
+    });
+
+    test('money permissions belong to owner and manager', () {
+      const money = [
+        Permission.saleVoid, Permission.saleDiscount, Permission.customerCredit, Permission.purchaseCost,
+      ];
+      const allowed = {'owner': true, 'manager': true, 'cashier': false, 'stock_keeper': false, 'accountant': false};
+      allowed.forEach((role, can) {
+        final u = userWith([BranchAssignment(branchId: 'B1', roleName: role)]);
+        expect(money.every((p) => policy.can(u, p, 'B1') == can), isTrue, reason: role);
+      });
     });
 
     test('duplicate username rejected', () {

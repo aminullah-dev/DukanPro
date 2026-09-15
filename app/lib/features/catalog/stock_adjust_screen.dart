@@ -1,9 +1,14 @@
 import 'package:dukan_core/dukan_core.dart';
+import 'package:dukan_data/dukan_data.dart' show UnitRow;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/labels.dart';
+import '../../widgets/error_text.dart';
+import '../../widgets/number_input.dart';
 import '../auth/session.dart';
+import '../auth/providers.dart';
 import 'catalog_providers.dart';
 
 class StockAdjustScreen extends ConsumerStatefulWidget {
@@ -16,7 +21,7 @@ class StockAdjustScreen extends ConsumerStatefulWidget {
 class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
   final _qty = TextEditingController();
   bool _busy = false;
-  String? _error; // 'PERM' | 'QTY'
+  String? _error; // a message ready to show
 
   @override
   void dispose() {
@@ -25,16 +30,17 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
   }
 
   Future<void> _apply(int decimalPlaces) async {
+    final l = AppLocalizations.of(context);
     final actor = ref.read(sessionActorProvider);
     if (actor == null || !actor.can(Permission.stockAdjust)) {
-      setState(() => _error = 'PERM');
+      setState(() => _error = l.permissionDenied);
       return;
     }
-    int qtyDelta;
+    late final int qtyDelta;
     try {
       qtyDelta = quantityToMinor(_qty.text, decimalPlaces);
-    } on AppError {
-      setState(() => _error = 'QTY');
+    } on AppError catch (e) {
+      setState(() => _error = numberErrorText(l, e) ?? l.errGeneric);
       return;
     }
     setState(() {
@@ -48,13 +54,22 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
             branchId: branchId,
             qtyDelta: qtyDelta,
             actorId: actor.user.id,
-            deviceId: 'app',
+            deviceId: ref.read(deviceIdProvider),
           );
       ref.invalidate(onHandProvider((widget.product.id, branchId)));
       if (mounted) Navigator.of(context).pop();
+    } on AppError catch (e) {
+      if (mounted) setState(() => _error = numberErrorText(l, e) ?? l.errGeneric);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  UnitRow? _unitOf(List<UnitRow> rows) {
+    for (final u in rows) {
+      if (u.id == widget.product.unitId) return u;
+    }
+    return null;
   }
 
   @override
@@ -69,15 +84,11 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
       appBar: AppBar(title: Text('${l.adjustStock} · ${widget.product.name}')),
       body: units.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => ErrorMessage(e),
         data: (unitRows) {
-          var decimalPlaces = 0;
-          for (final u in unitRows) {
-            if (u.id == widget.product.unitId) {
-              decimalPlaces = u.decimalPlaces;
-              break;
-            }
-          }
+          final unit = _unitOf(unitRows);
+          if (unit == null) return Center(child: Text(l.errUnitUnknown));
+          final decimalPlaces = unit.decimalPlaces;
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -85,7 +96,7 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
                 leading: const Icon(Icons.inventory_2_outlined),
                 title: Text(l.onHand),
                 trailing: Text(
-                  onHand.maybeWhen(data: (n) => '$n', orElse: () => '…'),
+                  onHand.maybeWhen(data: (n) => '${formatQuantity(n, decimalPlaces)} ${unitLabel(AppLocalizations.of(context), unit.id, unit.name)}', orElse: () => '…'),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -98,10 +109,7 @@ class _StockAdjustScreenState extends ConsumerState<StockAdjustScreen> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    _error == 'PERM' ? l.permissionDenied : l.wrongSecret,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
+                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ),
               const SizedBox(height: 16),
               FilledButton(

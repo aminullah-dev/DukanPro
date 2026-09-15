@@ -19,6 +19,7 @@ class AuthService(Protocol):
         display_name: str,
         shop_name: str,
         device_id: str,
+        setup_token: str,
     ) -> AuthResult: ...
 
     def authenticate(self, *, username: str, password: str, device_id: str) -> AuthResult: ...

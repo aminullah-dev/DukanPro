@@ -152,7 +152,7 @@ abstract class AppLocalizations {
   /// No description provided for @itemsInCart.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =0{No items} =1{1 item} other{{count} items}}'**
+  /// **'{count, plural, =0{No items} =1{{count} item} other{{count} items}}'**
   String itemsInCart(int count);
 
   /// No description provided for @signIn.
@@ -431,6 +431,18 @@ abstract class AppLocalizations {
   /// **'Credit limit'**
   String get creditLimit;
 
+  /// No description provided for @setCreditLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Set credit limit'**
+  String get setCreditLimit;
+
+  /// No description provided for @creditLimitHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty for no limit'**
+  String get creditLimitHelp;
+
   /// No description provided for @recordPayment.
   ///
   /// In en, this message translates to:
@@ -548,7 +560,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncPending.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =0{All changes synced} =1{1 change to sync} other{{count} changes to sync}}'**
+  /// **'{count, plural, =0{All changes synced} =1{{count} change to sync} other{{count} changes to sync}}'**
   String syncPending(int count);
 
   /// No description provided for @syncFailed.
@@ -560,8 +572,422 @@ abstract class AppLocalizations {
   /// No description provided for @syncConflicts.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 item needs review} other{{count} items need review}}'**
+  /// **'{count, plural, =1{{count} item needs review} other{{count} items need review}}'**
   String syncConflicts(int count);
+
+  /// No description provided for @syncRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{count} change was rejected by the server} other{{count} changes were rejected by the server}}'**
+  String syncRejected(int count);
+
+  /// No description provided for @setupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup code'**
+  String get setupCode;
+
+  /// No description provided for @setupCodeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown in the server console when the server starts'**
+  String get setupCodeHelp;
+
+  /// No description provided for @errSetupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong setup code. Check the server console.'**
+  String get errSetupCode;
+
+  /// No description provided for @lock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get lock;
+
+  /// No description provided for @logoutConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out of this device?'**
+  String get logoutConfirmTitle;
+
+  /// No description provided for @logoutConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing out removes the saved sign-in from this device. Until someone signs in online again, nobody can sell here.'**
+  String get logoutConfirmBody;
+
+  /// No description provided for @logoutPendingWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{count} change is not synced yet.} other{{count} changes are not synced yet.}}'**
+  String logoutPendingWarning(int count);
+
+  /// No description provided for @useAnotherAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Use another account'**
+  String get useAnotherAccount;
+
+  /// No description provided for @backToUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get backToUnlock;
+
+  /// No description provided for @errOfflineExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has been offline too long. Sign in online.'**
+  String get errOfflineExpired;
+
+  /// No description provided for @errStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s secure storage could not be read. Sign in again; if it keeps happening, restart the device.'**
+  String get errStorage;
+
+  /// No description provided for @errTotalTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This total is too large to record. Check the quantity and price.'**
+  String get errTotalTooLarge;
+
+  /// No description provided for @errSessionEndedUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session ended. Enter your password: the app keeps working offline and signs in again when it is online.'**
+  String get errSessionEndedUnlock;
+
+  /// No description provided for @cashNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash now'**
+  String get cashNow;
+
+  /// No description provided for @onCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'On credit'**
+  String get onCredit;
+
+  /// No description provided for @deactivateCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Close account'**
+  String get deactivateCustomer;
+
+  /// No description provided for @reactivateCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen account'**
+  String get reactivateCustomer;
+
+  /// No description provided for @customerInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Account closed: no credit'**
+  String get customerInactive;
+
+  /// No description provided for @writeOffDebt.
+  ///
+  /// In en, this message translates to:
+  /// **'Write off debt'**
+  String get writeOffDebt;
+
+  /// No description provided for @profitMissingCost.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{count} item sold without a cost} other{{count} items sold without a cost}}'**
+  String profitMissingCost(int count);
+
+  /// No description provided for @errCustomerInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'This customer\'s account is closed: no credit.'**
+  String get errCustomerInactive;
+
+  /// No description provided for @errDebtCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'This customer\'s debt is in another currency; credit is given only in their currency.'**
+  String get errDebtCurrency;
+
+  /// No description provided for @errOverCreditLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'This sale would take the customer over their credit limit.'**
+  String get errOverCreditLimit;
+
+  /// No description provided for @errDebtOverpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'That is more than the customer owes.'**
+  String get errDebtOverpayment;
+
+  /// No description provided for @errWriteOffTooMuch.
+  ///
+  /// In en, this message translates to:
+  /// **'You can write off at most what the customer owes.'**
+  String get errWriteOffTooMuch;
+
+  /// No description provided for @openShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Open shift'**
+  String get openShift;
+
+  /// No description provided for @closeShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Close shift'**
+  String get closeShift;
+
+  /// No description provided for @openingFloat.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash in the drawer to start'**
+  String get openingFloat;
+
+  /// No description provided for @openShiftPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Open your shift to start selling. Count the cash already in the drawer.'**
+  String get openShiftPrompt;
+
+  /// No description provided for @zReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift report'**
+  String get zReport;
+
+  /// No description provided for @cashSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash sales'**
+  String get cashSales;
+
+  /// No description provided for @cardSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Card sales'**
+  String get cardSales;
+
+  /// No description provided for @transferSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile money and transfers'**
+  String get transferSales;
+
+  /// No description provided for @debtCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Debt collected in cash'**
+  String get debtCollected;
+
+  /// No description provided for @expectedCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash that should be in the drawer'**
+  String get expectedCash;
+
+  /// No description provided for @countedCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash counted'**
+  String get countedCash;
+
+  /// No description provided for @variance.
+  ///
+  /// In en, this message translates to:
+  /// **'Difference'**
+  String get variance;
+
+  /// No description provided for @card.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get card;
+
+  /// No description provided for @transfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get transfer;
+
+  /// No description provided for @addPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add payment'**
+  String get addPayment;
+
+  /// No description provided for @remaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Still to pay'**
+  String get remaining;
+
+  /// No description provided for @shiftClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift closed. Difference: {variance}'**
+  String shiftClosed(String variance);
+
+  /// No description provided for @errShiftNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a shift first: sales go into an open shift of yours.'**
+  String get errShiftNotOpen;
+
+  /// No description provided for @errShiftAlreadyOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have an open shift here.'**
+  String get errShiftAlreadyOpen;
+
+  /// No description provided for @suppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Suppliers'**
+  String get suppliers;
+
+  /// No description provided for @paySupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay supplier'**
+  String get paySupplier;
+
+  /// No description provided for @addSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Add supplier'**
+  String get addSupplier;
+
+  /// No description provided for @supplierName.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier name'**
+  String get supplierName;
+
+  /// No description provided for @noSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'No suppliers yet'**
+  String get noSuppliers;
+
+  /// No description provided for @paidToSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid to suppliers in cash'**
+  String get paidToSuppliers;
+
+  /// No description provided for @productActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active: offered for sale'**
+  String get productActive;
+
+  /// No description provided for @barcodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcodes'**
+  String get barcodes;
+
+  /// No description provided for @addBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Add barcode'**
+  String get addBarcode;
+
+  /// No description provided for @removeBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove barcode'**
+  String get removeBarcode;
+
+  /// No description provided for @errBarcodeTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This barcode is already on another product. Remove it there first.'**
+  String get errBarcodeTaken;
+
+  /// No description provided for @errSupplierOverpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'That is more than the shop owes this supplier.'**
+  String get errSupplierOverpayment;
+
+  /// No description provided for @errNotStockTracked.
+  ///
+  /// In en, this message translates to:
+  /// **'This product\'s stock is not tracked.'**
+  String get errNotStockTracked;
+
+  /// No description provided for @recentSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent sales'**
+  String get recentSales;
+
+  /// No description provided for @noRecentSales.
+  ///
+  /// In en, this message translates to:
+  /// **'No sales yet'**
+  String get noRecentSales;
+
+  /// No description provided for @receivedOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Received into stock'**
+  String get receivedOk;
+
+  /// No description provided for @drawerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The receipt printed, but the cash drawer did not open.'**
+  String get drawerFailed;
+
+  /// No description provided for @searchCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Search customers'**
+  String get searchCustomer;
+
+  /// No description provided for @paid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get paid;
+
+  /// No description provided for @voided.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided'**
+  String get voided;
+
+  /// No description provided for @language.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get language;
+
+  /// No description provided for @errSessionEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your access has changed or ended. Sign in again.'**
+  String get errSessionEnded;
+
+  /// No description provided for @biometricUnlockSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock with fingerprint'**
+  String get biometricUnlockSetting;
+
+  /// No description provided for @confirmPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your password'**
+  String get confirmPasswordTitle;
 
   /// No description provided for @lastSyncedAt.
   ///
@@ -737,6 +1163,108 @@ abstract class AppLocalizations {
   /// **'Something went wrong. Please try again.'**
   String get errGeneric;
 
+  /// No description provided for @syncIssuesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync issues'**
+  String get syncIssuesTitle;
+
+  /// No description provided for @syncIssuesReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get syncIssuesReview;
+
+  /// No description provided for @syncIssueConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'changed elsewhere first; that change was kept'**
+  String get syncIssueConflict;
+
+  /// No description provided for @syncIssueRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'the server did not accept this change'**
+  String get syncIssueRejected;
+
+  /// No description provided for @syncIssueRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply again'**
+  String get syncIssueRetry;
+
+  /// No description provided for @syncIssueDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Set aside'**
+  String get syncIssueDismiss;
+
+  /// No description provided for @syncIssuesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to review.'**
+  String get syncIssuesEmpty;
+
+  /// No description provided for @errUnitUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'This product\'s unit isn\'t loaded yet. Sync, then try again.'**
+  String get errUnitUnknown;
+
+  /// No description provided for @editQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Change quantity'**
+  String get editQuantity;
+
+  /// No description provided for @errAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an amount such as 250 or 250.50.'**
+  String get errAmountInvalid;
+
+  /// No description provided for @errQtyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a quantity such as 3 or 2.5.'**
+  String get errQtyInvalid;
+
+  /// No description provided for @errQtyPrecision.
+  ///
+  /// In en, this message translates to:
+  /// **'This unit does not take that many decimal places.'**
+  String get errQtyPrecision;
+
+  /// No description provided for @errMustBePositive.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number greater than zero.'**
+  String get errMustBePositive;
+
+  /// No description provided for @errChooseProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a product.'**
+  String get errChooseProduct;
+
+  /// No description provided for @errRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required.'**
+  String get errRequired;
+
+  /// No description provided for @errTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Too long.'**
+  String get errTooLong;
+
+  /// No description provided for @quantityReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity received'**
+  String get quantityReceived;
+
   /// No description provided for @savedOk.
   ///
   /// In en, this message translates to:
@@ -842,8 +1370,8 @@ abstract class AppLocalizations {
   /// No description provided for @insightDeadStock.
   ///
   /// In en, this message translates to:
-  /// **'{product} hasn\'t sold in {days} days'**
-  String insightDeadStock(String product, String days);
+  /// **'{days, plural, =1{{product} hasn\'t sold in {days} day} other{{product} hasn\'t sold in {days} days}}'**
+  String insightDeadStock(String product, int days);
 
   /// No description provided for @insightDebtRisk.
   ///
@@ -854,8 +1382,8 @@ abstract class AppLocalizations {
   /// No description provided for @insightDigest.
   ///
   /// In en, this message translates to:
-  /// **'{count} sales today'**
-  String insightDigest(String count);
+  /// **'{count, plural, =1{{count} sale today} other{{count} sales today}}'**
+  String insightDigest(int count);
 
   /// No description provided for @insightUnknown.
   ///
@@ -874,6 +1402,642 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No activity recorded yet'**
   String get noAuditEntries;
+
+  /// No description provided for @errSaleEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an item first.'**
+  String get errSaleEmpty;
+
+  /// No description provided for @errUnderpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment is less than the total.'**
+  String get errUnderpaid;
+
+  /// No description provided for @errOverpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment is more than the total.'**
+  String get errOverpaid;
+
+  /// No description provided for @errDiscountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The discount can\'t be below zero or more than the total.'**
+  String get errDiscountInvalid;
+
+  /// No description provided for @errSaleNotVoidable.
+  ///
+  /// In en, this message translates to:
+  /// **'This sale can\'t be voided.'**
+  String get errSaleNotVoidable;
+
+  /// No description provided for @errStockInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough stock for this sale.'**
+  String get errStockInsufficient;
+
+  /// No description provided for @errShiftAlreadyClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'This shift is already closed.'**
+  String get errShiftAlreadyClosed;
+
+  /// No description provided for @errCurrencyMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The currencies don\'t match.'**
+  String get errCurrencyMismatch;
+
+  /// No description provided for @errBranchInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'This branch is closed.'**
+  String get errBranchInactive;
+
+  /// No description provided for @errUserLastAssignment.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the employee\'s only branch.'**
+  String get errUserLastAssignment;
+
+  /// No description provided for @errWeakPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'This password is too short or too simple.'**
+  String get errWeakPassword;
+
+  /// No description provided for @errNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This no longer exists. Refresh and try again.'**
+  String get errNotFound;
+
+  /// No description provided for @errConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else changed this meanwhile. Refresh and try again.'**
+  String get errConflict;
+
+  /// No description provided for @errInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Some values weren\'t accepted. Check them and try again.'**
+  String get errInvalid;
+
+  /// No description provided for @biometricReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm it\'s you to unlock DukanPro'**
+  String get biometricReason;
+
+  /// No description provided for @unitPiece.
+  ///
+  /// In en, this message translates to:
+  /// **'piece'**
+  String get unitPiece;
+
+  /// No description provided for @unitKg.
+  ///
+  /// In en, this message translates to:
+  /// **'kg'**
+  String get unitKg;
+
+  /// No description provided for @unitLitre.
+  ///
+  /// In en, this message translates to:
+  /// **'litre'**
+  String get unitLitre;
+
+  /// No description provided for @unitDozen.
+  ///
+  /// In en, this message translates to:
+  /// **'dozen'**
+  String get unitDozen;
+
+  /// No description provided for @unitMeter.
+  ///
+  /// In en, this message translates to:
+  /// **'meter'**
+  String get unitMeter;
+
+  /// No description provided for @timeZoneKabul.
+  ///
+  /// In en, this message translates to:
+  /// **'Kabul time'**
+  String get timeZoneKabul;
+
+  /// No description provided for @currencyAfn.
+  ///
+  /// In en, this message translates to:
+  /// **'Afghani'**
+  String get currencyAfn;
+
+  /// No description provided for @currencyUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'US dollar'**
+  String get currencyUsd;
+
+  /// No description provided for @currencyPkr.
+  ///
+  /// In en, this message translates to:
+  /// **'Pakistani rupee'**
+  String get currencyPkr;
+
+  /// No description provided for @currencyEur.
+  ///
+  /// In en, this message translates to:
+  /// **'Euro'**
+  String get currencyEur;
+
+  /// No description provided for @auditSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get auditSystem;
+
+  /// No description provided for @auditOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other activity'**
+  String get auditOther;
+
+  /// No description provided for @branchRole.
+  ///
+  /// In en, this message translates to:
+  /// **'{branch} · {role}'**
+  String branchRole(String branch, String role);
+
+  /// No description provided for @branchZoneCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'{zone} · {currency}'**
+  String branchZoneCurrency(String zone, String currency);
+
+  /// No description provided for @auditBy.
+  ///
+  /// In en, this message translates to:
+  /// **'{actor} · {time}'**
+  String auditBy(String actor, String time);
+
+  /// No description provided for @auditBarcodeAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode added'**
+  String get auditBarcodeAdded;
+
+  /// No description provided for @auditBarcodeRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode removed'**
+  String get auditBarcodeRemoved;
+
+  /// No description provided for @auditBranchActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch reopened'**
+  String get auditBranchActivated;
+
+  /// No description provided for @auditBranchCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch opened'**
+  String get auditBranchCreated;
+
+  /// No description provided for @auditBranchDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch closed'**
+  String get auditBranchDeactivated;
+
+  /// No description provided for @auditBranchUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch changed'**
+  String get auditBranchUpdated;
+
+  /// No description provided for @auditCostValuationChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock cost updated'**
+  String get auditCostValuationChanged;
+
+  /// No description provided for @auditCustomerCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer added'**
+  String get auditCustomerCreated;
+
+  /// No description provided for @auditCustomerCreditLimitChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit limit changed'**
+  String get auditCustomerCreditLimitChanged;
+
+  /// No description provided for @auditCustomerDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer account closed'**
+  String get auditCustomerDeactivated;
+
+  /// No description provided for @auditCustomerReactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer account reopened'**
+  String get auditCustomerReactivated;
+
+  /// No description provided for @auditCustomerUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer changed'**
+  String get auditCustomerUpdated;
+
+  /// No description provided for @auditDebtChargePosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale on credit'**
+  String get auditDebtChargePosted;
+
+  /// No description provided for @auditDebtPaymentRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Debt payment received'**
+  String get auditDebtPaymentRecorded;
+
+  /// No description provided for @auditDebtWrittenOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Debt written off'**
+  String get auditDebtWrittenOff;
+
+  /// No description provided for @auditDiscountApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount given'**
+  String get auditDiscountApplied;
+
+  /// No description provided for @auditNotificationsRefreshed.
+  ///
+  /// In en, this message translates to:
+  /// **'Insights refreshed'**
+  String get auditNotificationsRefreshed;
+
+  /// No description provided for @auditOwnerBootstrapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop set up'**
+  String get auditOwnerBootstrapped;
+
+  /// No description provided for @auditPasswordReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset'**
+  String get auditPasswordReset;
+
+  /// No description provided for @auditPaymentRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment recorded'**
+  String get auditPaymentRecorded;
+
+  /// No description provided for @auditProductCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Product added'**
+  String get auditProductCreated;
+
+  /// No description provided for @auditProductDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Product deactivated'**
+  String get auditProductDeactivated;
+
+  /// No description provided for @auditProductPriceChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Price changed'**
+  String get auditProductPriceChanged;
+
+  /// No description provided for @auditProductUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Product changed'**
+  String get auditProductUpdated;
+
+  /// No description provided for @auditPurchaseReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods received'**
+  String get auditPurchaseReceived;
+
+  /// No description provided for @auditRoleAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Role granted'**
+  String get auditRoleAssigned;
+
+  /// No description provided for @auditRoleRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Role removed'**
+  String get auditRoleRevoked;
+
+  /// No description provided for @auditSaleLineAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Item added to a sale'**
+  String get auditSaleLineAdded;
+
+  /// No description provided for @auditSaleSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale completed'**
+  String get auditSaleSettled;
+
+  /// No description provided for @auditSaleVoided.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale voided'**
+  String get auditSaleVoided;
+
+  /// No description provided for @auditSessionReuseDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspicious sign-in blocked'**
+  String get auditSessionReuseDetected;
+
+  /// No description provided for @auditShiftClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift closed'**
+  String get auditShiftClosed;
+
+  /// No description provided for @auditShiftOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift opened'**
+  String get auditShiftOpened;
+
+  /// No description provided for @auditStockAdjusted.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock adjusted'**
+  String get auditStockAdjusted;
+
+  /// No description provided for @auditStockReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock received'**
+  String get auditStockReceived;
+
+  /// No description provided for @auditStockSold.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock sold'**
+  String get auditStockSold;
+
+  /// No description provided for @auditSupplierBillPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier bill recorded'**
+  String get auditSupplierBillPosted;
+
+  /// No description provided for @auditSupplierCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier added'**
+  String get auditSupplierCreated;
+
+  /// No description provided for @auditSupplierPaymentRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier paid'**
+  String get auditSupplierPaymentRecorded;
+
+  /// No description provided for @auditSyncPull.
+  ///
+  /// In en, this message translates to:
+  /// **'Device synced'**
+  String get auditSyncPull;
+
+  /// No description provided for @auditUnitCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit added'**
+  String get auditUnitCreated;
+
+  /// No description provided for @auditUserAuthenticated.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get auditUserAuthenticated;
+
+  /// No description provided for @auditUserCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee added'**
+  String get auditUserCreated;
+
+  /// No description provided for @auditUserDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee disabled'**
+  String get auditUserDisabled;
+
+  /// No description provided for @auditUserEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee enabled'**
+  String get auditUserEnabled;
+
+  /// No description provided for @auditUserLoginFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed sign-in'**
+  String get auditUserLoginFailed;
+
+  /// No description provided for @auditUserLogout.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out'**
+  String get auditUserLogout;
+
+  /// No description provided for @solarMonth1.
+  ///
+  /// In en, this message translates to:
+  /// **'Hamal'**
+  String get solarMonth1;
+
+  /// No description provided for @solarMonth2.
+  ///
+  /// In en, this message translates to:
+  /// **'Sawr'**
+  String get solarMonth2;
+
+  /// No description provided for @solarMonth3.
+  ///
+  /// In en, this message translates to:
+  /// **'Jawza'**
+  String get solarMonth3;
+
+  /// No description provided for @solarMonth4.
+  ///
+  /// In en, this message translates to:
+  /// **'Saratan'**
+  String get solarMonth4;
+
+  /// No description provided for @solarMonth5.
+  ///
+  /// In en, this message translates to:
+  /// **'Asad'**
+  String get solarMonth5;
+
+  /// No description provided for @solarMonth6.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunbula'**
+  String get solarMonth6;
+
+  /// No description provided for @solarMonth7.
+  ///
+  /// In en, this message translates to:
+  /// **'Mizan'**
+  String get solarMonth7;
+
+  /// No description provided for @solarMonth8.
+  ///
+  /// In en, this message translates to:
+  /// **'Aqrab'**
+  String get solarMonth8;
+
+  /// No description provided for @solarMonth9.
+  ///
+  /// In en, this message translates to:
+  /// **'Qaws'**
+  String get solarMonth9;
+
+  /// No description provided for @solarMonth10.
+  ///
+  /// In en, this message translates to:
+  /// **'Jadi'**
+  String get solarMonth10;
+
+  /// No description provided for @solarMonth11.
+  ///
+  /// In en, this message translates to:
+  /// **'Dalw'**
+  String get solarMonth11;
+
+  /// No description provided for @solarMonth12.
+  ///
+  /// In en, this message translates to:
+  /// **'Hut'**
+  String get solarMonth12;
+
+  /// No description provided for @solarDate.
+  ///
+  /// In en, this message translates to:
+  /// **'{day} {month} {year}'**
+  String solarDate(String day, String month, String year);
+
+  /// No description provided for @dateAndTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{date}, {time}'**
+  String dateAndTime(String date, String time);
+
+  /// No description provided for @symbolAfn.
+  ///
+  /// In en, this message translates to:
+  /// **'AFN'**
+  String get symbolAfn;
+
+  /// No description provided for @symbolUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'USD'**
+  String get symbolUsd;
+
+  /// No description provided for @symbolPkr.
+  ///
+  /// In en, this message translates to:
+  /// **'PKR'**
+  String get symbolPkr;
+
+  /// No description provided for @symbolEur.
+  ///
+  /// In en, this message translates to:
+  /// **'EUR'**
+  String get symbolEur;
+
+  /// No description provided for @moneyAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} {currency}'**
+  String moneyAmount(String amount, String currency);
+
+  /// No description provided for @shift.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get shift;
+
+  /// No description provided for @category.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get category;
+
+  /// No description provided for @syncIssueOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other data'**
+  String get syncIssueOther;
+
+  /// No description provided for @errAccountDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'This account is disabled. Ask the shop\'s owner.'**
+  String get errAccountDisabled;
+
+  /// No description provided for @timeZoneKarachi.
+  ///
+  /// In en, this message translates to:
+  /// **'Karachi time'**
+  String get timeZoneKarachi;
+
+  /// No description provided for @timeZoneTashkent.
+  ///
+  /// In en, this message translates to:
+  /// **'Tashkent time'**
+  String get timeZoneTashkent;
+
+  /// No description provided for @timeZoneDushanbe.
+  ///
+  /// In en, this message translates to:
+  /// **'Dushanbe time'**
+  String get timeZoneDushanbe;
+
+  /// No description provided for @timeZoneDubai.
+  ///
+  /// In en, this message translates to:
+  /// **'Dubai time'**
+  String get timeZoneDubai;
+
+  /// No description provided for @timeZoneTehran.
+  ///
+  /// In en, this message translates to:
+  /// **'Tehran time'**
+  String get timeZoneTehran;
+
+  /// No description provided for @timeZoneUtc.
+  ///
+  /// In en, this message translates to:
+  /// **'UTC'**
+  String get timeZoneUtc;
 }
 
 class _AppLocalizationsDelegate

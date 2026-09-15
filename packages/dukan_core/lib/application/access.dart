@@ -18,3 +18,19 @@ void requirePermission({
     });
   }
 }
+
+/// Passes when the actor holds at least one of [permissions] in [branchId].
+void requireAnyPermission({
+  required PermissionPolicy policy,
+  required User actor,
+  required Iterable<Permission> permissions,
+  required String branchId,
+}) {
+  if (!permissions.any((p) => policy.can(actor, p, branchId))) {
+    throw PermissionDeniedError('ACCESS_DENIED', {
+      'permission': permissions.map((p) => p.code).join('|'),
+      'branchId': branchId,
+      'actorId': actor.id,
+    });
+  }
+}

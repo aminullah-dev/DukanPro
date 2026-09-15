@@ -11,6 +11,7 @@ export 'shared/clock.dart';
 export 'shared/money.dart';
 export 'shared/errors.dart';
 export 'shared/result.dart';
+export 'shared/solar_hijri.dart';
 
 // domain
 export 'domain/branches.dart';
@@ -19,6 +20,7 @@ export 'domain/customers.dart';
 export 'domain/identity.dart';
 export 'domain/insights.dart';
 export 'domain/inventory.dart';
+export 'domain/numbers.dart';
 export 'domain/purchasing.dart';
 export 'domain/sales.dart';
 

@@ -11,7 +11,10 @@ from dukan.domain.identity import User
 @dataclass(frozen=True, slots=True)
 class TopSellerView:
     name: str
-    qty_minor: int
+    qty_minor: int  # in the unit's minor granularity (10**decimal_places)
+    decimal_places: int = 0
+    unit_name: str = ""
+    revenue_minor: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +24,7 @@ class DashboardView:
     outstanding_debt_minor: int
     low_stock_count: int
     top_sellers: tuple[TopSellerView, ...]
+    unknown_cost_lines: int  # today's lines sold without a cost: profit counts them as free
 
 
 class ReportsService(Protocol):

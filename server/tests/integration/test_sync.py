@@ -14,7 +14,7 @@ def _uuid() -> str:
 def _setup(client: TestClient) -> tuple[dict, str, str]:
     boot = client.post(
         "/auth/bootstrap",
-        json={"username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
+        json={"setup_token": "test-setup-token", "username": "owner", "password": "pw12345678", "display_name": "Owner", "shop_name": "Dukan"},
     ).json()
     h = {"Authorization": f"Bearer {boot['tokens']['access_token']}"}
     branch = boot["user"]["default_branch_id"]

@@ -1,3 +1,5 @@
+import 'package:dukan_core/dukan_core.dart' show formatQuantity;
+
 import 'receipt.dart';
 
 /// Encodes a [ReceiptData] into ESC/POS printer bytes (text mode). Pure and
@@ -25,7 +27,7 @@ final class EscPosEncoder {
     _line(out, r.shopName);
     _bold(out, false);
     _line(out, r.number);
-    _line(out, _stamp(r.dateTime));
+    _line(out, r.stamp);
     _align(out, 0); // left
     _rule(out);
     for (final l in r.lines) {
@@ -76,12 +78,8 @@ final class EscPosEncoder {
     if (bold) _bold(out, false);
   }
 
-  String _money(int minor) => (minor / 100).toStringAsFixed(2);
+  String _money(int minor) => formatQuantity(minor, 2); // integers, never a float
 
-  String _stamp(DateTime dt) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${dt.year}-${two(dt.month)}-${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}';
-  }
 
   /// Latin-1 text path: runes above 0xFF become `?` (see class doc).
   List<int> _encodeText(String text) =>

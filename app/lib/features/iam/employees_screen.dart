@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/iam_api.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bidi.dart';
+import '../../widgets/error_text.dart';
+import '../../widgets/shell_scope.dart';
 import 'iam_providers.dart';
 import 'iam_ui.dart';
 
@@ -14,15 +17,15 @@ class EmployeesScreen extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final async = ref.watch(employeesControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l.employees)),
-      floatingActionButton: FloatingActionButton.extended(
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.employees)),
+      floatingActionButton: FloatingActionButton.extended(heroTag: null,
         onPressed: () => _add(context, ref, l),
         icon: const Icon(Icons.person_add),
         label: Text(l.addEmployee),
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(iamErrorMessage(l, e))),
+        error: (e, _) => ErrorMessage(e),
         data: (employees) => employees.isEmpty
             ? Center(child: Text(l.noEmployees))
             : ListView.separated(
@@ -58,7 +61,7 @@ class _EmployeeTile extends ConsumerWidget {
         .join('   ');
     return ListTile(
       leading: CircleAvatar(child: Text(employee.displayName.isNotEmpty ? employee.displayName[0] : '?')),
-      title: Text('${employee.displayName}  (@${employee.username})'),
+      title: Text('${employee.displayName}  (${ltr('@${employee.username}')})'),
       subtitle: roles.isEmpty ? null : Text(roles),
       trailing: Chip(
         label: Text(employee.isActive ? l.statusActive : l.statusDisabled),
@@ -77,7 +80,7 @@ class _EmployeeTile extends ConsumerWidget {
           children: [
             ListTile(
               title: Text(employee.displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('@${employee.username}'),
+              subtitle: Text(ltr('@${employee.username}')),
             ),
             const Divider(height: 1),
             ListTile(
@@ -172,6 +175,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text(l.addEmployee),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: _name, decoration: InputDecoration(labelText: l.displayName)),
@@ -184,6 +188,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           initialValue: _role,
+          isExpanded: true,
           decoration: InputDecoration(labelText: l.role),
           items: [
             for (final r in kRoleNames) DropdownMenuItem(value: r, child: Text(roleLabel(l, r))),
@@ -223,19 +228,22 @@ class _AssignRoleDialogState extends State<_AssignRoleDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text(l.assignRole),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         DropdownButtonFormField<String>(
           initialValue: _branchId,
+          isExpanded: true,
           decoration: InputDecoration(labelText: l.branches),
           items: [
-            for (final b in widget.branches) DropdownMenuItem(value: b.id, child: Text(b.name)),
+            for (final b in widget.branches) DropdownMenuItem(value: b.id, child: Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
           ],
           onChanged: (v) => setState(() => _branchId = v ?? _branchId),
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           initialValue: _role,
+          isExpanded: true,
           decoration: InputDecoration(labelText: l.role),
           items: [
             for (final r in kRoleNames) DropdownMenuItem(value: r, child: Text(roleLabel(l, r))),
@@ -272,6 +280,7 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
+      scrollable: true, // the keyboard can take half a phone's height
       title: Text(l.resetPassword),
       content: TextField(
         controller: _password,

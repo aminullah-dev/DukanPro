@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from dukan.application.purchasing import PurchasingService, ReceiptLineInput
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_current_actor, get_purchasing_service
+from dukan.ui.fields import Id, Money, Str8, Str32, Str128
 from dukan.ui.serializers import goods_receipt_view_dict, supplier_view_dict
 
 router = APIRouter(tags=["purchasing"])
@@ -20,24 +21,31 @@ BranchHeader = Annotated[str | None, Header()]
 
 
 class CreateSupplierRequest(BaseModel):
-    name: str
-    phone: str | None = None
+    name: Str128
+    phone: Str32 | None = None
 
 
 class ReceiptLineReq(BaseModel):
-    product_id: str
-    qty_minor: int
-    unit_cost_minor: int
+    product_id: Id
+    qty_minor: Money
+    unit_cost_minor: Money
 
 
 class ReceiveGoodsRequest(BaseModel):
-    supplier_id: str | None = None
+    supplier_id: Id | None = None
     lines: list[ReceiptLineReq]
 
 
+class SupplierPaymentRequest(BaseModel):
+    amount_minor: Money
+    method: Str8 = "cash"  # cash, card or transfer
+    shift_id: Id | None = None  # the till's open shift: cash comes out of its drawer
+
+
 @router.get("/suppliers")
-def list_suppliers(actor: Actor, svc: Purchasing) -> list[dict]:
-    return [supplier_view_dict(v) for v in svc.list_suppliers()]
+def list_suppliers(actor: Actor, svc: Purchasing, x_branch_id: BranchHeader = None) -> list[dict]:
+    views = svc.list_suppliers(actor=actor, branch_id=active_branch(actor, x_branch_id))
+    return [supplier_view_dict(v) for v in views]
 
 
 @router.post("/suppliers")
@@ -70,5 +78,21 @@ def receive_goods(
                 )
                 for l in body.lines
             ],
+        )
+    )
+
+
+@router.post("/suppliers/{supplier_id}/payments")
+def pay_supplier(
+    supplier_id: str,
+    body: SupplierPaymentRequest,
+    actor: Actor,
+    svc: Purchasing,
+    x_branch_id: BranchHeader = None,
+) -> dict:
+    return supplier_view_dict(
+        svc.pay_supplier(
+            actor=actor, branch_id=active_branch(actor, x_branch_id), supplier_id=supplier_id,
+            amount_minor=body.amount_minor, method=body.method, shift_id=body.shift_id,
         )
     )

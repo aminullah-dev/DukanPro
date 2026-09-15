@@ -9,5 +9,6 @@ export 'src/in_memory.dart';
 export 'src/reports.dart';
 export 'src/sales_store.dart';
 export 'src/settings_store.dart';
+export 'src/shifts_store.dart';
 export 'src/sync_recorder.dart';
 export 'src/sync_service.dart';

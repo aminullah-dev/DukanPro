@@ -4,9 +4,17 @@ import 'package:dukan_core/dukan_core.dart';
 import '../database.dart';
 
 class TopSeller {
-  const TopSeller(this.name, this.qtyMinor);
+  const TopSeller(this.name, this.qtyMinor,
+      {this.decimalPlaces = 0, this.unitName = '', this.unitId = '', this.revenueMinor = 0});
   final String name;
   final int qtyMinor;
+  final int decimalPlaces;
+  final String unitName;
+
+  /// The unit's id, so the app names a built-in unit in the user's language.
+  final String unitId;
+  final int revenueMinor;
+
 }
 
 /// Read-model projection for the dashboard. Computed from the local ledgers
@@ -18,12 +26,24 @@ class DashboardData {
     required this.outstandingDebtMinor,
     required this.lowStockCount,
     required this.topSellers,
+    this.unknownCostLines = 0,
   });
   final int salesTodayMinor;
   final int profitTodayMinor;
   final int outstandingDebtMinor;
   final int lowStockCount;
   final List<TopSeller> topSellers;
+
+  /// Today's lines sold without a cost: profit counts them as free.
+  final int unknownCostLines;
+}
+
+int _pow10(int n) {
+  var r = 1;
+  for (var i = 0; i < n; i++) {
+    r *= 10;
+  }
+  return r;
 }
 
 /// Reporting queries over the local database. Reports are projections, not
@@ -32,12 +52,22 @@ final class LocalReports {
   LocalReports(this._db);
   final AppDatabase _db;
 
-  Future<DashboardData> dashboard(String branchId, {int lowStockThreshold = 5}) async {
-    final now = DateTime.now();
-    bool isToday(DateTime d) {
-      final local = d.toLocal();
-      return local.year == now.year && local.month == now.month && local.day == now.day;
-    }
+  /// [lowStockThreshold] is in whole units of each product's unit: 5 kg is
+  /// 5000 grams, 5 pieces is 5.
+  /// "Today" is the business day of the branch's [zone] (docs/domain/branches.md),
+  /// not the device's day: a till set to another zone counts the same sales.
+  Future<DashboardData> dashboard(
+    String branchId, {
+    String zone = defaultBranchZone,
+    DateTime? now,
+    int lowStockThreshold = 5,
+  }) async {
+    final today = businessDay(zone, now ?? DateTime.now());
+    bool isToday(DateTime d) => !d.isBefore(today.start) && d.isBefore(today.end);
+
+    final units = {for (final u in await _db.select(_db.units).get()) u.id: u};
+    final products = await (_db.select(_db.products)..where((t) => t.deletedAt.isNull())).get();
+    final unitOf = {for (final p in products) p.id: units[p.unitId]};
 
     final settled = await (_db.select(_db.sales)
           ..where((t) => t.branchId.equals(branchId) & t.status.equals('settled')))
@@ -46,22 +76,27 @@ final class LocalReports {
     final salesToday = todaySales.fold<int>(0, (sum, s) => sum + s.totalMinor);
     final todayIds = todaySales.map((s) => s.id).toSet();
 
-    final lines = await _db.select(_db.saleLines).get();
-    var profit = 0;
-    final sellers = <String, (String, int)>{};
+    final lines = await (_db.select(_db.saleLines)..where((t) => t.saleId.isIn(todayIds))).get();
+    var costs = 0;
+    var unknownCost = 0;
+    final sellers = <String, TopSeller>{};
     for (final ln in lines) {
-      if (!todayIds.contains(ln.saleId)) continue;
-      final costTotal = lineTotalMinor(ln.unitCostMinor, ln.qtyMinor, ln.decimalPlaces);
-      profit += ln.lineTotalMinor - costTotal;
+      costs += lineTotalMinor(ln.unitCostMinor, ln.qtyMinor, ln.decimalPlaces);
+      if (ln.unitCostMinor == 0) unknownCost++; // sold before any cost was known
       final prev = sellers[ln.productId];
-      sellers[ln.productId] = (ln.name, (prev?.$2 ?? 0) + ln.qtyMinor);
+      sellers[ln.productId] = TopSeller(
+        ln.name, (prev?.qtyMinor ?? 0) + ln.qtyMinor,
+        decimalPlaces: ln.decimalPlaces,
+        unitName: unitOf[ln.productId]?.name ?? '',
+        unitId: unitOf[ln.productId]?.id ?? '',
+        revenueMinor: (prev?.revenueMinor ?? 0) + ln.lineTotalMinor,
+      );
     }
 
     final ledger = await (_db.select(_db.customerLedger)..where((t) => t.deletedAt.isNull())).get();
     final debt = ledger.fold<int>(
         0, (sum, e) => sum + (e.type == 'payment' ? -e.amountMinor : e.amountMinor));
 
-    final products = await (_db.select(_db.products)..where((t) => t.deletedAt.isNull())).get();
     final moves = await (_db.select(_db.stockMovements)
           ..where((t) => t.branchId.equals(branchId) & t.deletedAt.isNull()))
         .get();
@@ -71,18 +106,22 @@ final class LocalReports {
     }
     var lowCount = 0;
     for (final p in products) {
-      if (p.trackStock && (onHand[p.id] ?? 0) <= lowStockThreshold) lowCount++;
+      if (!p.trackStock || !p.isActive) continue;
+      final scale = _pow10(units[p.unitId]?.decimalPlaces ?? 0);
+      if ((onHand[p.id] ?? 0) <= lowStockThreshold * scale) lowCount++;
     }
 
-    final top = sellers.entries.map((e) => TopSeller(e.value.$1, e.value.$2)).toList()
-      ..sort((a, b) => b.qtyMinor.compareTo(a.qtyMinor));
+    // Ranked by revenue: 2 kg of rice and 500 soaps are not comparable counts.
+    final top = sellers.values.toList()..sort((a, b) => b.revenueMinor.compareTo(a.revenueMinor));
 
     return DashboardData(
       salesTodayMinor: salesToday,
-      profitTodayMinor: profit,
+      // What the sales took (after discounts), less what the goods cost.
+      profitTodayMinor: salesToday - costs,
       outstandingDebtMinor: debt,
       lowStockCount: lowCount,
       topSellers: top.take(5).toList(),
+      unknownCostLines: unknownCost,
     );
   }
 }

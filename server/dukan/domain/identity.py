@@ -21,6 +21,10 @@ class Permission(StrEnum):
     BRANCH_MANAGE = "branch.manage"
     DEBT_WRITE_OFF = "debt.write_off"
     AUDIT_VIEW = "audit.view"
+    SALE_VOID = "sale.void"
+    SALE_DISCOUNT = "sale.discount"
+    CUSTOMER_CREDIT = "customer.credit"
+    PURCHASE_COST = "purchase.cost"
 
 
 # Built-in role name -> permission set. Single source for PermissionPolicy.
@@ -29,6 +33,8 @@ BUILTIN_ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "manager": frozenset({
         Permission.SALE_CREATE, Permission.PRICE_CHANGE, Permission.STOCK_ADJUST,
         Permission.PRODUCT_MANAGE, Permission.REPORT_VIEW, Permission.DEBT_WRITE_OFF,
+        Permission.SALE_VOID, Permission.SALE_DISCOUNT, Permission.CUSTOMER_CREDIT,
+        Permission.PURCHASE_COST,
     }),
     "cashier": frozenset({Permission.SALE_CREATE}),
     "stock_keeper": frozenset({Permission.STOCK_ADJUST}),
@@ -83,9 +89,34 @@ class PermissionPolicy:
         return permission in self.permissions_for(user, branch_id)
 
 
-def assert_not_last_owner(*, target: User, active_owner_count: int) -> None:
-    if target.is_owner and active_owner_count <= 1:
-        raise ConflictError("USER_LAST_OWNER", user_id=target.id)
+def assert_branch_keeps_owner(*, branch_id: str, owners_after: int) -> None:
+    """Every branch keeps at least one active owner, so someone can always
+    administer it. `owners_after` counts the branch's active owners once the
+    change applies. Raises ConflictError USER_LAST_OWNER."""
+    if owners_after < 1:
+        raise ConflictError("USER_LAST_OWNER", branch_id=branch_id)
+
+
+def assert_shop_keeps_owner(*, owners_after: int) -> None:
+    """Some active user keeps owning every branch, or nobody could open a branch
+    or read the shop-wide audit trail. `owners_after` counts such users once the
+    change applies. Raises ConflictError USER_LAST_OWNER."""
+    if owners_after < 1:
+        raise ConflictError("USER_LAST_OWNER", scope="shop")
+
+
+def assert_keeps_an_assignment(*, user_id: str, remaining: int) -> None:
+    """A user keeps at least one branch assignment. Raises ConflictError
+    USER_LAST_ASSIGNMENT."""
+    if remaining < 1:
+        raise ConflictError("USER_LAST_ASSIGNMENT", user_id=user_id)
+
+
+def assert_role_known(*, role_name: str) -> None:
+    """Only built-in roles can be assigned until custom roles exist. Raises
+    ValidationError ROLE_UNKNOWN."""
+    if role_name not in BUILTIN_ROLE_PERMISSIONS:
+        raise ValidationError("ROLE_UNKNOWN", role=role_name)
 
 
 def assert_username_available(*, username: str, taken: bool) -> None:

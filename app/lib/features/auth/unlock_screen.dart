@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,9 +23,15 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(biometricProvider).isAvailable().then((v) {
-      if (mounted) setState(() => _biometricAvailable = v);
-    });
+    _checkBiometric();
+  }
+
+  /// The fingerprint button shows only when the device supports it and the
+  /// cached user opted in.
+  Future<void> _checkBiometric() async {
+    final available = await ref.read(biometricProvider).isAvailable() &&
+        await ref.read(authControllerProvider.notifier).biometricEnabled();
+    if (mounted) setState(() => _biometricAvailable = available);
   }
 
   @override
@@ -33,9 +41,23 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   }
 
   Future<void> _unlock() async {
+    final controller = ref.read(authControllerProvider.notifier);
+    final password = _secret.text;
     setState(() => _busy = true);
-    await ref.read(authControllerProvider.notifier).unlockWithPassword(_secret.text);
-    if (mounted) setState(() => _busy = false);
+    try {
+      await controller.unlockWithPassword(password);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    // Once unlocked, confirm the user with the server if it is reachable; a
+    // session that simply ended renews with this password.
+    unawaited(controller.revalidate(password: password));
+  }
+
+  Future<void> _unlockWithBiometric() async {
+    final controller = ref.read(authControllerProvider.notifier);
+    final reason = AppLocalizations.of(context).biometricReason;
+    if (await controller.unlockWithBiometric(reason)) unawaited(controller.revalidate());
   }
 
   @override
@@ -67,7 +89,12 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
               ),
               if (error != null) ...[
                 const SizedBox(height: 12),
-                Text(l.wrongSecret, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  // A wrong password, or a session the server ended: then the
+                  // password is what signs in again.
+                  error == 'WRONG_SECRET' ? l.wrongSecret : l.errSessionEndedUnlock,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: 20),
               FilledButton(
@@ -78,13 +105,15 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
               ),
               if (_biometricAvailable)
                 TextButton.icon(
-                  onPressed: () => ref.read(authControllerProvider.notifier).unlockWithBiometric(),
+                  onPressed: _unlockWithBiometric,
                   icon: const Icon(Icons.fingerprint),
                   label: Text(l.useBiometric),
                 ),
+              // Signing out here would wipe the saved sign-in without any password;
+              // from the lock screen one can only switch to another account.
               TextButton(
-                onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-                child: Text(l.logout),
+                onPressed: () => ref.read(authControllerProvider.notifier).useAnotherAccount(),
+                child: Text(l.useAnotherAccount),
               ),
             ],
           ),

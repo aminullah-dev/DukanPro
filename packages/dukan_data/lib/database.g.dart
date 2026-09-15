@@ -113,6 +113,12 @@ class $OutboxEntriesTable extends OutboxEntries
   late final GeneratedColumn<int> baseVersion = GeneratedColumn<int>(
       'base_version', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _lastErrorMeta =
+      const VerificationMeta('lastError');
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+      'last_error', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -130,7 +136,8 @@ class $OutboxEntriesTable extends OutboxEntries
         deviceId,
         actorId,
         status,
-        baseVersion
+        baseVersion,
+        lastError
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -227,6 +234,10 @@ class $OutboxEntriesTable extends OutboxEntries
           baseVersion.isAcceptableOrUnknown(
               data['base_version']!, _baseVersionMeta));
     }
+    if (data.containsKey('last_error')) {
+      context.handle(_lastErrorMeta,
+          lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta));
+    }
     return context;
   }
 
@@ -268,6 +279,8 @@ class $OutboxEntriesTable extends OutboxEntries
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       baseVersion: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}base_version']),
+      lastError: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}last_error']),
     );
   }
 
@@ -294,6 +307,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
   final String actorId;
   final String status;
   final int? baseVersion;
+
+  /// The server's code for an op it conflicted or rejected (shown for review).
+  final String? lastError;
   const OutboxRow(
       {required this.id,
       required this.createdAt,
@@ -310,7 +326,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       required this.deviceId,
       required this.actorId,
       required this.status,
-      this.baseVersion});
+      this.baseVersion,
+      this.lastError});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -337,6 +354,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || baseVersion != null) {
       map['base_version'] = Variable<int>(baseVersion);
+    }
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
     }
     return map;
   }
@@ -367,6 +387,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       baseVersion: baseVersion == null && nullToAbsent
           ? const Value.absent()
           : Value(baseVersion),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
     );
   }
 
@@ -390,6 +413,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       actorId: serializer.fromJson<String>(json['actorId']),
       status: serializer.fromJson<String>(json['status']),
       baseVersion: serializer.fromJson<int?>(json['baseVersion']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
     );
   }
   @override
@@ -412,6 +436,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       'actorId': serializer.toJson<String>(actorId),
       'status': serializer.toJson<String>(status),
       'baseVersion': serializer.toJson<int?>(baseVersion),
+      'lastError': serializer.toJson<String?>(lastError),
     };
   }
 
@@ -431,7 +456,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           String? deviceId,
           String? actorId,
           String? status,
-          Value<int?> baseVersion = const Value.absent()}) =>
+          Value<int?> baseVersion = const Value.absent(),
+          Value<String?> lastError = const Value.absent()}) =>
       OutboxRow(
         id: id ?? this.id,
         createdAt: createdAt ?? this.createdAt,
@@ -449,6 +475,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
         actorId: actorId ?? this.actorId,
         status: status ?? this.status,
         baseVersion: baseVersion.present ? baseVersion.value : this.baseVersion,
+        lastError: lastError.present ? lastError.value : this.lastError,
       );
   OutboxRow copyWithCompanion(OutboxEntriesCompanion data) {
     return OutboxRow(
@@ -472,6 +499,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       status: data.status.present ? data.status.value : this.status,
       baseVersion:
           data.baseVersion.present ? data.baseVersion.value : this.baseVersion,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
     );
   }
 
@@ -493,7 +521,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           ..write('deviceId: $deviceId, ')
           ..write('actorId: $actorId, ')
           ..write('status: $status, ')
-          ..write('baseVersion: $baseVersion')
+          ..write('baseVersion: $baseVersion, ')
+          ..write('lastError: $lastError')
           ..write(')'))
         .toString();
   }
@@ -515,7 +544,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       deviceId,
       actorId,
       status,
-      baseVersion);
+      baseVersion,
+      lastError);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -535,7 +565,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           other.deviceId == this.deviceId &&
           other.actorId == this.actorId &&
           other.status == this.status &&
-          other.baseVersion == this.baseVersion);
+          other.baseVersion == this.baseVersion &&
+          other.lastError == this.lastError);
 }
 
 class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
@@ -555,6 +586,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
   final Value<String> actorId;
   final Value<String> status;
   final Value<int?> baseVersion;
+  final Value<String?> lastError;
   final Value<int> rowid;
   const OutboxEntriesCompanion({
     this.id = const Value.absent(),
@@ -573,6 +605,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     this.actorId = const Value.absent(),
     this.status = const Value.absent(),
     this.baseVersion = const Value.absent(),
+    this.lastError = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   OutboxEntriesCompanion.insert({
@@ -592,6 +625,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     required String actorId,
     this.status = const Value.absent(),
     this.baseVersion = const Value.absent(),
+    this.lastError = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         aggregateType = Value(aggregateType),
@@ -618,6 +652,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     Expression<String>? actorId,
     Expression<String>? status,
     Expression<int>? baseVersion,
+    Expression<String>? lastError,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -637,6 +672,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       if (actorId != null) 'actor_id': actorId,
       if (status != null) 'status': status,
       if (baseVersion != null) 'base_version': baseVersion,
+      if (lastError != null) 'last_error': lastError,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -658,6 +694,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       Value<String>? actorId,
       Value<String>? status,
       Value<int?>? baseVersion,
+      Value<String?>? lastError,
       Value<int>? rowid}) {
     return OutboxEntriesCompanion(
       id: id ?? this.id,
@@ -676,6 +713,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       actorId: actorId ?? this.actorId,
       status: status ?? this.status,
       baseVersion: baseVersion ?? this.baseVersion,
+      lastError: lastError ?? this.lastError,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -731,6 +769,9 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     if (baseVersion.present) {
       map['base_version'] = Variable<int>(baseVersion.value);
     }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -756,6 +797,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
           ..write('actorId: $actorId, ')
           ..write('status: $status, ')
           ..write('baseVersion: $baseVersion, ')
+          ..write('lastError: $lastError, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7728,6 +7770,17 @@ class $CustomerLedgerTable extends CustomerLedger
   late final GeneratedColumn<String> customerId = GeneratedColumn<String>(
       'customer_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _methodMeta = const VerificationMeta('method');
+  @override
+  late final GeneratedColumn<String> method = GeneratedColumn<String>(
+      'method', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _shiftIdMeta =
+      const VerificationMeta('shiftId');
+  @override
+  late final GeneratedColumn<String> shiftId = GeneratedColumn<String>(
+      'shift_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
@@ -7776,6 +7829,8 @@ class $CustomerLedgerTable extends CustomerLedger
         updatedBy,
         version,
         customerId,
+        method,
+        shiftId,
         type,
         amountMinor,
         currency,
@@ -7829,6 +7884,14 @@ class $CustomerLedgerTable extends CustomerLedger
               data['customer_id']!, _customerIdMeta));
     } else if (isInserting) {
       context.missing(_customerIdMeta);
+    }
+    if (data.containsKey('method')) {
+      context.handle(_methodMeta,
+          method.isAcceptableOrUnknown(data['method']!, _methodMeta));
+    }
+    if (data.containsKey('shift_id')) {
+      context.handle(_shiftIdMeta,
+          shiftId.isAcceptableOrUnknown(data['shift_id']!, _shiftIdMeta));
     }
     if (data.containsKey('type')) {
       context.handle(
@@ -7887,6 +7950,10 @@ class $CustomerLedgerTable extends CustomerLedger
           .read(DriftSqlType.int, data['${effectivePrefix}version'])!,
       customerId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}customer_id'])!,
+      method: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}method']),
+      shiftId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}shift_id']),
       type: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
       amountMinor: attachedDatabase.typeMapping
@@ -7918,6 +7985,10 @@ class CustomerLedgerRow extends DataClass
   final String? updatedBy;
   final int version;
   final String customerId;
+
+  /// A debt payment: how it was paid, and the shift whose drawer it went into.
+  final String? method;
+  final String? shiftId;
   final String type;
   final int amountMinor;
   final String currency;
@@ -7933,6 +8004,8 @@ class CustomerLedgerRow extends DataClass
       this.updatedBy,
       required this.version,
       required this.customerId,
+      this.method,
+      this.shiftId,
       required this.type,
       required this.amountMinor,
       required this.currency,
@@ -7956,6 +8029,12 @@ class CustomerLedgerRow extends DataClass
     }
     map['version'] = Variable<int>(version);
     map['customer_id'] = Variable<String>(customerId);
+    if (!nullToAbsent || method != null) {
+      map['method'] = Variable<String>(method);
+    }
+    if (!nullToAbsent || shiftId != null) {
+      map['shift_id'] = Variable<String>(shiftId);
+    }
     map['type'] = Variable<String>(type);
     map['amount_minor'] = Variable<int>(amountMinor);
     map['currency'] = Variable<String>(currency);
@@ -7985,6 +8064,11 @@ class CustomerLedgerRow extends DataClass
           : Value(updatedBy),
       version: Value(version),
       customerId: Value(customerId),
+      method:
+          method == null && nullToAbsent ? const Value.absent() : Value(method),
+      shiftId: shiftId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shiftId),
       type: Value(type),
       amountMinor: Value(amountMinor),
       currency: Value(currency),
@@ -8009,6 +8093,8 @@ class CustomerLedgerRow extends DataClass
       updatedBy: serializer.fromJson<String?>(json['updatedBy']),
       version: serializer.fromJson<int>(json['version']),
       customerId: serializer.fromJson<String>(json['customerId']),
+      method: serializer.fromJson<String?>(json['method']),
+      shiftId: serializer.fromJson<String?>(json['shiftId']),
       type: serializer.fromJson<String>(json['type']),
       amountMinor: serializer.fromJson<int>(json['amountMinor']),
       currency: serializer.fromJson<String>(json['currency']),
@@ -8029,6 +8115,8 @@ class CustomerLedgerRow extends DataClass
       'updatedBy': serializer.toJson<String?>(updatedBy),
       'version': serializer.toJson<int>(version),
       'customerId': serializer.toJson<String>(customerId),
+      'method': serializer.toJson<String?>(method),
+      'shiftId': serializer.toJson<String?>(shiftId),
       'type': serializer.toJson<String>(type),
       'amountMinor': serializer.toJson<int>(amountMinor),
       'currency': serializer.toJson<String>(currency),
@@ -8047,6 +8135,8 @@ class CustomerLedgerRow extends DataClass
           Value<String?> updatedBy = const Value.absent(),
           int? version,
           String? customerId,
+          Value<String?> method = const Value.absent(),
+          Value<String?> shiftId = const Value.absent(),
           String? type,
           int? amountMinor,
           String? currency,
@@ -8062,6 +8152,8 @@ class CustomerLedgerRow extends DataClass
         updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
         version: version ?? this.version,
         customerId: customerId ?? this.customerId,
+        method: method.present ? method.value : this.method,
+        shiftId: shiftId.present ? shiftId.value : this.shiftId,
         type: type ?? this.type,
         amountMinor: amountMinor ?? this.amountMinor,
         currency: currency ?? this.currency,
@@ -8080,6 +8172,8 @@ class CustomerLedgerRow extends DataClass
       version: data.version.present ? data.version.value : this.version,
       customerId:
           data.customerId.present ? data.customerId.value : this.customerId,
+      method: data.method.present ? data.method.value : this.method,
+      shiftId: data.shiftId.present ? data.shiftId.value : this.shiftId,
       type: data.type.present ? data.type.value : this.type,
       amountMinor:
           data.amountMinor.present ? data.amountMinor.value : this.amountMinor,
@@ -8102,6 +8196,8 @@ class CustomerLedgerRow extends DataClass
           ..write('updatedBy: $updatedBy, ')
           ..write('version: $version, ')
           ..write('customerId: $customerId, ')
+          ..write('method: $method, ')
+          ..write('shiftId: $shiftId, ')
           ..write('type: $type, ')
           ..write('amountMinor: $amountMinor, ')
           ..write('currency: $currency, ')
@@ -8122,6 +8218,8 @@ class CustomerLedgerRow extends DataClass
       updatedBy,
       version,
       customerId,
+      method,
+      shiftId,
       type,
       amountMinor,
       currency,
@@ -8140,6 +8238,8 @@ class CustomerLedgerRow extends DataClass
           other.updatedBy == this.updatedBy &&
           other.version == this.version &&
           other.customerId == this.customerId &&
+          other.method == this.method &&
+          other.shiftId == this.shiftId &&
           other.type == this.type &&
           other.amountMinor == this.amountMinor &&
           other.currency == this.currency &&
@@ -8157,6 +8257,8 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
   final Value<String?> updatedBy;
   final Value<int> version;
   final Value<String> customerId;
+  final Value<String?> method;
+  final Value<String?> shiftId;
   final Value<String> type;
   final Value<int> amountMinor;
   final Value<String> currency;
@@ -8173,6 +8275,8 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
     this.updatedBy = const Value.absent(),
     this.version = const Value.absent(),
     this.customerId = const Value.absent(),
+    this.method = const Value.absent(),
+    this.shiftId = const Value.absent(),
     this.type = const Value.absent(),
     this.amountMinor = const Value.absent(),
     this.currency = const Value.absent(),
@@ -8190,6 +8294,8 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
     this.updatedBy = const Value.absent(),
     this.version = const Value.absent(),
     required String customerId,
+    this.method = const Value.absent(),
+    this.shiftId = const Value.absent(),
     required String type,
     required int amountMinor,
     this.currency = const Value.absent(),
@@ -8210,6 +8316,8 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
     Expression<String>? updatedBy,
     Expression<int>? version,
     Expression<String>? customerId,
+    Expression<String>? method,
+    Expression<String>? shiftId,
     Expression<String>? type,
     Expression<int>? amountMinor,
     Expression<String>? currency,
@@ -8227,6 +8335,8 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
       if (updatedBy != null) 'updated_by': updatedBy,
       if (version != null) 'version': version,
       if (customerId != null) 'customer_id': customerId,
+      if (method != null) 'method': method,
+      if (shiftId != null) 'shift_id': shiftId,
       if (type != null) 'type': type,
       if (amountMinor != null) 'amount_minor': amountMinor,
       if (currency != null) 'currency': currency,
@@ -8246,6 +8356,8 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
       Value<String?>? updatedBy,
       Value<int>? version,
       Value<String>? customerId,
+      Value<String?>? method,
+      Value<String?>? shiftId,
       Value<String>? type,
       Value<int>? amountMinor,
       Value<String>? currency,
@@ -8262,6 +8374,8 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
       updatedBy: updatedBy ?? this.updatedBy,
       version: version ?? this.version,
       customerId: customerId ?? this.customerId,
+      method: method ?? this.method,
+      shiftId: shiftId ?? this.shiftId,
       type: type ?? this.type,
       amountMinor: amountMinor ?? this.amountMinor,
       currency: currency ?? this.currency,
@@ -8299,6 +8413,12 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
     if (customerId.present) {
       map['customer_id'] = Variable<String>(customerId.value);
     }
+    if (method.present) {
+      map['method'] = Variable<String>(method.value);
+    }
+    if (shiftId.present) {
+      map['shift_id'] = Variable<String>(shiftId.value);
+    }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
     }
@@ -8334,6 +8454,8 @@ class CustomerLedgerCompanion extends UpdateCompanion<CustomerLedgerRow> {
           ..write('updatedBy: $updatedBy, ')
           ..write('version: $version, ')
           ..write('customerId: $customerId, ')
+          ..write('method: $method, ')
+          ..write('shiftId: $shiftId, ')
           ..write('type: $type, ')
           ..write('amountMinor: $amountMinor, ')
           ..write('currency: $currency, ')
@@ -8952,6 +9074,17 @@ class $SupplierLedgerTable extends SupplierLedger
   late final GeneratedColumn<String> supplierId = GeneratedColumn<String>(
       'supplier_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _methodMeta = const VerificationMeta('method');
+  @override
+  late final GeneratedColumn<String> method = GeneratedColumn<String>(
+      'method', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _shiftIdMeta =
+      const VerificationMeta('shiftId');
+  @override
+  late final GeneratedColumn<String> shiftId = GeneratedColumn<String>(
+      'shift_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
@@ -8989,6 +9122,8 @@ class $SupplierLedgerTable extends SupplierLedger
         updatedBy,
         version,
         supplierId,
+        method,
+        shiftId,
         type,
         amountMinor,
         currency,
@@ -9041,6 +9176,14 @@ class $SupplierLedgerTable extends SupplierLedger
     } else if (isInserting) {
       context.missing(_supplierIdMeta);
     }
+    if (data.containsKey('method')) {
+      context.handle(_methodMeta,
+          method.isAcceptableOrUnknown(data['method']!, _methodMeta));
+    }
+    if (data.containsKey('shift_id')) {
+      context.handle(_shiftIdMeta,
+          shiftId.isAcceptableOrUnknown(data['shift_id']!, _shiftIdMeta));
+    }
     if (data.containsKey('type')) {
       context.handle(
           _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
@@ -9090,6 +9233,10 @@ class $SupplierLedgerTable extends SupplierLedger
           .read(DriftSqlType.int, data['${effectivePrefix}version'])!,
       supplierId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}supplier_id'])!,
+      method: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}method']),
+      shiftId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}shift_id']),
       type: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
       amountMinor: attachedDatabase.typeMapping
@@ -9117,6 +9264,10 @@ class SupplierLedgerRow extends DataClass
   final String? updatedBy;
   final int version;
   final String supplierId;
+
+  /// A payment: how it was paid, and the shift whose drawer it came out of.
+  final String? method;
+  final String? shiftId;
   final String type;
   final int amountMinor;
   final String currency;
@@ -9130,6 +9281,8 @@ class SupplierLedgerRow extends DataClass
       this.updatedBy,
       required this.version,
       required this.supplierId,
+      this.method,
+      this.shiftId,
       required this.type,
       required this.amountMinor,
       required this.currency,
@@ -9151,6 +9304,12 @@ class SupplierLedgerRow extends DataClass
     }
     map['version'] = Variable<int>(version);
     map['supplier_id'] = Variable<String>(supplierId);
+    if (!nullToAbsent || method != null) {
+      map['method'] = Variable<String>(method);
+    }
+    if (!nullToAbsent || shiftId != null) {
+      map['shift_id'] = Variable<String>(shiftId);
+    }
     map['type'] = Variable<String>(type);
     map['amount_minor'] = Variable<int>(amountMinor);
     map['currency'] = Variable<String>(currency);
@@ -9174,6 +9333,11 @@ class SupplierLedgerRow extends DataClass
           : Value(updatedBy),
       version: Value(version),
       supplierId: Value(supplierId),
+      method:
+          method == null && nullToAbsent ? const Value.absent() : Value(method),
+      shiftId: shiftId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shiftId),
       type: Value(type),
       amountMinor: Value(amountMinor),
       currency: Value(currency),
@@ -9193,6 +9357,8 @@ class SupplierLedgerRow extends DataClass
       updatedBy: serializer.fromJson<String?>(json['updatedBy']),
       version: serializer.fromJson<int>(json['version']),
       supplierId: serializer.fromJson<String>(json['supplierId']),
+      method: serializer.fromJson<String?>(json['method']),
+      shiftId: serializer.fromJson<String?>(json['shiftId']),
       type: serializer.fromJson<String>(json['type']),
       amountMinor: serializer.fromJson<int>(json['amountMinor']),
       currency: serializer.fromJson<String>(json['currency']),
@@ -9211,6 +9377,8 @@ class SupplierLedgerRow extends DataClass
       'updatedBy': serializer.toJson<String?>(updatedBy),
       'version': serializer.toJson<int>(version),
       'supplierId': serializer.toJson<String>(supplierId),
+      'method': serializer.toJson<String?>(method),
+      'shiftId': serializer.toJson<String?>(shiftId),
       'type': serializer.toJson<String>(type),
       'amountMinor': serializer.toJson<int>(amountMinor),
       'currency': serializer.toJson<String>(currency),
@@ -9227,6 +9395,8 @@ class SupplierLedgerRow extends DataClass
           Value<String?> updatedBy = const Value.absent(),
           int? version,
           String? supplierId,
+          Value<String?> method = const Value.absent(),
+          Value<String?> shiftId = const Value.absent(),
           String? type,
           int? amountMinor,
           String? currency,
@@ -9240,6 +9410,8 @@ class SupplierLedgerRow extends DataClass
         updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
         version: version ?? this.version,
         supplierId: supplierId ?? this.supplierId,
+        method: method.present ? method.value : this.method,
+        shiftId: shiftId.present ? shiftId.value : this.shiftId,
         type: type ?? this.type,
         amountMinor: amountMinor ?? this.amountMinor,
         currency: currency ?? this.currency,
@@ -9256,6 +9428,8 @@ class SupplierLedgerRow extends DataClass
       version: data.version.present ? data.version.value : this.version,
       supplierId:
           data.supplierId.present ? data.supplierId.value : this.supplierId,
+      method: data.method.present ? data.method.value : this.method,
+      shiftId: data.shiftId.present ? data.shiftId.value : this.shiftId,
       type: data.type.present ? data.type.value : this.type,
       amountMinor:
           data.amountMinor.present ? data.amountMinor.value : this.amountMinor,
@@ -9276,6 +9450,8 @@ class SupplierLedgerRow extends DataClass
           ..write('updatedBy: $updatedBy, ')
           ..write('version: $version, ')
           ..write('supplierId: $supplierId, ')
+          ..write('method: $method, ')
+          ..write('shiftId: $shiftId, ')
           ..write('type: $type, ')
           ..write('amountMinor: $amountMinor, ')
           ..write('currency: $currency, ')
@@ -9294,6 +9470,8 @@ class SupplierLedgerRow extends DataClass
       updatedBy,
       version,
       supplierId,
+      method,
+      shiftId,
       type,
       amountMinor,
       currency,
@@ -9310,6 +9488,8 @@ class SupplierLedgerRow extends DataClass
           other.updatedBy == this.updatedBy &&
           other.version == this.version &&
           other.supplierId == this.supplierId &&
+          other.method == this.method &&
+          other.shiftId == this.shiftId &&
           other.type == this.type &&
           other.amountMinor == this.amountMinor &&
           other.currency == this.currency &&
@@ -9325,6 +9505,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
   final Value<String?> updatedBy;
   final Value<int> version;
   final Value<String> supplierId;
+  final Value<String?> method;
+  final Value<String?> shiftId;
   final Value<String> type;
   final Value<int> amountMinor;
   final Value<String> currency;
@@ -9339,6 +9521,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
     this.updatedBy = const Value.absent(),
     this.version = const Value.absent(),
     this.supplierId = const Value.absent(),
+    this.method = const Value.absent(),
+    this.shiftId = const Value.absent(),
     this.type = const Value.absent(),
     this.amountMinor = const Value.absent(),
     this.currency = const Value.absent(),
@@ -9354,6 +9538,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
     this.updatedBy = const Value.absent(),
     this.version = const Value.absent(),
     required String supplierId,
+    this.method = const Value.absent(),
+    this.shiftId = const Value.absent(),
     required String type,
     required int amountMinor,
     this.currency = const Value.absent(),
@@ -9372,6 +9558,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
     Expression<String>? updatedBy,
     Expression<int>? version,
     Expression<String>? supplierId,
+    Expression<String>? method,
+    Expression<String>? shiftId,
     Expression<String>? type,
     Expression<int>? amountMinor,
     Expression<String>? currency,
@@ -9387,6 +9575,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
       if (updatedBy != null) 'updated_by': updatedBy,
       if (version != null) 'version': version,
       if (supplierId != null) 'supplier_id': supplierId,
+      if (method != null) 'method': method,
+      if (shiftId != null) 'shift_id': shiftId,
       if (type != null) 'type': type,
       if (amountMinor != null) 'amount_minor': amountMinor,
       if (currency != null) 'currency': currency,
@@ -9404,6 +9594,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
       Value<String?>? updatedBy,
       Value<int>? version,
       Value<String>? supplierId,
+      Value<String?>? method,
+      Value<String?>? shiftId,
       Value<String>? type,
       Value<int>? amountMinor,
       Value<String>? currency,
@@ -9418,6 +9610,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
       updatedBy: updatedBy ?? this.updatedBy,
       version: version ?? this.version,
       supplierId: supplierId ?? this.supplierId,
+      method: method ?? this.method,
+      shiftId: shiftId ?? this.shiftId,
       type: type ?? this.type,
       amountMinor: amountMinor ?? this.amountMinor,
       currency: currency ?? this.currency,
@@ -9453,6 +9647,12 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
     if (supplierId.present) {
       map['supplier_id'] = Variable<String>(supplierId.value);
     }
+    if (method.present) {
+      map['method'] = Variable<String>(method.value);
+    }
+    if (shiftId.present) {
+      map['shift_id'] = Variable<String>(shiftId.value);
+    }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
     }
@@ -9482,6 +9682,8 @@ class SupplierLedgerCompanion extends UpdateCompanion<SupplierLedgerRow> {
           ..write('updatedBy: $updatedBy, ')
           ..write('version: $version, ')
           ..write('supplierId: $supplierId, ')
+          ..write('method: $method, ')
+          ..write('shiftId: $shiftId, ')
           ..write('type: $type, ')
           ..write('amountMinor: $amountMinor, ')
           ..write('currency: $currency, ')
@@ -9512,8 +9714,20 @@ class $SyncStatesTable extends SyncStates
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _watermarkTokenMeta =
+      const VerificationMeta('watermarkToken');
   @override
-  List<GeneratedColumn> get $columns => [deviceId, lastPulledSeq];
+  late final GeneratedColumn<String> watermarkToken = GeneratedColumn<String>(
+      'watermark_token', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _scopeMeta = const VerificationMeta('scope');
+  @override
+  late final GeneratedColumn<String> scope = GeneratedColumn<String>(
+      'scope', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [deviceId, lastPulledSeq, watermarkToken, scope];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -9536,6 +9750,16 @@ class $SyncStatesTable extends SyncStates
           lastPulledSeq.isAcceptableOrUnknown(
               data['last_pulled_seq']!, _lastPulledSeqMeta));
     }
+    if (data.containsKey('watermark_token')) {
+      context.handle(
+          _watermarkTokenMeta,
+          watermarkToken.isAcceptableOrUnknown(
+              data['watermark_token']!, _watermarkTokenMeta));
+    }
+    if (data.containsKey('scope')) {
+      context.handle(
+          _scopeMeta, scope.isAcceptableOrUnknown(data['scope']!, _scopeMeta));
+    }
     return context;
   }
 
@@ -9549,6 +9773,10 @@ class $SyncStatesTable extends SyncStates
           .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
       lastPulledSeq: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}last_pulled_seq'])!,
+      watermarkToken: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}watermark_token']),
+      scope: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}scope']),
     );
   }
 
@@ -9561,12 +9789,30 @@ class $SyncStatesTable extends SyncStates
 class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
   final String deviceId;
   final int lastPulledSeq;
-  const SyncStateRow({required this.deviceId, required this.lastPulledSeq});
+
+  /// The server's name for the change at the cursor: another change there means
+  /// the server was restored from a backup (docs/sync-protocol.md, "Pull").
+  final String? watermarkToken;
+
+  /// The read scope the cursor was pulled in: a new one (a role or a branch
+  /// granted) reads the feed again, for the rows the old scope hid.
+  final String? scope;
+  const SyncStateRow(
+      {required this.deviceId,
+      required this.lastPulledSeq,
+      this.watermarkToken,
+      this.scope});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['device_id'] = Variable<String>(deviceId);
     map['last_pulled_seq'] = Variable<int>(lastPulledSeq);
+    if (!nullToAbsent || watermarkToken != null) {
+      map['watermark_token'] = Variable<String>(watermarkToken);
+    }
+    if (!nullToAbsent || scope != null) {
+      map['scope'] = Variable<String>(scope);
+    }
     return map;
   }
 
@@ -9574,6 +9820,11 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
     return SyncStatesCompanion(
       deviceId: Value(deviceId),
       lastPulledSeq: Value(lastPulledSeq),
+      watermarkToken: watermarkToken == null && nullToAbsent
+          ? const Value.absent()
+          : Value(watermarkToken),
+      scope:
+          scope == null && nullToAbsent ? const Value.absent() : Value(scope),
     );
   }
 
@@ -9583,6 +9834,8 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
     return SyncStateRow(
       deviceId: serializer.fromJson<String>(json['deviceId']),
       lastPulledSeq: serializer.fromJson<int>(json['lastPulledSeq']),
+      watermarkToken: serializer.fromJson<String?>(json['watermarkToken']),
+      scope: serializer.fromJson<String?>(json['scope']),
     );
   }
   @override
@@ -9591,12 +9844,22 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
     return <String, dynamic>{
       'deviceId': serializer.toJson<String>(deviceId),
       'lastPulledSeq': serializer.toJson<int>(lastPulledSeq),
+      'watermarkToken': serializer.toJson<String?>(watermarkToken),
+      'scope': serializer.toJson<String?>(scope),
     };
   }
 
-  SyncStateRow copyWith({String? deviceId, int? lastPulledSeq}) => SyncStateRow(
+  SyncStateRow copyWith(
+          {String? deviceId,
+          int? lastPulledSeq,
+          Value<String?> watermarkToken = const Value.absent(),
+          Value<String?> scope = const Value.absent()}) =>
+      SyncStateRow(
         deviceId: deviceId ?? this.deviceId,
         lastPulledSeq: lastPulledSeq ?? this.lastPulledSeq,
+        watermarkToken:
+            watermarkToken.present ? watermarkToken.value : this.watermarkToken,
+        scope: scope.present ? scope.value : this.scope,
       );
   SyncStateRow copyWithCompanion(SyncStatesCompanion data) {
     return SyncStateRow(
@@ -9604,6 +9867,10 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
       lastPulledSeq: data.lastPulledSeq.present
           ? data.lastPulledSeq.value
           : this.lastPulledSeq,
+      watermarkToken: data.watermarkToken.present
+          ? data.watermarkToken.value
+          : this.watermarkToken,
+      scope: data.scope.present ? data.scope.value : this.scope,
     );
   }
 
@@ -9611,52 +9878,73 @@ class SyncStateRow extends DataClass implements Insertable<SyncStateRow> {
   String toString() {
     return (StringBuffer('SyncStateRow(')
           ..write('deviceId: $deviceId, ')
-          ..write('lastPulledSeq: $lastPulledSeq')
+          ..write('lastPulledSeq: $lastPulledSeq, ')
+          ..write('watermarkToken: $watermarkToken, ')
+          ..write('scope: $scope')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(deviceId, lastPulledSeq);
+  int get hashCode =>
+      Object.hash(deviceId, lastPulledSeq, watermarkToken, scope);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SyncStateRow &&
           other.deviceId == this.deviceId &&
-          other.lastPulledSeq == this.lastPulledSeq);
+          other.lastPulledSeq == this.lastPulledSeq &&
+          other.watermarkToken == this.watermarkToken &&
+          other.scope == this.scope);
 }
 
 class SyncStatesCompanion extends UpdateCompanion<SyncStateRow> {
   final Value<String> deviceId;
   final Value<int> lastPulledSeq;
+  final Value<String?> watermarkToken;
+  final Value<String?> scope;
   final Value<int> rowid;
   const SyncStatesCompanion({
     this.deviceId = const Value.absent(),
     this.lastPulledSeq = const Value.absent(),
+    this.watermarkToken = const Value.absent(),
+    this.scope = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SyncStatesCompanion.insert({
     required String deviceId,
     this.lastPulledSeq = const Value.absent(),
+    this.watermarkToken = const Value.absent(),
+    this.scope = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : deviceId = Value(deviceId);
   static Insertable<SyncStateRow> custom({
     Expression<String>? deviceId,
     Expression<int>? lastPulledSeq,
+    Expression<String>? watermarkToken,
+    Expression<String>? scope,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (deviceId != null) 'device_id': deviceId,
       if (lastPulledSeq != null) 'last_pulled_seq': lastPulledSeq,
+      if (watermarkToken != null) 'watermark_token': watermarkToken,
+      if (scope != null) 'scope': scope,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   SyncStatesCompanion copyWith(
-      {Value<String>? deviceId, Value<int>? lastPulledSeq, Value<int>? rowid}) {
+      {Value<String>? deviceId,
+      Value<int>? lastPulledSeq,
+      Value<String?>? watermarkToken,
+      Value<String?>? scope,
+      Value<int>? rowid}) {
     return SyncStatesCompanion(
       deviceId: deviceId ?? this.deviceId,
       lastPulledSeq: lastPulledSeq ?? this.lastPulledSeq,
+      watermarkToken: watermarkToken ?? this.watermarkToken,
+      scope: scope ?? this.scope,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -9670,6 +9958,12 @@ class SyncStatesCompanion extends UpdateCompanion<SyncStateRow> {
     if (lastPulledSeq.present) {
       map['last_pulled_seq'] = Variable<int>(lastPulledSeq.value);
     }
+    if (watermarkToken.present) {
+      map['watermark_token'] = Variable<String>(watermarkToken.value);
+    }
+    if (scope.present) {
+      map['scope'] = Variable<String>(scope.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -9681,6 +9975,8 @@ class SyncStatesCompanion extends UpdateCompanion<SyncStateRow> {
     return (StringBuffer('SyncStatesCompanion(')
           ..write('deviceId: $deviceId, ')
           ..write('lastPulledSeq: $lastPulledSeq, ')
+          ..write('watermarkToken: $watermarkToken, ')
+          ..write('scope: $scope, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9940,6 +10236,7 @@ typedef $$OutboxEntriesTableCreateCompanionBuilder = OutboxEntriesCompanion
   required String actorId,
   Value<String> status,
   Value<int?> baseVersion,
+  Value<String?> lastError,
   Value<int> rowid,
 });
 typedef $$OutboxEntriesTableUpdateCompanionBuilder = OutboxEntriesCompanion
@@ -9960,6 +10257,7 @@ typedef $$OutboxEntriesTableUpdateCompanionBuilder = OutboxEntriesCompanion
   Value<String> actorId,
   Value<String> status,
   Value<int?> baseVersion,
+  Value<String?> lastError,
   Value<int> rowid,
 });
 
@@ -10019,6 +10317,9 @@ class $$OutboxEntriesTableFilterComposer
 
   ColumnFilters<int> get baseVersion => $composableBuilder(
       column: $table.baseVersion, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+      column: $table.lastError, builder: (column) => ColumnFilters(column));
 }
 
 class $$OutboxEntriesTableOrderingComposer
@@ -10078,6 +10379,9 @@ class $$OutboxEntriesTableOrderingComposer
 
   ColumnOrderings<int> get baseVersion => $composableBuilder(
       column: $table.baseVersion, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+      column: $table.lastError, builder: (column) => ColumnOrderings(column));
 }
 
 class $$OutboxEntriesTableAnnotationComposer
@@ -10136,6 +10440,9 @@ class $$OutboxEntriesTableAnnotationComposer
 
   GeneratedColumn<int> get baseVersion => $composableBuilder(
       column: $table.baseVersion, builder: (column) => column);
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
 }
 
 class $$OutboxEntriesTableTableManager extends RootTableManager<
@@ -10177,6 +10484,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             Value<String> actorId = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<int?> baseVersion = const Value.absent(),
+            Value<String?> lastError = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               OutboxEntriesCompanion(
@@ -10196,6 +10504,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             actorId: actorId,
             status: status,
             baseVersion: baseVersion,
+            lastError: lastError,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -10215,6 +10524,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             required String actorId,
             Value<String> status = const Value.absent(),
             Value<int?> baseVersion = const Value.absent(),
+            Value<String?> lastError = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               OutboxEntriesCompanion.insert(
@@ -10234,6 +10544,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             actorId: actorId,
             status: status,
             baseVersion: baseVersion,
+            lastError: lastError,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -13444,6 +13755,8 @@ typedef $$CustomerLedgerTableCreateCompanionBuilder = CustomerLedgerCompanion
   Value<String?> updatedBy,
   Value<int> version,
   required String customerId,
+  Value<String?> method,
+  Value<String?> shiftId,
   required String type,
   required int amountMinor,
   Value<String> currency,
@@ -13462,6 +13775,8 @@ typedef $$CustomerLedgerTableUpdateCompanionBuilder = CustomerLedgerCompanion
   Value<String?> updatedBy,
   Value<int> version,
   Value<String> customerId,
+  Value<String?> method,
+  Value<String?> shiftId,
   Value<String> type,
   Value<int> amountMinor,
   Value<String> currency,
@@ -13503,6 +13818,12 @@ class $$CustomerLedgerTableFilterComposer
 
   ColumnFilters<String> get customerId => $composableBuilder(
       column: $table.customerId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get method => $composableBuilder(
+      column: $table.method, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get shiftId => $composableBuilder(
+      column: $table.shiftId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnFilters(column));
@@ -13556,6 +13877,12 @@ class $$CustomerLedgerTableOrderingComposer
   ColumnOrderings<String> get customerId => $composableBuilder(
       column: $table.customerId, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get method => $composableBuilder(
+      column: $table.method, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get shiftId => $composableBuilder(
+      column: $table.shiftId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnOrderings(column));
 
@@ -13607,6 +13934,12 @@ class $$CustomerLedgerTableAnnotationComposer
 
   GeneratedColumn<String> get customerId => $composableBuilder(
       column: $table.customerId, builder: (column) => column);
+
+  GeneratedColumn<String> get method =>
+      $composableBuilder(column: $table.method, builder: (column) => column);
+
+  GeneratedColumn<String> get shiftId =>
+      $composableBuilder(column: $table.shiftId, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
@@ -13662,6 +13995,8 @@ class $$CustomerLedgerTableTableManager extends RootTableManager<
             Value<String?> updatedBy = const Value.absent(),
             Value<int> version = const Value.absent(),
             Value<String> customerId = const Value.absent(),
+            Value<String?> method = const Value.absent(),
+            Value<String?> shiftId = const Value.absent(),
             Value<String> type = const Value.absent(),
             Value<int> amountMinor = const Value.absent(),
             Value<String> currency = const Value.absent(),
@@ -13679,6 +14014,8 @@ class $$CustomerLedgerTableTableManager extends RootTableManager<
             updatedBy: updatedBy,
             version: version,
             customerId: customerId,
+            method: method,
+            shiftId: shiftId,
             type: type,
             amountMinor: amountMinor,
             currency: currency,
@@ -13696,6 +14033,8 @@ class $$CustomerLedgerTableTableManager extends RootTableManager<
             Value<String?> updatedBy = const Value.absent(),
             Value<int> version = const Value.absent(),
             required String customerId,
+            Value<String?> method = const Value.absent(),
+            Value<String?> shiftId = const Value.absent(),
             required String type,
             required int amountMinor,
             Value<String> currency = const Value.absent(),
@@ -13713,6 +14052,8 @@ class $$CustomerLedgerTableTableManager extends RootTableManager<
             updatedBy: updatedBy,
             version: version,
             customerId: customerId,
+            method: method,
+            shiftId: shiftId,
             type: type,
             amountMinor: amountMinor,
             currency: currency,
@@ -14016,6 +14357,8 @@ typedef $$SupplierLedgerTableCreateCompanionBuilder = SupplierLedgerCompanion
   Value<String?> updatedBy,
   Value<int> version,
   required String supplierId,
+  Value<String?> method,
+  Value<String?> shiftId,
   required String type,
   required int amountMinor,
   Value<String> currency,
@@ -14032,6 +14375,8 @@ typedef $$SupplierLedgerTableUpdateCompanionBuilder = SupplierLedgerCompanion
   Value<String?> updatedBy,
   Value<int> version,
   Value<String> supplierId,
+  Value<String?> method,
+  Value<String?> shiftId,
   Value<String> type,
   Value<int> amountMinor,
   Value<String> currency,
@@ -14071,6 +14416,12 @@ class $$SupplierLedgerTableFilterComposer
 
   ColumnFilters<String> get supplierId => $composableBuilder(
       column: $table.supplierId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get method => $composableBuilder(
+      column: $table.method, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get shiftId => $composableBuilder(
+      column: $table.shiftId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnFilters(column));
@@ -14118,6 +14469,12 @@ class $$SupplierLedgerTableOrderingComposer
   ColumnOrderings<String> get supplierId => $composableBuilder(
       column: $table.supplierId, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get method => $composableBuilder(
+      column: $table.method, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get shiftId => $composableBuilder(
+      column: $table.shiftId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnOrderings(column));
 
@@ -14163,6 +14520,12 @@ class $$SupplierLedgerTableAnnotationComposer
 
   GeneratedColumn<String> get supplierId => $composableBuilder(
       column: $table.supplierId, builder: (column) => column);
+
+  GeneratedColumn<String> get method =>
+      $composableBuilder(column: $table.method, builder: (column) => column);
+
+  GeneratedColumn<String> get shiftId =>
+      $composableBuilder(column: $table.shiftId, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
@@ -14212,6 +14575,8 @@ class $$SupplierLedgerTableTableManager extends RootTableManager<
             Value<String?> updatedBy = const Value.absent(),
             Value<int> version = const Value.absent(),
             Value<String> supplierId = const Value.absent(),
+            Value<String?> method = const Value.absent(),
+            Value<String?> shiftId = const Value.absent(),
             Value<String> type = const Value.absent(),
             Value<int> amountMinor = const Value.absent(),
             Value<String> currency = const Value.absent(),
@@ -14227,6 +14592,8 @@ class $$SupplierLedgerTableTableManager extends RootTableManager<
             updatedBy: updatedBy,
             version: version,
             supplierId: supplierId,
+            method: method,
+            shiftId: shiftId,
             type: type,
             amountMinor: amountMinor,
             currency: currency,
@@ -14242,6 +14609,8 @@ class $$SupplierLedgerTableTableManager extends RootTableManager<
             Value<String?> updatedBy = const Value.absent(),
             Value<int> version = const Value.absent(),
             required String supplierId,
+            Value<String?> method = const Value.absent(),
+            Value<String?> shiftId = const Value.absent(),
             required String type,
             required int amountMinor,
             Value<String> currency = const Value.absent(),
@@ -14257,6 +14626,8 @@ class $$SupplierLedgerTableTableManager extends RootTableManager<
             updatedBy: updatedBy,
             version: version,
             supplierId: supplierId,
+            method: method,
+            shiftId: shiftId,
             type: type,
             amountMinor: amountMinor,
             currency: currency,
@@ -14292,11 +14663,15 @@ typedef $$SupplierLedgerTableProcessedTableManager = ProcessedTableManager<
 typedef $$SyncStatesTableCreateCompanionBuilder = SyncStatesCompanion Function({
   required String deviceId,
   Value<int> lastPulledSeq,
+  Value<String?> watermarkToken,
+  Value<String?> scope,
   Value<int> rowid,
 });
 typedef $$SyncStatesTableUpdateCompanionBuilder = SyncStatesCompanion Function({
   Value<String> deviceId,
   Value<int> lastPulledSeq,
+  Value<String?> watermarkToken,
+  Value<String?> scope,
   Value<int> rowid,
 });
 
@@ -14314,6 +14689,13 @@ class $$SyncStatesTableFilterComposer
 
   ColumnFilters<int> get lastPulledSeq => $composableBuilder(
       column: $table.lastPulledSeq, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get watermarkToken => $composableBuilder(
+      column: $table.watermarkToken,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get scope => $composableBuilder(
+      column: $table.scope, builder: (column) => ColumnFilters(column));
 }
 
 class $$SyncStatesTableOrderingComposer
@@ -14331,6 +14713,13 @@ class $$SyncStatesTableOrderingComposer
   ColumnOrderings<int> get lastPulledSeq => $composableBuilder(
       column: $table.lastPulledSeq,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get watermarkToken => $composableBuilder(
+      column: $table.watermarkToken,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get scope => $composableBuilder(
+      column: $table.scope, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SyncStatesTableAnnotationComposer
@@ -14347,6 +14736,12 @@ class $$SyncStatesTableAnnotationComposer
 
   GeneratedColumn<int> get lastPulledSeq => $composableBuilder(
       column: $table.lastPulledSeq, builder: (column) => column);
+
+  GeneratedColumn<String> get watermarkToken => $composableBuilder(
+      column: $table.watermarkToken, builder: (column) => column);
+
+  GeneratedColumn<String> get scope =>
+      $composableBuilder(column: $table.scope, builder: (column) => column);
 }
 
 class $$SyncStatesTableTableManager extends RootTableManager<
@@ -14377,21 +14772,29 @@ class $$SyncStatesTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<String> deviceId = const Value.absent(),
             Value<int> lastPulledSeq = const Value.absent(),
+            Value<String?> watermarkToken = const Value.absent(),
+            Value<String?> scope = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SyncStatesCompanion(
             deviceId: deviceId,
             lastPulledSeq: lastPulledSeq,
+            watermarkToken: watermarkToken,
+            scope: scope,
             rowid: rowid,
           ),
           createCompanionCallback: ({
             required String deviceId,
             Value<int> lastPulledSeq = const Value.absent(),
+            Value<String?> watermarkToken = const Value.absent(),
+            Value<String?> scope = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SyncStatesCompanion.insert(
             deviceId: deviceId,
             lastPulledSeq: lastPulledSeq,
+            watermarkToken: watermarkToken,
+            scope: scope,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
