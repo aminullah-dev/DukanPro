@@ -23,6 +23,7 @@ import '../auth/providers.dart';
 import '../read_models.dart';
 import 'pos_providers.dart';
 import 'receipt_builder.dart';
+import 'receipt_raster.dart';
 
 String _afn(int minor) => formatQuantity(minor, 2);
 
@@ -987,12 +988,16 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
     }
     setState(() => _printing = true);
     try {
-      final data = buildReceipt(
-        shopName: ref.read(shopNameProvider), sale: widget.sale, lines: widget.lines,
-        zone: ref.read(branchZoneProvider),
+      final zone = ref.read(branchZoneProvider);
+      final data = buildReceipt(shopName: ref.read(shopNameProvider), sale: widget.sale, lines: widget.lines, zone: zone);
+      // Drawn in the reader's language: the printer has no Persian letters of its own.
+      final image = await rasterReceipt(
+        l: l, data: data, occurredAt: widget.sale.occurredAt, zone: zone,
+        paperMm: ref.read(printerSettingsControllerProvider).asData?.value.paperMm ?? 80,
+        voided: widget.sale.status == 'voided',
       );
       // A printer that stops answering must not hold the till.
-      await printer.printRaw(const EscPosEncoder().encode(data)).timeout(const Duration(seconds: 10));
+      await printer.printRaw(const EscPosEncoder().encodeRaster(image)).timeout(const Duration(seconds: 10));
     } on Object {
       _say(l.printFailed);
       if (mounted) setState(() => _printing = false);

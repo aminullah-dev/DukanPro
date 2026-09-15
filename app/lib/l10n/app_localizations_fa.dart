@@ -727,6 +727,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get printerSettings => 'چاپگر رسید';
 
   @override
+  String get paperWidth => 'عرض کاغذ';
+
+  @override
+  String paperMillimetres(int mm) {
+    final intl.NumberFormat mmNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String mmString = mmNumberFormat.format(mm);
+
+    return '$mmString میلی‌متر';
+  }
+
+  @override
   String get enablePrinting => 'چاپ رسیدها';
 
   @override
@@ -1871,6 +1884,19 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get printerSettings => 'چاپگر رسید';
+
+  @override
+  String get paperWidth => 'عرض کاغذ';
+
+  @override
+  String paperMillimetres(int mm) {
+    final intl.NumberFormat mmNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String mmString = mmNumberFormat.format(mm);
+
+    return '$mmString میلی‌متر';
+  }
 
   @override
   String get enablePrinting => 'چاپ رسیدها';

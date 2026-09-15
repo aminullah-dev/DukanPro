@@ -201,6 +201,8 @@
   "savedOk": "وساتل شو.",
   "settings": "تنظیمات",
   "printerSettings": "د رسید چاپګر",
+  "paperWidth": "د کاغذ پلنوالی",
+  "paperMillimetres": "{mm} ملي متره",
   "enablePrinting": "د رسیدونو چاپ",
   "printerHost": "د چاپګر IP پته",
   "printerPort": "پورټ",

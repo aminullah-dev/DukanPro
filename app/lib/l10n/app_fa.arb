@@ -201,6 +201,8 @@
   "savedOk": "ذخیره شد.",
   "settings": "تنظیمات",
   "printerSettings": "چاپگر رسید",
+  "paperWidth": "عرض کاغذ",
+  "paperMillimetres": "{mm} میلی‌متر",
   "enablePrinting": "چاپ رسیدها",
   "printerHost": "آدرس IP چاپگر",
   "printerPort": "پورت",

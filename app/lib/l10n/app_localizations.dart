@@ -1307,6 +1307,18 @@ abstract class AppLocalizations {
   /// **'Receipt printer'**
   String get printerSettings;
 
+  /// No description provided for @paperWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper width'**
+  String get paperWidth;
+
+  /// No description provided for @paperMillimetres.
+  ///
+  /// In en, this message translates to:
+  /// **'{mm} mm'**
+  String paperMillimetres(int mm);
+
   /// No description provided for @enablePrinting.
   ///
   /// In en, this message translates to:

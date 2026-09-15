@@ -723,6 +723,19 @@ class AppLocalizationsPs extends AppLocalizations {
   String get printerSettings => 'د رسید چاپګر';
 
   @override
+  String get paperWidth => 'د کاغذ پلنوالی';
+
+  @override
+  String paperMillimetres(int mm) {
+    final intl.NumberFormat mmNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String mmString = mmNumberFormat.format(mm);
+
+    return '$mmString ملي متره';
+  }
+
+  @override
   String get enablePrinting => 'د رسیدونو چاپ';
 
   @override

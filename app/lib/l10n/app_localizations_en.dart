@@ -730,6 +730,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get printerSettings => 'Receipt printer';
 
   @override
+  String get paperWidth => 'Paper width';
+
+  @override
+  String paperMillimetres(int mm) {
+    final intl.NumberFormat mmNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String mmString = mmNumberFormat.format(mm);
+
+    return '$mmString mm';
+  }
+
+  @override
   String get enablePrinting => 'Print receipts';
 
   @override
