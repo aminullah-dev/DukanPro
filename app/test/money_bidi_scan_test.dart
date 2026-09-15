@@ -35,6 +35,11 @@ void main() {
     expect(scanCharFor(PhysicalKeyboardKey.keyA, 'ؤ', shift: true), 'A');
     expect(scanCharFor(PhysicalKeyboardKey.digit1, '1', shift: false), '1'); // a Latin layout
     expect(scanCharFor(PhysicalKeyboardKey.minus, '-', shift: false), '-');
+    // Shifted digits and punctuation, as a scanner set up for a US keyboard means them.
+    expect(scanCharFor(PhysicalKeyboardKey.digit3, '٫', shift: true), '#');
+    expect(scanCharFor(PhysicalKeyboardKey.slash, '/', shift: false), '/');
+    expect(scanCharFor(PhysicalKeyboardKey.minus, 'ـ', shift: false), '-');
+    expect(scanCharFor(PhysicalKeyboardKey.period, 'ژ', shift: true), '>');
 
     final decoder = WedgeDecoder();
     var at = DateTime(2026);

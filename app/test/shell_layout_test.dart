@@ -118,4 +118,66 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  Future<ProviderContainer> signedIn(WidgetTester tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(() async => db.close());
+    final container = ProviderContainer(overrides: [
+      databaseProvider.overrideWithValue(db),
+      secureStoreProvider.overrideWithValue(FakeSecureStore()),
+      authApiProvider.overrideWithValue(FakeAuthApi()),
+      verifierProvider.overrideWithValue(FakeVerifier()),
+      syncClientProvider.overrideWithValue(FakeSyncClient()),
+      autoSyncProvider.overrideWithValue(false),
+      insightsApiProvider.overrideWithValue(FakeInsightsApi()),
+      iamApiProvider.overrideWithValue(FakeIamApi()),
+      auditApiProvider.overrideWithValue(FakeAuditApi(const [])),
+    ]);
+    await container.read(authControllerProvider.notifier).loginOnline(username: 'owner', password: 'correct');
+    await tester.pumpWidget(_app(container, const AppShell()));
+    await tester.pumpAndSettle();
+    return container;
+  }
+
+  Future<void> end(WidgetTester tester, ProviderContainer container) async {
+    await tester.pumpWidget(const SizedBox());
+    container.dispose();
+    await tester.pump(const Duration(seconds: 1));
+  }
+
+  testWidgets('on a phone, back closes the open menu before it changes pane', (tester) async {
+    _size(tester, const Size(390, 844));
+    final container = await signedIn(tester);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Customers'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Open navigation menu').hitTestable().first);
+    await tester.pumpAndSettle();
+    final shell = tester.firstState<ScaffoldState>(find.byType(Scaffold));
+    expect(shell.isDrawerOpen, isTrue);
+    // ignore: invalid_use_of_protected_member
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(shell.isDrawerOpen, isFalse);
+    expect(find.widgetWithText(AppBar, 'Customers').hitTestable(), findsOneWidget); // still on Customers
+    // ignore: invalid_use_of_protected_member
+    await tester.binding.handlePopRoute(); // then back goes home
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, 'Customers').hitTestable(), findsOneWidget);
+    await end(tester, container);
+  });
+
+  testWidgets('panes with an add button stay side by side without a hero clash', (tester) async {
+    _size(tester, const Size(1280, 800));
+    final container = await signedIn(tester);
+    Finder rail(String label) => find.descendant(of: find.byType(NavigationRail), matching: find.text(label));
+    await tester.tap(rail('Customers'));
+    await tester.pumpAndSettle();
+    await tester.tap(rail('Products'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add product'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await end(tester, container);
+  });
 }
+

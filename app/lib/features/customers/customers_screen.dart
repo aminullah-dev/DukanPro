@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/digits.dart';
 import '../../widgets/bidi.dart';
 import '../../widgets/money.dart';
 import '../../widgets/shell_scope.dart';
@@ -119,7 +120,7 @@ class CustomersScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.customers)),
       floatingActionButton: canManage
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton.extended(heroTag: null,
               onPressed: () => _add(context, ref), icon: const Icon(Icons.person_add), label: Text(l.addCustomer))
           : null,
       body: async.when(
@@ -236,7 +237,7 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
             // Bounds mirror the server's columns so a saved customer is never
             // rejected at sync: name ≤ 128, phone ≤ 32, credit limit ≥ 0.
             final name = _name.text.trim();
-            final phone = _phone.text.trim();
+            final phone = latinDigits(_phone.text.trim()); // stored with Latin digits, found with either
             if (name.isEmpty || name.length > 128 || phone.length > 32) return;
             int? limit;
             try {

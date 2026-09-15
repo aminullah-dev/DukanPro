@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/digits.dart';
 import '../../widgets/bidi.dart';
 import '../../widgets/money.dart';
 import '../../widgets/labels.dart';
@@ -43,7 +44,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
     return Scaffold(
       appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.products)),
       floatingActionButton: canManage
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton.extended(heroTag: null,
               onPressed: () => _open(const ProductEditScreen()),
               icon: const Icon(Icons.add),
               label: Text(l.addProduct),
@@ -68,12 +69,10 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => ErrorMessage(e),
               data: (products) {
-                final q = _query.toLowerCase();
-                final items = q.isEmpty
-                    ? products
-                    : products
-                        .where((p) => p.name.toLowerCase().contains(q) || p.sku.toLowerCase().contains(q))
-                        .toList();
+                // A Dari keyboard's digits find what Latin ones do.
+                final q = latinDigits(_query.trim()).toLowerCase();
+                bool hit(String s) => latinDigits(s).toLowerCase().contains(q);
+                final items = q.isEmpty ? products : products.where((p) => hit(p.name) || hit(p.sku)).toList();
                 if (items.isEmpty) return Center(child: Text(l.noProducts));
                 return ListView.separated(
                   itemCount: items.length,

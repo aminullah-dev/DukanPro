@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/digits.dart';
 import '../../widgets/money.dart';
 import '../../widgets/labels.dart';
 import '../../widgets/shell_scope.dart';
@@ -124,11 +125,11 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
               key: ValueKey(_form),
               displayStringForOption: (p) => p.name,
               optionsBuilder: (value) {
-                final q = value.text.trim().toLowerCase();
+                // A Dari keyboard's digits find what Latin ones do.
+                final q = latinDigits(value.text.trim()).toLowerCase();
                 if (q.isEmpty) return const Iterable<Product>.empty();
-                return products
-                    .where((p) => p.name.toLowerCase().contains(q) || p.sku.toLowerCase().contains(q))
-                    .take(20);
+                bool hit(String s) => latinDigits(s).toLowerCase().contains(q);
+                return products.where((p) => hit(p.name) || hit(p.sku)).take(20);
               },
               onSelected: (p) => setState(() => _product = p),
               fieldViewBuilder: (context, controller, focus, onSubmit) => TextField(

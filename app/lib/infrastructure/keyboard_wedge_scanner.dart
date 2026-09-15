@@ -39,7 +39,7 @@ class WedgeDecoder {
 String scanCharFor(PhysicalKeyboardKey key, String? typed, {required bool shift}) {
   if (typed != null && typed.isNotEmpty && typed.codeUnitAt(0) < 0x80) return typed; // a Latin layout
   final digit = _digitKeys.indexOf(key);
-  if (digit >= 0 && !shift) return '$digit';
+  if (digit >= 0) return shift ? _shiftedDigits[digit] : '$digit';
   final numpad = _numpadKeys.indexOf(key);
   if (numpad >= 0) return '$numpad';
   final letter = _letterKeys.indexOf(key);
@@ -47,8 +47,33 @@ String scanCharFor(PhysicalKeyboardKey key, String? typed, {required bool shift}
     final c = String.fromCharCode(0x61 + letter);
     return shift ? c.toUpperCase() : c;
   }
+  final symbol = _usSymbols[key];
+  if (symbol != null) return shift ? symbol.$2 : symbol.$1;
   return typed ?? '';
 }
+
+// What a scanner set up for a US keyboard means by the digit row with Shift and
+// by the punctuation keys (without, with Shift).
+const _shiftedDigits = [')', '!', '@', '#', r'$', '%', '^', '&', '*', '('];
+final _usSymbols = <PhysicalKeyboardKey, (String, String)>{
+  PhysicalKeyboardKey.minus: ('-', '_'),
+  PhysicalKeyboardKey.equal: ('=', '+'),
+  PhysicalKeyboardKey.bracketLeft: ('[', '{'),
+  PhysicalKeyboardKey.bracketRight: (']', '}'),
+  PhysicalKeyboardKey.backslash: (r'\', '|'),
+  PhysicalKeyboardKey.semicolon: (';', ':'),
+  PhysicalKeyboardKey.quote: ("'", '"'),
+  PhysicalKeyboardKey.backquote: ('`', '~'),
+  PhysicalKeyboardKey.comma: (',', '<'),
+  PhysicalKeyboardKey.period: ('.', '>'),
+  PhysicalKeyboardKey.slash: ('/', '?'),
+  PhysicalKeyboardKey.space: (' ', ' '),
+  PhysicalKeyboardKey.numpadDecimal: ('.', '.'),
+  PhysicalKeyboardKey.numpadSubtract: ('-', '-'),
+  PhysicalKeyboardKey.numpadAdd: ('+', '+'),
+  PhysicalKeyboardKey.numpadMultiply: ('*', '*'),
+  PhysicalKeyboardKey.numpadDivide: ('/', '/'),
+};
 
 const _digitKeys = [PhysicalKeyboardKey.digit0, PhysicalKeyboardKey.digit1, PhysicalKeyboardKey.digit2, PhysicalKeyboardKey.digit3, PhysicalKeyboardKey.digit4, PhysicalKeyboardKey.digit5, PhysicalKeyboardKey.digit6, PhysicalKeyboardKey.digit7, PhysicalKeyboardKey.digit8, PhysicalKeyboardKey.digit9];
 const _numpadKeys = [PhysicalKeyboardKey.numpad0, PhysicalKeyboardKey.numpad1, PhysicalKeyboardKey.numpad2, PhysicalKeyboardKey.numpad3, PhysicalKeyboardKey.numpad4, PhysicalKeyboardKey.numpad5, PhysicalKeyboardKey.numpad6, PhysicalKeyboardKey.numpad7, PhysicalKeyboardKey.numpad8, PhysicalKeyboardKey.numpad9];

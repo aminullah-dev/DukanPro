@@ -18,7 +18,7 @@ class BranchesScreen extends ConsumerWidget {
     final async = ref.watch(branchesControllerProvider);
     return Scaffold(
       appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.branches)),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton.extended(heroTag: null,
         onPressed: () => _add(context, ref, l),
         icon: const Icon(Icons.add_business_outlined),
         label: Text(l.addBranch),

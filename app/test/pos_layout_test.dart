@@ -96,11 +96,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(container.read(posCartProvider).single.qtyMinor, 1);
 
-    // Cancelled, the POS takes scans again.
+    // Cancelled, the scan made during the payment comes in, and the POS takes
+    // scans again.
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
+    expect(container.read(posCartProvider).single.qtyMinor, 2);
     scanner.controller.add(_scan());
     await tester.pumpAndSettle();
-    expect(container.read(posCartProvider).single.qtyMinor, 2);
+    expect(container.read(posCartProvider).single.qtyMinor, 3);
   });
 }

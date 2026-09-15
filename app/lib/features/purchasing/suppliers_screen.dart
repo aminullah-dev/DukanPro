@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/digits.dart';
 import '../../widgets/bidi.dart';
 import '../../widgets/money.dart';
 import '../../widgets/shell_scope.dart';
@@ -66,7 +67,7 @@ class SuppliersScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.suppliers)),
       floatingActionButton: canAdd
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton.extended(heroTag: null,
               onPressed: () => _add(context, ref),
               icon: const Icon(Icons.add_business_outlined),
               label: Text(l.addSupplier),
@@ -142,7 +143,7 @@ class _AddSupplierDialogState extends State<_AddSupplierDialog> {
           onPressed: () {
             // Bounds mirror the server's columns: name up to 128, phone up to 32.
             final name = _name.text.trim();
-            final phone = _phone.text.trim();
+            final phone = latinDigits(_phone.text.trim()); // stored with Latin digits, found with either
             if (name.isEmpty || name.length > 128 || phone.length > 32) return;
             Navigator.pop(context, (name: name, phone: phone.isEmpty ? null : phone));
           },

@@ -18,7 +18,7 @@ class EmployeesScreen extends ConsumerWidget {
     final async = ref.watch(employeesControllerProvider);
     return Scaffold(
       appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.employees)),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton.extended(heroTag: null,
         onPressed: () => _add(context, ref, l),
         icon: const Icon(Icons.person_add),
         label: Text(l.addEmployee),

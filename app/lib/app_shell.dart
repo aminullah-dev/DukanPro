@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_state.dart';
 import 'features/audit/audit_log_screen.dart';
+import 'features/iam/iam_providers.dart';
+import 'features/audit/audit_providers.dart';
 import 'features/auth/session.dart';
 import 'features/auth/session_guard.dart';
 import 'features/catalog/product_list_screen.dart';
@@ -128,6 +130,15 @@ class _ShellState extends ConsumerState<_Shell> {
     });
     // A pane coming back into view shows current figures, not those it last loaded.
     refreshReadModels(ref.invalidate);
+    // Panes read from the server refresh as they come into view too.
+    switch (id) {
+      case 'audit':
+        ref.invalidate(auditLogProvider);
+      case 'employees':
+        ref.invalidate(employeesControllerProvider);
+      case 'branches':
+        ref.invalidate(branchesControllerProvider);
+    }
   }
 
   @override
@@ -168,7 +179,13 @@ class _ShellState extends ConsumerState<_Shell> {
         // On a phone, back goes to the home pane before it leaves the app.
         canPop: wide || selected == _home,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _select(_home);
+          if (didPop) return;
+          final scaffold = _scaffold.currentState;
+          if (scaffold != null && scaffold.isDrawerOpen) {
+            scaffold.closeDrawer(); // back closes the menu first
+          } else {
+            _select(_home);
+          }
         },
         child: Scaffold(
           key: _scaffold,
@@ -284,7 +301,8 @@ class _HomePane extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: ShellScope.menuButton(context),
-        title: Text(l.appTitle),
+        // On the narrowest phones the name scales down rather than being cut off.
+        title: FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart, child: Text(l.appTitle)),
         // A phone's bar keeps its title: lock and sign-out wait in a menu.
         actions: showShellActions
             ? [

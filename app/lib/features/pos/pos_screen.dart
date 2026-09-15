@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
 import 'package:dukan_hardware/dukan_hardware.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/digits.dart';
 import '../../widgets/money.dart';
 import '../../widgets/dates.dart';
 import '../../widgets/labels.dart';
@@ -37,6 +40,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   /// Set while a sale is being charged: the cart is frozen and scans wait, so
   /// what is settled is exactly what the cashier confirmed.
   bool _charging = false;
+  // Scans made while this till's own dialog or sheet is open (the payment, the
+  // receipt, the cart), added in order once it closes.
+  final _queuedScans = <String>[];
+  int _modals = 0;
+  bool _cartSheetOpen = false; // the cart itself is in front: a scan shows in it at once
+  // A scan the search field had focus for, while its characters may still be
+  // on their way into the field.
+  ({String code, DateTime at})? _fieldScan;
 
   /// Whether this POS is the one on screen: not a pane hidden in the shell, not
   /// under a dialog (see build). Only then do scans reach it.
@@ -63,8 +74,45 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     ref.read(posCartProvider.notifier).add(p, unit.decimalPlaces, unitName: unitLabel(AppLocalizations.of(context), unit.id, unit.name));
   }
 
+  /// Runs one of this till's own dialogs or sheets: scans made meanwhile wait.
+  Future<T?> _modal<T>(Future<T?> Function() open) async {
+    _modals++;
+    try {
+      return await open();
+    } finally {
+      _modals--;
+      _drainScans();
+    }
+  }
+
+  /// Adds the scans that waited, in order, once nothing of this till is open.
+  Future<void> _drainScans() async {
+    if (!mounted || _charging || _modals > 0 || _queuedScans.isEmpty) return;
+    final codes = List.of(_queuedScans);
+    _queuedScans.clear();
+    for (final code in codes) {
+      await _addByBarcode(code);
+    }
+  }
+
+  /// A scan while the search field has focus: the scanner typed the code into
+  /// the field too. An empty field's Enter adds it (onSubmitted). A field that
+  /// held a search looked for "search + code" and found nothing, so the code
+  /// comes back out of the field and its product goes in.
+  void _scanIntoSearch(String code) {
+    final text = _search.text;
+    if (text.length > code.length && latinDigits(text).endsWith(code)) {
+      final rest = text.substring(0, text.length - code.length);
+      _search.value = TextEditingValue(text: rest, selection: TextSelection.collapsed(offset: rest.length));
+      setState(() => _query = rest);
+      _addByBarcode(code);
+    } else {
+      _fieldScan = (code: code, at: DateTime.now());
+    }
+  }
+
   Future<void> _editQty(int i, CartLine line) async {
-    final qty = await showDialog<int>(context: context, builder: (_) => _QtyDialog(line: line));
+    final qty = await _modal(() => showDialog<int>(context: context, builder: (_) => _QtyDialog(line: line)));
     if (qty != null && !_charging) ref.read(posCartProvider.notifier).setQty(i, qty);
   }
 
@@ -78,10 +126,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (lines.isEmpty) return;
     setState(() => _charging = true);
     try {
-      final result = await showDialog<_PayResult>(
-        context: context,
-        builder: (_) => _PaymentDialog(totalMinor: computeTotals(lines).totalMinor),
-      );
+      final result = await _modal(() => showDialog<_PayResult>(
+            context: context,
+            builder: (_) => _PaymentDialog(totalMinor: computeTotals(lines).totalMinor),
+          ));
       if (result == null) return;
       final sales = ref.read(localSalesProvider);
       final sale = await sales.settle(
@@ -92,21 +140,24 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       ref.read(posCartProvider.notifier).clear();
       refreshReadModels(ref.invalidate);
       if (mounted) {
-        await showDialog<void>(
-          context: context,
-          builder: (_) => _ReceiptDialog(
-            sale: sale, lines: saleLines,
-            // The drawer opens for cash taken now, never for a reprint.
-            openDrawer: result.tenders.any((t) => t.method == PaymentMethod.cash),
-          ),
-        );
+        await _modal(() => showDialog<void>(
+              context: context,
+              builder: (_) => _ReceiptDialog(
+                sale: sale, lines: saleLines,
+                // The drawer opens for cash taken now, never for a reprint.
+                openDrawer: result.tenders.any((t) => t.method == PaymentMethod.cash),
+              ),
+            ));
       }
     } on AppError catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appErrorText(l, e))));
       }
     } finally {
-      if (mounted) setState(() => _charging = false);
+      if (mounted) {
+        setState(() => _charging = false);
+        _drainScans(); // the next customer's items, scanned during the payment or receipt
+      }
     }
   }
 
@@ -158,11 +209,24 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   /// clears the field; anything else stays a name search. (A scanner's keys land
   /// here while the field has focus, so the scan listener leaves them alone.)
   Future<void> _submitSearch(String text) async {
+    final scanned = _fieldScan;
+    _fieldScan = null;
     final p = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(text));
-    if (p == null || !mounted) return;
-    _add(p);
-    _search.clear();
-    setState(() => _query = '');
+    if (!mounted) return;
+    if (p != null) {
+      _add(p);
+      _search.clear();
+      setState(() => _query = '');
+      return;
+    }
+    // The scanner's code landed after a typed search: take it back out, add it.
+    final recent = scanned != null && DateTime.now().difference(scanned.at) < const Duration(seconds: 2);
+    if (recent && text.length > scanned.code.length && latinDigits(text).endsWith(scanned.code)) {
+      final rest = text.substring(0, text.length - scanned.code.length);
+      _search.value = TextEditingValue(text: rest, selection: TextSelection.collapsed(offset: rest.length));
+      setState(() => _query = rest);
+      await _addByBarcode(scanned.code);
+    }
   }
 
   /// This device's latest sales, to reprint one's receipt.
@@ -172,16 +236,18 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final sales = ref.read(localSalesProvider);
     final recent = await sales.recent(branchId: actor.branchId);
     if (!mounted) return;
-    final picked = await showDialog<SaleRow>(context: context, builder: (_) => _RecentSalesDialog(zone: ref.read(branchZoneProvider), sales: recent));
+    final picked = await _modal(() => showDialog<SaleRow>(
+        context: context, builder: (_) => _RecentSalesDialog(zone: ref.read(branchZoneProvider), sales: recent)));
     if (picked == null) return;
     final lines = await sales.saleLinesFor(picked.id);
     if (mounted) {
-      await showDialog<void>(context: context, builder: (_) => _ReceiptDialog(sale: picked, lines: lines));
+      await _modal(() => showDialog<void>(context: context, builder: (_) => _ReceiptDialog(sale: picked, lines: lines)));
     }
   }
 
   void _openCart(AppLocalizations l, bool canSell) {
-    showModalBottomSheet<void>(
+    setState(() => _cartSheetOpen = true);
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -197,7 +263,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => _cartSheetOpen = false);
+    }));
   }
 
   Widget _productPane(BuildContext context, AppLocalizations l, AsyncValue<List<Product>> productsAsync, bool canSell) {
@@ -224,10 +292,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => ErrorMessage(e),
             data: (products) {
-              final q = _query.toLowerCase();
-              final items = q.isEmpty
-                  ? products
-                  : products.where((p) => p.name.toLowerCase().contains(q) || p.sku.toLowerCase().contains(q)).toList();
+              // A Dari keyboard's digits find what Latin ones do.
+              final q = latinDigits(_query.trim()).toLowerCase();
+              bool hit(String s) => latinDigits(s).toLowerCase().contains(q);
+              final items = q.isEmpty ? products : products.where((p) => hit(p.name) || hit(p.sku)).toList();
               return GridView.builder(
                 padding: const EdgeInsets.all(12),
                 gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
@@ -278,16 +346,24 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final total = cart.fold<int>(0, (s, l) => s + l.lineTotal);
     return IgnorePointer(
       ignoring: _charging,
-      child: Column(
+      child: LayoutBuilder(builder: (context, box) {
+        // Short (a landscape phone with its keyboard up): the whole panel scrolls,
+        // so Charge stays reachable.
+        final short = box.maxHeight < 320;
+        final panel = Column(
+        mainAxisSize: short ? MainAxisSize.min : MainAxisSize.max,
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(children: [Text(l.cartTitle, style: Theme.of(context).textTheme.titleMedium)]),
           ),
-          Expanded(
-            child: cart.isEmpty
-                ? Center(child: Text(l.emptyCart))
+          _grow(
+            short,
+            cart.isEmpty
+                ? Padding(padding: const EdgeInsets.all(16), child: Center(child: Text(l.emptyCart)))
                 : ListView.builder(
+                    shrinkWrap: short,
+                    physics: short ? const NeverScrollableScrollPhysics() : null,
                     itemCount: cart.length,
                     itemBuilder: (context, i) {
                       final line = cart[i];
@@ -352,7 +428,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             ),
           ),
         ],
-      ),
+      );
+        return short ? SingleChildScrollView(child: panel) : panel;
+      }),
     );
   }
 
@@ -398,11 +476,20 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     // this route not current. Scans go only to the POS in front of the cashier.
     _visible = TickerMode.valuesOf(context).enabled && (ModalRoute.of(context)?.isCurrent ?? true);
     ref.listen(posScanProvider, (_, next) {
-      // With the search field focused the scanner's keys arrive there too, and
-      // onSubmitted adds the product: one path per scan.
-      if (canSell && _visible && !_charging && !_searchFocus.hasFocus) {
-        next.whenData((e) => _addByBarcode(e.code));
-      }
+      next.whenData((e) {
+        if (!canSell) return;
+        if (_searchFocus.hasFocus) {
+          _scanIntoSearch(e.code); // its keys arrived in the field too
+        } else if (_cartSheetOpen && !_charging) {
+          _addByBarcode(e.code); // the cart sheet shows it at once
+        } else if (_charging || _modals > 0) {
+          // This till's own dialog is in front (the payment, the receipt): the
+          // scan waits for it to close, in order.
+          if (TickerMode.valuesOf(context).enabled) _queuedScans.add(e.code);
+        } else if (_visible) {
+          _addByBarcode(e.code);
+        }
+      });
     });
     final productsAsync = ref.watch(productsProvider);
     final cart = ref.watch(posCartProvider);
@@ -481,6 +568,21 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   late final List<_TenderLine> _lines = [_TenderLine(PaymentMethod.cash, _afn(widget.totalMinor))];
   final List<_TenderLine> _removed = [];
   Customer? _customer;
+  TextEditingController? _customerField;
+
+  /// A scanner types like a keyboard: a scan while this dialog is open also
+  /// typed its code into the focused field. It comes back out; the scan itself
+  /// waits for the next sale (the POS keeps it).
+  void _stripScan(ScanEvent e) {
+    for (final field in [for (final t in _lines) t.amount, ?_customerField]) {
+      final text = field.text;
+      if (text.length >= e.code.length && latinDigits(text).endsWith(e.code)) {
+        final rest = text.substring(0, text.length - e.code.length);
+        field.value = TextEditingValue(text: rest, selection: TextSelection.collapsed(offset: rest.length));
+      }
+    }
+    setState(() {});
+  }
 
   @override
   void dispose() {
@@ -544,11 +646,22 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
     final customersAsync = ref.watch(customersProvider);
     // What goes on the customer's account: the total less what is paid now.
     final onCredit = _customer != null && split != null ? split.remaining : 0;
+    ref.listen(posScanProvider, (_, next) => next.whenData(_stripScan));
     Widget amountRow(String label, int value, {Color? color}) => Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label),
-            Text(formatMoney(l, value, shopCurrencyOf(context)), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            Flexible(child: Text(label)),
+            const SizedBox(width: 8),
+            // A long figure at a large text size scales down instead of overflowing.
+            Flexible(
+              flex: 2,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerEnd,
+                child: Text(formatMoney(l, value, shopCurrencyOf(context)),
+                    style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+              ),
+            ),
           ],
         );
     return AlertDialog(
@@ -561,16 +674,18 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
             const SizedBox(height: 12),
             for (final (i, t) in _lines.indexed) ...[
               Row(children: [
-                DropdownButton<PaymentMethod>(
+                Flexible(child: DropdownButton<PaymentMethod>(
+                  isExpanded: true,
                   value: t.method,
                   items: [
                     for (final m in const [PaymentMethod.cash, PaymentMethod.card, PaymentMethod.transfer])
                       DropdownMenuItem(value: m, child: Text(_methodName(l, m))),
                   ],
                   onChanged: (m) => setState(() => t.method = m ?? t.method),
-                ),
+                )),
                 const SizedBox(width: 8),
                 Expanded(
+                  flex: 2,
                   child: TextField(
                     controller: t.amount,
                     autofocus: i == 0,
@@ -621,18 +736,24 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
               data: (customers) => Autocomplete<Customer>(
                 displayStringForOption: (c) => c.name,
                 optionsBuilder: (value) {
-                  final q = value.text.trim().toLowerCase();
+                  // A phone typed with a Dari keyboard's digits finds the same customer.
+                  final q = latinDigits(value.text.trim()).toLowerCase();
                   final open = customers.where((c) => c.isActive);
                   return (q.isEmpty
                           ? open
-                          : open.where((c) => c.name.toLowerCase().contains(q) || (c.phone ?? '').contains(q)))
+                          : open.where((c) =>
+                              latinDigits(c.name).toLowerCase().contains(q) || latinDigits(c.phone ?? '').contains(q)))
                       .take(20);
                 },
                 onSelected: _pick,
                 fieldViewBuilder: (context, controller, focus, onSubmit) => TextField(
-                  controller: controller,
+                  controller: _customerField = controller,
                   focusNode: focus,
                   onSubmitted: (_) => onSubmit(),
+                  onChanged: (text) {
+                    // Credit goes to the customer the field names: typing over a pick drops it.
+                    if (_customer != null && text != _customer!.name) _pick(null);
+                  },
                   decoration: InputDecoration(
                     labelText: l.credit,
                     hintText: l.searchCustomer,
@@ -715,7 +836,9 @@ class _OpenShiftPanelState extends State<_OpenShiftPanel> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return Center(
-      child: ConstrainedBox(
+      // Scrolls, so the keyboard never hides the button on a small phone.
+      child: SingleChildScrollView(
+        child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 380),
         child: Card(
           margin: const EdgeInsets.all(16),
@@ -744,6 +867,7 @@ class _OpenShiftPanelState extends State<_OpenShiftPanel> {
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -785,8 +909,15 @@ class _ZReportDialogState extends State<_ZReportDialog> {
           padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Flexible(child: Text(label)),
-            Text(formatMoney(l, value, shopCurrencyOf(context)),
-                style: TextStyle(fontWeight: bold ? FontWeight.bold : null, color: color)),
+            const SizedBox(width: 8),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerEnd,
+                child: Text(formatMoney(l, value, shopCurrencyOf(context)),
+                    style: TextStyle(fontWeight: bold ? FontWeight.bold : null, color: color)),
+              ),
+            ),
           ]),
         );
     return AlertDialog(
@@ -1021,3 +1152,6 @@ class _QtyDialogState extends State<_QtyDialog> {
     );
   }
 }
+
+/// [child] taking the rest of a column, unless the column is short and scrolls.
+Widget _grow(bool short, Widget child) => short ? child : Expanded(child: child);

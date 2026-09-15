@@ -20,6 +20,8 @@ class LocaleToggle extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(localeProvider);
     final label = _locales.firstWhere((e) => e.$1 == active, orElse: () => _locales[1]).$2;
+    // A phone's bar is short of room: the icon alone, the menu names the rest.
+    final compact = MediaQuery.sizeOf(context).width < 600;
     return PopupMenuButton<Locale>(
       tooltip: AppLocalizations.of(context).language,
       onSelected: (locale) => ref.read(localeProvider.notifier).set(locale),
@@ -31,8 +33,7 @@ class LocaleToggle extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Icons.translate, size: 20),
-          const SizedBox(width: 4),
-          Text(label),
+          if (!compact) ...[const SizedBox(width: 4), Text(label)],
         ]),
       ),
     );
