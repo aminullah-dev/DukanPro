@@ -1,9 +1,9 @@
-import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/money.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/locale_toggle.dart';
@@ -19,7 +19,6 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) {
   return ref.watch(localReportsProvider).dashboard(branch, zone: ref.watch(branchZoneProvider));
 });
 
-String _afn(int minor) => formatQuantity(minor, 2); // integers, never a float
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -28,6 +27,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final async = ref.watch(dashboardProvider);
+    final currency = ref.watch(shopCurrencyProvider);
     return Scaffold(
       appBar: AppBar(
         leading: ShellScope.menuButton(context),
@@ -56,14 +56,14 @@ class DashboardScreen extends ConsumerWidget {
                 crossAxisSpacing: 12,
               ),
               children: [
-                _Tile(label: l.salesToday, value: '${_afn(d.salesTodayMinor)} AFN', icon: Icons.today, color: const Color(0xFF0F6B5C)),
+                _Tile(label: l.salesToday, value: formatMoney(l, d.salesTodayMinor, currency), icon: Icons.today, color: const Color(0xFF0F6B5C)),
                 _Tile(
-                  label: l.profit, value: '${_afn(d.profitTodayMinor)} AFN', icon: Icons.trending_up,
+                  label: l.profit, value: formatMoney(l, d.profitTodayMinor, currency), icon: Icons.trending_up,
                   color: const Color(0xFF1B7F4B),
                   // Lines sold without a cost count as free: say how many.
                   note: d.unknownCostLines > 0 ? l.profitMissingCost(d.unknownCostLines) : null,
                 ),
-                _Tile(label: l.outstandingDebt, value: '${_afn(d.outstandingDebtMinor)} AFN', icon: Icons.account_balance_wallet, color: const Color(0xFFC2571F)),
+                _Tile(label: l.outstandingDebt, value: formatMoney(l, d.outstandingDebtMinor, currency), icon: Icons.account_balance_wallet, color: const Color(0xFFC2571F)),
                 _Tile(label: l.lowStock, value: '${d.lowStockCount}', icon: Icons.warning_amber, color: const Color(0xFFB5820B)),
               ],
             ),

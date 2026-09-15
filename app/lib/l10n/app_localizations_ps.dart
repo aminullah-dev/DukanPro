@@ -1073,4 +1073,21 @@ class AppLocalizationsPs extends AppLocalizations {
   String dateAndTime(String date, String time) {
     return '$date، $time';
   }
+
+  @override
+  String get symbolAfn => 'افغانۍ';
+
+  @override
+  String get symbolUsd => 'ډالر';
+
+  @override
+  String get symbolPkr => 'کلدار';
+
+  @override
+  String get symbolEur => 'یورو';
+
+  @override
+  String moneyAmount(String amount, String currency) {
+    return '$amount $currency';
+  }
 }

@@ -1948,6 +1948,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{date}, {time}'**
   String dateAndTime(String date, String time);
+
+  /// No description provided for @symbolAfn.
+  ///
+  /// In en, this message translates to:
+  /// **'AFN'**
+  String get symbolAfn;
+
+  /// No description provided for @symbolUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'USD'**
+  String get symbolUsd;
+
+  /// No description provided for @symbolPkr.
+  ///
+  /// In en, this message translates to:
+  /// **'PKR'**
+  String get symbolPkr;
+
+  /// No description provided for @symbolEur.
+  ///
+  /// In en, this message translates to:
+  /// **'EUR'**
+  String get symbolEur;
+
+  /// No description provided for @moneyAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} {currency}'**
+  String moneyAmount(String amount, String currency);
 }
 
 class _AppLocalizationsDelegate

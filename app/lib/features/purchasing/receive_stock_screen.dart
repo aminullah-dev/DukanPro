@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/money.dart';
 import '../../widgets/labels.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
@@ -155,7 +156,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
               TextField(
                 controller: _cost,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(labelText: l.unitCost, suffixText: 'AFN', border: const OutlineInputBorder()),
+                decoration: InputDecoration(labelText: l.unitCost, suffixText: currencySymbol(l, shopCurrencyOf(context)), border: const OutlineInputBorder()),
               ),
               const SizedBox(height: 12),
               suppliersAsync.maybeWhen(

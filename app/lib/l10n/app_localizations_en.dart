@@ -1078,4 +1078,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String dateAndTime(String date, String time) {
     return '$date, $time';
   }
+
+  @override
+  String get symbolAfn => 'AFN';
+
+  @override
+  String get symbolUsd => 'USD';
+
+  @override
+  String get symbolPkr => 'PKR';
+
+  @override
+  String get symbolEur => 'EUR';
+
+  @override
+  String moneyAmount(String amount, String currency) {
+    return '$amount $currency';
+  }
 }

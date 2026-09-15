@@ -326,5 +326,11 @@
   "solarDate": "{day} {month} {year}",
   "@solarDate": { "placeholders": { "day": { "type": "String" }, "month": { "type": "String" }, "year": { "type": "String" } } },
   "dateAndTime": "{date}, {time}",
-  "@dateAndTime": { "placeholders": { "date": { "type": "String" }, "time": { "type": "String" } } }
+  "@dateAndTime": { "placeholders": { "date": { "type": "String" }, "time": { "type": "String" } } },
+  "symbolAfn": "AFN",
+  "symbolUsd": "USD",
+  "symbolPkr": "PKR",
+  "symbolEur": "EUR",
+  "moneyAmount": "{amount} {currency}",
+  "@moneyAmount": { "placeholders": { "amount": { "type": "String" }, "currency": { "type": "String" } } }
 }

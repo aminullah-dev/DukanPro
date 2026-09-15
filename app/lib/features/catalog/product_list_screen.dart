@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bidi.dart';
+import '../../widgets/money.dart';
 import '../../widgets/labels.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
@@ -26,7 +28,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
   }
 
   Future<void> _onScan(String code) async {
-    final product = await ref.read(localCatalogProvider).products.findByBarcode(code.trim());
+    final product = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(code));
     if (!mounted || product == null) return;
     await _open(ProductEditScreen(product: product));
   }
@@ -80,7 +82,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                     final p = items[i];
                     return ListTile(
                       title: Text(p.name),
-                      subtitle: Text(p.sku),
+                      subtitle: Text(ltr(p.sku)),
                       onTap: canManage ? () => _open(ProductEditScreen(product: p)) : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -88,7 +90,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                           if (p.trackStock) _OnHandBadge(productId: p.id, branchId: actor?.branchId ?? '', unitId: p.unitId),
                           const SizedBox(width: 10),
                           Text(
-                            '${(p.sellPrice.amountMinor / 100).toStringAsFixed(2)} ${p.sellPrice.currency}',
+                            formatMoney(AppLocalizations.of(context), p.sellPrice.amountMinor, p.sellPrice.currency),
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           if (p.trackStock && (actor?.can(Permission.stockAdjust) ?? false))

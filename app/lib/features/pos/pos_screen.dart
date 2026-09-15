@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/money.dart';
 import '../../widgets/dates.dart';
 import '../../widgets/labels.dart';
 import '../../widgets/shell_scope.dart';
@@ -144,12 +145,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (mounted) {
       final l = AppLocalizations.of(context);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.shiftClosed(_afn(closed.varianceMinor ?? 0)))));
+          .showSnackBar(SnackBar(content: Text(l.shiftClosed(amountText(closed.varianceMinor ?? 0)))));
     }
   }
 
   Future<void> _addByBarcode(String code) async {
-    final p = await ref.read(localCatalogProvider).products.findByBarcode(code.trim());
+    final p = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(code));
     if (p != null && mounted) _add(p);
   }
 
@@ -157,7 +158,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   /// clears the field; anything else stays a name search. (A scanner's keys land
   /// here while the field has focus, so the scan listener leaves them alone.)
   Future<void> _submitSearch(String text) async {
-    final p = await ref.read(localCatalogProvider).products.findByBarcode(text.trim());
+    final p = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(text));
     if (p == null || !mounted) return;
     _add(p);
     _search.clear();
@@ -250,7 +251,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             FittedBox(
                               fit: BoxFit.scaleDown,
                               alignment: AlignmentDirectional.centerStart,
-                              child: Text('${_afn(p.sellPrice.amountMinor)} ${p.sellPrice.currency}',
+                              child: Text(formatMoney(AppLocalizations.of(context), p.sellPrice.amountMinor, p.sellPrice.currency),
                                   style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
                             ),
                           ],
@@ -315,7 +316,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             ),
                           ],
                         ),
-                        trailing: Text(_afn(line.lineTotal), style: const TextStyle(fontWeight: FontWeight.w600)),
+                        trailing: Text(amountText(line.lineTotal), style: const TextStyle(fontWeight: FontWeight.w600)),
                       );
                     },
                   ),
@@ -332,7 +333,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     Flexible(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text('${_afn(total)} AFN',
+                        child: Text(formatMoney(AppLocalizations.of(context), total, shopCurrencyOf(context)),
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                       ),
                     ),
@@ -373,7 +374,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   isLabelVisible: cart.isNotEmpty,
                   child: const Icon(Icons.shopping_cart_outlined),
                 ),
-                label: FittedBox(fit: BoxFit.scaleDown, child: Text('${_afn(total)} AFN')),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text(formatMoney(AppLocalizations.of(context), total, shopCurrencyOf(context)))),
               ),
             ),
             const SizedBox(width: 8),
@@ -547,7 +548,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label),
-            Text('${_afn(value)} AFN', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            Text(formatMoney(l, value, shopCurrencyOf(context)), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
           ],
         );
     return AlertDialog(
@@ -580,7 +581,7 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                           : _customer == null
                               ? l.tendered
                               : l.cashNow,
-                      suffixText: 'AFN',
+                      suffixText: currencySymbol(l, shopCurrencyOf(context)),
                       isDense: true,
                     ),
                     onChanged: (_) => setState(() {}),
@@ -732,7 +733,7 @@ class _OpenShiftPanelState extends State<_OpenShiftPanel> {
                   controller: _float,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: l.openingFloat, suffixText: 'AFN', errorText: _error,
+                    labelText: l.openingFloat, suffixText: currencySymbol(l, shopCurrencyOf(context)), errorText: _error,
                     border: const OutlineInputBorder(),
                   ),
                   onSubmitted: (_) => _open(l),
@@ -784,7 +785,7 @@ class _ZReportDialogState extends State<_ZReportDialog> {
           padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Flexible(child: Text(label)),
-            Text('${_afn(value)} AFN',
+            Text(formatMoney(l, value, shopCurrencyOf(context)),
                 style: TextStyle(fontWeight: bold ? FontWeight.bold : null, color: color)),
           ]),
         );
@@ -806,7 +807,7 @@ class _ZReportDialogState extends State<_ZReportDialog> {
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: l.countedCash, suffixText: 'AFN', border: const OutlineInputBorder(),
+              labelText: l.countedCash, suffixText: currencySymbol(l, shopCurrencyOf(context)), border: const OutlineInputBorder(),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -898,20 +899,20 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
             for (final line in widget.lines)
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Flexible(child: Text('${line.name} ×${formatQuantity(line.qtyMinor, line.decimalPlaces)}')),
-                Text(_afn(line.lineTotalMinor)),
+                Text(amountText(line.lineTotalMinor)),
               ]),
             const Divider(),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(l.total, style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text('${_afn(sale.totalMinor)} AFN', style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(formatMoney(l, sale.totalMinor, sale.currency), style: const TextStyle(fontWeight: FontWeight.bold)),
             ]),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(l.paid),
-              Text('${_afn(sale.paidMinor + sale.changeMinor)} AFN'),
+              Text(formatMoney(l, sale.paidMinor + sale.changeMinor, sale.currency)),
             ]),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(l.change),
-              Text('${_afn(sale.changeMinor)} AFN'),
+              Text(formatMoney(l, sale.changeMinor, sale.currency)),
             ]),
           ],
         ),
@@ -956,7 +957,7 @@ class _RecentSalesDialog extends StatelessWidget {
                     dense: true,
                     title: Text(s.number, maxLines: 1, overflow: TextOverflow.ellipsis),
                     subtitle: Text(s.status == 'voided' ? '$time · ${l.voided}' : time),
-                    trailing: Text(_afn(s.totalMinor)),
+                    trailing: Text(formatMoney(l, s.totalMinor, s.currency)),
                     onTap: () => Navigator.pop(context, s),
                   );
                 },

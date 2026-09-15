@@ -22,6 +22,9 @@ RULES = [  # (pattern, why, files where it is the one right place)
     (re.compile(r"DateFormat[.(]"), "a date on the device's clock or calendar: use formatDate/formatTime",
      {"widgets/dates.dart"}),
     (re.compile(r"TimeOfDay\.fromDateTime\("), "a time on the device's clock: use formatTime", set()),
+    (re.compile(r"toStringAsFixed\("), "money or a quantity through a float: use amountText or formatQuantity", set()),
+    (re.compile(r"'AFN'"), "a fixed currency: use the sale's or product's, or the branch's (shopCurrencyOf)",
+     {"widgets/labels.dart", "widgets/money.dart", "features/auth/session.dart", "infrastructure/iam_api.dart"}),
 ]
 
 

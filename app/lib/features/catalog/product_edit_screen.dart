@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/money.dart';
 import '../../widgets/labels.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
@@ -102,7 +103,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
         final id = newId();
         final product = Product(
           id: id, sku: _sku.text.trim(), name: _name.text.trim(), unitId: _unitId!,
-          sellPrice: Money(priceMinor, 'AFN'), trackStock: _track,
+          sellPrice: Money(priceMinor, ref.read(shopCurrencyProvider)), trackStock: _track,
         );
         final barcodes = _barcode.text.trim().isEmpty
             ? <Barcode>[]
@@ -112,7 +113,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
         final p = widget.product!;
         final product = Product(
           id: p.id, sku: p.sku, name: _name.text.trim(), unitId: p.unitId,
-          sellPrice: Money(priceMinor, 'AFN'), categoryId: p.categoryId, cost: p.cost,
+          sellPrice: Money(priceMinor, p.sellPrice.currency), categoryId: p.categoryId, cost: p.cost, // keeps its currency
           trackStock: _track, isActive: _active, version: p.version,
         );
         await catalog.updateProduct(product, actorId: actor.user.id, deviceId: ref.read(deviceIdProvider));
@@ -168,7 +169,7 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                 TextFormField(
                   controller: _price,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: l.price, suffixText: 'AFN', border: const OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: l.price, suffixText: currencySymbol(l, widget.product?.sellPrice.currency ?? ref.watch(shopCurrencyProvider)), border: const OutlineInputBorder()),
                   validator: (v) => _priceError(l, v),
                 ),
                 const SizedBox(height: 12),

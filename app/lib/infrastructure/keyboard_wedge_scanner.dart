@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dukan_core/dukan_core.dart' show normalizeDigits;
 import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter/services.dart';
 
@@ -21,7 +22,7 @@ class WedgeDecoder {
     if (_last != null && now.difference(_last!) > maxGap) _buf.clear();
     _last = now;
     if (ch == '\n' || ch == '\r') {
-      final code = _buf.toString();
+      final code = normalizeDigits(_buf.toString()); // Persian digits from a Dari layout
       _buf.clear();
       return code.isEmpty ? null : code;
     }
@@ -29,6 +30,29 @@ class WedgeDecoder {
     return null;
   }
 }
+
+/// The character a scanner meant by a key press. HID scanners send key
+/// positions and the active keyboard layout turns them into characters: under a
+/// Dari or Pashto layout the digit row types Persian digits and the letter keys
+/// Arabic letters. So digits and letters are read from the physical key, and
+/// any other key as typed.
+String scanCharFor(PhysicalKeyboardKey key, String? typed, {required bool shift}) {
+  if (typed != null && typed.isNotEmpty && typed.codeUnitAt(0) < 0x80) return typed; // a Latin layout
+  final digit = _digitKeys.indexOf(key);
+  if (digit >= 0 && !shift) return '$digit';
+  final numpad = _numpadKeys.indexOf(key);
+  if (numpad >= 0) return '$numpad';
+  final letter = _letterKeys.indexOf(key);
+  if (letter >= 0) {
+    final c = String.fromCharCode(0x61 + letter);
+    return shift ? c.toUpperCase() : c;
+  }
+  return typed ?? '';
+}
+
+const _digitKeys = [PhysicalKeyboardKey.digit0, PhysicalKeyboardKey.digit1, PhysicalKeyboardKey.digit2, PhysicalKeyboardKey.digit3, PhysicalKeyboardKey.digit4, PhysicalKeyboardKey.digit5, PhysicalKeyboardKey.digit6, PhysicalKeyboardKey.digit7, PhysicalKeyboardKey.digit8, PhysicalKeyboardKey.digit9];
+const _numpadKeys = [PhysicalKeyboardKey.numpad0, PhysicalKeyboardKey.numpad1, PhysicalKeyboardKey.numpad2, PhysicalKeyboardKey.numpad3, PhysicalKeyboardKey.numpad4, PhysicalKeyboardKey.numpad5, PhysicalKeyboardKey.numpad6, PhysicalKeyboardKey.numpad7, PhysicalKeyboardKey.numpad8, PhysicalKeyboardKey.numpad9];
+const _letterKeys = [PhysicalKeyboardKey.keyA, PhysicalKeyboardKey.keyB, PhysicalKeyboardKey.keyC, PhysicalKeyboardKey.keyD, PhysicalKeyboardKey.keyE, PhysicalKeyboardKey.keyF, PhysicalKeyboardKey.keyG, PhysicalKeyboardKey.keyH, PhysicalKeyboardKey.keyI, PhysicalKeyboardKey.keyJ, PhysicalKeyboardKey.keyK, PhysicalKeyboardKey.keyL, PhysicalKeyboardKey.keyM, PhysicalKeyboardKey.keyN, PhysicalKeyboardKey.keyO, PhysicalKeyboardKey.keyP, PhysicalKeyboardKey.keyQ, PhysicalKeyboardKey.keyR, PhysicalKeyboardKey.keyS, PhysicalKeyboardKey.keyT, PhysicalKeyboardKey.keyU, PhysicalKeyboardKey.keyV, PhysicalKeyboardKey.keyW, PhysicalKeyboardKey.keyX, PhysicalKeyboardKey.keyY, PhysicalKeyboardKey.keyZ];
 
 /// Guesses a symbology from the code shape (enough for receipt/catalog lookup).
 String guessSymbology(String code) {
@@ -57,7 +81,9 @@ class KeyboardWedgeScanner implements BarcodeScanner {
     if (event is! KeyDownEvent) return false;
     final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.numpadEnter;
-    final ch = isEnter ? '\n' : (event.character ?? '');
+    final ch = isEnter
+        ? '\n'
+        : scanCharFor(event.physicalKey, event.character, shift: HardwareKeyboard.instance.isShiftPressed);
     if (ch.isEmpty) return false;
     final code = _decoder.feed(ch, _now());
     if (code != null) _controller.add(ScanEvent(code, guessSymbology(code)));

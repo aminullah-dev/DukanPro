@@ -307,5 +307,10 @@
   "solarMonth11": "دلو",
   "solarMonth12": "حوت",
   "solarDate": "{day} {month} {year}",
-  "dateAndTime": "{date}، {time}"
+  "dateAndTime": "{date}، {time}",
+  "symbolAfn": "افغانی",
+  "symbolUsd": "دالر",
+  "symbolPkr": "کلدار",
+  "symbolEur": "یورو",
+  "moneyAmount": "{amount} {currency}"
 }

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bidi.dart';
+import '../../widgets/money.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
@@ -11,7 +13,6 @@ import '../auth/session.dart';
 import '../customers/customers_providers.dart';
 import '../pos/pos_providers.dart';
 
-String _afn(int minor) => formatQuantity(minor, 2);
 
 typedef _Payment = ({int amount, PaymentMethod method});
 
@@ -83,10 +84,10 @@ class SuppliersScreen extends ConsumerWidget {
                   final s = suppliers[i];
                   return ListTile(
                     title: Text(s.name),
-                    subtitle: s.phone == null ? null : Text(s.phone!),
+                    subtitle: s.phone == null ? null : Text(ltr(s.phone!)),
                     trailing: ref.watch(supplierBalanceProvider(s.id)).maybeWhen(
                           data: (b) => Text(
-                            '${l.balance}: ${_afn(b)}',
+                            '${l.balance}: ${formatMoney(l, b, shopCurrencyOf(context))}',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: b > 0 ? Theme.of(context).colorScheme.error : null,
@@ -128,7 +129,12 @@ class _AddSupplierDialogState extends State<_AddSupplierDialog> {
       title: Text(l.addSupplier),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: _name, autofocus: true, decoration: InputDecoration(labelText: l.supplierName)),
-        TextField(controller: _phone, decoration: InputDecoration(labelText: l.phone)),
+        TextField(
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+          textDirection: TextDirection.ltr, // digit groups keep their order in Dari
+          decoration: InputDecoration(labelText: l.phone),
+        ),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
@@ -175,7 +181,7 @@ class _PayDialogState extends ConsumerState<_PayDialog> {
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(l.balance),
-          Text(balance.maybeWhen(data: (b) => _afn(b), orElse: () => '…'),
+          Text(balance.maybeWhen(data: (b) => formatMoney(l, b, shopCurrencyOf(context)), orElse: () => '…'),
               style: const TextStyle(fontWeight: FontWeight.bold)),
         ]),
         const SizedBox(height: 8),
@@ -183,7 +189,7 @@ class _PayDialogState extends ConsumerState<_PayDialog> {
           controller: _amount,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: l.amount, suffixText: 'AFN', errorText: _error),
+          decoration: InputDecoration(labelText: l.amount, suffixText: currencySymbol(l, shopCurrencyOf(context)), errorText: _error),
         ),
         const SizedBox(height: 12),
         SegmentedButton<PaymentMethod>(

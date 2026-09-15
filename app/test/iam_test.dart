@@ -89,7 +89,7 @@ void main() {
       ),
     );
     await tester.pump(); // resolve the FutureProvider
-    expect(find.text('Amir  (@amir)'), findsOneWidget);
+    expect(find.text('Amir  (\u2066@amir\u2069)'  /* the username isolated left to right */), findsOneWidget);
     expect(find.text('Add employee'), findsOneWidget);
   });
 }

@@ -1075,6 +1075,23 @@ class AppLocalizationsFa extends AppLocalizations {
   String dateAndTime(String date, String time) {
     return '$date، $time';
   }
+
+  @override
+  String get symbolAfn => 'افغانی';
+
+  @override
+  String get symbolUsd => 'دالر';
+
+  @override
+  String get symbolPkr => 'کلدار';
+
+  @override
+  String get symbolEur => 'یورو';
+
+  @override
+  String moneyAmount(String amount, String currency) {
+    return '$amount $currency';
+  }
 }
 
 /// The translations for Persian, as used in Afghanistan (`fa_AF`).
@@ -2146,5 +2163,22 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String dateAndTime(String date, String time) {
     return '$date، $time';
+  }
+
+  @override
+  String get symbolAfn => 'افغانی';
+
+  @override
+  String get symbolUsd => 'دالر';
+
+  @override
+  String get symbolPkr => 'کلدار';
+
+  @override
+  String get symbolEur => 'یورو';
+
+  @override
+  String moneyAmount(String amount, String currency) {
+    return '$amount $currency';
   }
 }

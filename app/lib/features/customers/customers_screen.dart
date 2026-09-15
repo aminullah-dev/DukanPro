@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bidi.dart';
+import '../../widgets/money.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
@@ -18,7 +20,7 @@ enum _CustomerAction { creditLimit, toggleActive, writeOff }
 typedef _Amount = ({int amount, PaymentMethod method});
 
 Widget? _subtitle(AppLocalizations l, Customer c) {
-  final parts = [if (c.phone != null) c.phone!, if (!c.isActive) l.customerInactive];
+  final parts = [if (c.phone != null) ltr(c.phone!), if (!c.isActive) l.customerInactive];
   return parts.isEmpty ? null : Text(parts.join(' · '));
 }
 
@@ -172,7 +174,7 @@ class _BalanceChip extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final async = ref.watch(customerBalanceProvider(customerId));
     return async.maybeWhen(
-      data: (b) => Text('${l.balance}: ${_afn(b)}',
+      data: (b) => Text('${l.balance}: ${formatMoney(l, b, shopCurrencyOf(context))}',
           style: TextStyle(fontWeight: FontWeight.w600, color: b > 0 ? Theme.of(context).colorScheme.error : null)),
       orElse: () => const SizedBox.shrink(),
     );
@@ -211,13 +213,18 @@ class _AddCustomerDialogState extends State<_AddCustomerDialog> {
       title: Text(l.addCustomer),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: _name, decoration: InputDecoration(labelText: l.customerName)),
-        TextField(controller: _phone, decoration: InputDecoration(labelText: l.phone)),
+        TextField(
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+          textDirection: TextDirection.ltr, // digit groups keep their order in Dari
+          decoration: InputDecoration(labelText: l.phone),
+        ),
         if (widget.canGrantCredit)
           TextField(
             controller: _limit,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: l.creditLimit, suffixText: 'AFN', helperText: l.creditLimitHelp,
+              labelText: l.creditLimit, suffixText: currencySymbol(l, shopCurrencyOf(context)), helperText: l.creditLimitHelp,
               errorText: _limitError,
             ),
           ),
@@ -286,7 +293,7 @@ class _CreditLimitDialogState extends State<_CreditLimitDialog> {
         autofocus: true,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
-          labelText: l.creditLimit, suffixText: 'AFN', helperText: l.creditLimitHelp,
+          labelText: l.creditLimit, suffixText: currencySymbol(l, shopCurrencyOf(context)), helperText: l.creditLimitHelp,
           errorText: _error,
         ),
       ),
@@ -338,14 +345,14 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(l.balance),
-          Text(balance.maybeWhen(data: (b) => _afn(b), orElse: () => '…'), style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(balance.maybeWhen(data: (b) => formatMoney(l, b, shopCurrencyOf(context)), orElse: () => '…'), style: const TextStyle(fontWeight: FontWeight.bold)),
         ]),
         const SizedBox(height: 8),
         TextField(
           controller: _amount,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: l.amount, suffixText: 'AFN', errorText: _error),
+          decoration: InputDecoration(labelText: l.amount, suffixText: currencySymbol(l, shopCurrencyOf(context)), errorText: _error),
         ),
         if (!widget.writeOff) ...[
           const SizedBox(height: 12),

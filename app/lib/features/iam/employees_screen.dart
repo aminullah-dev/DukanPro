@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/iam_api.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bidi.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/shell_scope.dart';
 import 'iam_providers.dart';
@@ -60,7 +61,7 @@ class _EmployeeTile extends ConsumerWidget {
         .join('   ');
     return ListTile(
       leading: CircleAvatar(child: Text(employee.displayName.isNotEmpty ? employee.displayName[0] : '?')),
-      title: Text('${employee.displayName}  (@${employee.username})'),
+      title: Text('${employee.displayName}  (${ltr('@${employee.username}')})'),
       subtitle: roles.isEmpty ? null : Text(roles),
       trailing: Chip(
         label: Text(employee.isActive ? l.statusActive : l.statusDisabled),
@@ -79,7 +80,7 @@ class _EmployeeTile extends ConsumerWidget {
           children: [
             ListTile(
               title: Text(employee.displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('@${employee.username}'),
+              subtitle: Text(ltr('@${employee.username}')),
             ),
             const Divider(height: 1),
             ListTile(
