@@ -352,6 +352,10 @@ class AppLocalizationsPs extends AppLocalizations {
       'د دې وسیلې خوندي حافظه ونه لوستل شوه. بیا ننوځئ؛ که بیا پېښ شو، وسیله بیا چالانه کړئ.';
 
   @override
+  String get errLocalDatabase =>
+      'د دې وسیلې معلومات خلاص نه شول. اپ وتړئ او بیا یې پرانیزئ؛ که بیا هم وشول، وسیله بیا چالانه کړئ.';
+
+  @override
   String get errTotalTooLarge =>
       'دا ټولټال د ثبتولو لپاره ډېر لوی دی. شمېر او بیه وګورئ.';
 
@@ -542,6 +546,27 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get biometricUnlockSetting => 'د ګوتې په نښه خلاصول';
+
+  @override
+  String get idleLockSetting => 'له بېکارۍ وروسته قلفېدل';
+
+  @override
+  String idleLockMinutes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString دقیقې',
+      one: '$countString دقیقه',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get idleLockManagersOnly => 'یوازې مالک یا مدیر یې بدلولی شي.';
 
   @override
   String get confirmPasswordTitle => 'خپل پټنوم تایید کړئ';

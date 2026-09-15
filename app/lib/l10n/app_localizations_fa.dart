@@ -355,6 +355,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'حافظهٔ امن این دستگاه خوانده نشد. دوباره وارد شوید؛ اگر تکرار شد، دستگاه را دوباره روشن کنید.';
 
   @override
+  String get errLocalDatabase =>
+      'داده‌های این دستگاه باز نشد. برنامه را ببندید و دوباره باز کنید؛ اگر باز هم تکرار شد، دستگاه را دوباره روشن کنید.';
+
+  @override
   String get errTotalTooLarge =>
       'این مجموع برای ثبت بیش از حد بزرگ است. تعداد و قیمت را بررسی کنید.';
 
@@ -544,6 +548,28 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get biometricUnlockSetting => 'باز کردن با اثر انگشت';
+
+  @override
+  String get idleLockSetting => 'قفل شدن پس از بی‌کاری';
+
+  @override
+  String idleLockMinutes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString دقیقه',
+      one: '$countString دقیقه',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get idleLockManagersOnly =>
+      'فقط مالک یا مدیر می‌تواند این را تغییر دهد.';
 
   @override
   String get confirmPasswordTitle => 'رمز عبور خود را تأیید کنید';
@@ -1475,6 +1501,10 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
       'حافظهٔ امن این دستگاه خوانده نشد. دوباره وارد شوید؛ اگر تکرار شد، دستگاه را دوباره روشن کنید.';
 
   @override
+  String get errLocalDatabase =>
+      'داده‌های این دستگاه باز نشد. برنامه را ببندید و دوباره باز کنید؛ اگر باز هم تکرار شد، دستگاه را دوباره روشن کنید.';
+
+  @override
   String get errTotalTooLarge =>
       'این مجموع برای ثبت بیش از حد بزرگ است. تعداد و قیمت را بررسی کنید.';
 
@@ -1664,6 +1694,28 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get biometricUnlockSetting => 'باز کردن با اثر انگشت';
+
+  @override
+  String get idleLockSetting => 'قفل شدن پس از بی‌کاری';
+
+  @override
+  String idleLockMinutes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString دقیقه',
+      one: '$countString دقیقه',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get idleLockManagersOnly =>
+      'فقط مالک یا مدیر می‌تواند این را تغییر دهد.';
 
   @override
   String get confirmPasswordTitle => 'رمز عبور خود را تأیید کنید';

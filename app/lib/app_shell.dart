@@ -22,6 +22,7 @@ import 'features/pos/pos_screen.dart';
 import 'features/purchasing/receive_stock_screen.dart';
 import 'features/purchasing/suppliers_screen.dart';
 import 'features/settings/printer_settings_screen.dart';
+import 'features/settings/settings_providers.dart';
 import 'features/sync/sync_button.dart';
 import 'features/sync/sync_providers.dart';
 import 'features/read_models.dart';
@@ -77,8 +78,11 @@ class AppShell extends ConsumerWidget {
     ];
 
     final showBell = can(Permission.reportView);
+    // Chosen per device by an owner or manager; 10 minutes until they do.
+    final idleMinutes = ref.watch(idleLockProvider).asData?.value ?? kDefaultIdleLockMinutes;
     return SessionGuard(
       onLock: () => ref.read(authControllerProvider.notifier).lock(),
+      idleLock: Duration(minutes: idleMinutes),
       child: _Shell(features: features, showBell: showBell),
     );
   }

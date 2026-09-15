@@ -1,3 +1,4 @@
+import 'package:dukan_core/dukan_core.dart' show Permission;
 import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,7 +83,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     final l = AppLocalizations.of(context);
     final async = ref.watch(printerSettingsControllerProvider);
     return Scaffold(
-      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.printerSettings)),
+      appBar: AppBar(leading: ShellScope.menuButton(context), title: Text(l.settings)),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorMessage(e),
@@ -92,6 +93,11 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               const _BiometricTile(),
+              const IdleLockTile(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(l.printerSettings, style: Theme.of(context).textTheme.titleSmall),
+              ),
               SwitchListTile(
                 title: Text(l.enablePrinting),
                 value: _enabled,
@@ -197,6 +203,53 @@ class _BiometricTileState extends ConsumerState<_BiometricTile> {
           title: Text(l.biometricUnlockSetting),
           value: _enabled,
           onChanged: (v) => _toggle(v, l),
+        ),
+        const Divider(height: 24),
+      ],
+    );
+  }
+}
+
+/// How soon this device locks when nobody touches it. Everyone sees the value;
+/// only an owner or a manager (settings.manage) can change it.
+class IdleLockTile extends ConsumerWidget {
+  const IdleLockTile({super.key});
+
+  Future<void> _choose(BuildContext context, WidgetRef ref, int minutes) async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(idleLockProvider.notifier).save(minutes);
+      messenger.showSnackBar(SnackBar(content: Text(l.savedOk)));
+    } on Object catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(appErrorText(l, e))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final minutes = ref.watch(idleLockProvider).asData?.value;
+    if (minutes == null) return const SizedBox.shrink();
+    final canChange = ref.watch(sessionActorProvider)?.can(Permission.settingsManage) ?? false;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ListTile(
+          leading: const Icon(Icons.lock_clock),
+          title: Text(l.idleLockSetting),
+          subtitle: canChange ? null : Text(l.idleLockManagersOnly),
+          trailing: DropdownButton<int>(
+            value: minutes,
+            items: [
+              for (final m in kIdleLockChoices) DropdownMenuItem(value: m, child: Text(l.idleLockMinutes(m))),
+            ],
+            onChanged: canChange
+                ? (m) {
+                    if (m != null && m != minutes) _choose(context, ref, m);
+                  }
+                : null,
+          ),
         ),
         const Divider(height: 24),
       ],

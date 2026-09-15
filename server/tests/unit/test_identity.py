@@ -88,6 +88,13 @@ def test_money_permissions_belong_to_owner_and_manager() -> None:
         assert all(POLICY.can(u, p, "B1") is allowed for p in money), role
 
 
+def test_device_settings_belong_to_owner_and_manager() -> None:
+    for role, allowed in (("owner", True), ("manager", True), ("cashier", False),
+                          ("stock_keeper", False), ("accountant", False)):
+        u = _user([BranchAssignment("B1", role)])
+        assert POLICY.can(u, Permission.SETTINGS_MANAGE, "B1") is allowed, role
+
+
 def test_duplicate_username_rejected() -> None:
     with pytest.raises(ConflictError) as e:
         assert_username_available(username="ahmad", taken=True)
