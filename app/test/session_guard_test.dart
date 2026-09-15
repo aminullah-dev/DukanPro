@@ -27,6 +27,20 @@ void main() {
     expect(locks, 1);
   });
 
+  testWidgets('a new idle time counts from when it is chosen', (tester) async {
+    var locks = 0;
+    Widget guard(Duration idle) => MaterialApp(
+          home: SessionGuard(onLock: () => locks++, idleLock: idle, child: const Scaffold(body: Text('shell'))),
+        );
+    await tester.pumpWidget(guard(const Duration(minutes: 10)));
+    await tester.pump(const Duration(minutes: 4));
+    await tester.pumpWidget(guard(const Duration(minutes: 2))); // a manager picks 2 minutes
+    await tester.pump(const Duration(minutes: 1));
+    expect(locks, 0);
+    await tester.pump(const Duration(minutes: 1, seconds: 1));
+    expect(locks, 1);
+  });
+
   testWidgets('keys (a barcode scanner) are activity too', (tester) async {
     var locks = 0;
     await tester.pumpWidget(MaterialApp(

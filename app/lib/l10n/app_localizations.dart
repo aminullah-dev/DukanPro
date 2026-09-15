@@ -983,6 +983,24 @@ abstract class AppLocalizations {
   /// **'Unlock with fingerprint'**
   String get biometricUnlockSetting;
 
+  /// No description provided for @idleLockSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock when idle for'**
+  String get idleLockSetting;
+
+  /// No description provided for @idleLockMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{count} minute} other{{count} minutes}}'**
+  String idleLockMinutes(int count);
+
+  /// No description provided for @idleLockManagersOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only an owner or a manager can change this.'**
+  String get idleLockManagersOnly;
+
   /// No description provided for @confirmPasswordTitle.
   ///
   /// In en, this message translates to:

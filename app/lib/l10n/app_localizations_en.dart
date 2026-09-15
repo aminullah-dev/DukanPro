@@ -548,6 +548,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get biometricUnlockSetting => 'Unlock with fingerprint';
 
   @override
+  String get idleLockSetting => 'Lock when idle for';
+
+  @override
+  String idleLockMinutes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString minutes',
+      one: '$countString minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get idleLockManagersOnly =>
+      'Only an owner or a manager can change this.';
+
+  @override
   String get confirmPasswordTitle => 'Confirm your password';
 
   @override

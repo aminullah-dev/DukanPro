@@ -544,6 +544,27 @@ class AppLocalizationsPs extends AppLocalizations {
   String get biometricUnlockSetting => 'د ګوتې په نښه خلاصول';
 
   @override
+  String get idleLockSetting => 'له بېکارۍ وروسته قلفېدل';
+
+  @override
+  String idleLockMinutes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString دقیقې',
+      one: '$countString دقیقه',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get idleLockManagersOnly => 'یوازې مالک یا مدیر یې بدلولی شي.';
+
+  @override
   String get confirmPasswordTitle => 'خپل پټنوم تایید کړئ';
 
   @override

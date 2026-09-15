@@ -546,6 +546,28 @@ class AppLocalizationsFa extends AppLocalizations {
   String get biometricUnlockSetting => 'باز کردن با اثر انگشت';
 
   @override
+  String get idleLockSetting => 'قفل شدن پس از بی‌کاری';
+
+  @override
+  String idleLockMinutes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString دقیقه',
+      one: '$countString دقیقه',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get idleLockManagersOnly =>
+      'فقط مالک یا مدیر می‌تواند این را تغییر دهد.';
+
+  @override
   String get confirmPasswordTitle => 'رمز عبور خود را تأیید کنید';
 
   @override
@@ -1664,6 +1686,28 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get biometricUnlockSetting => 'باز کردن با اثر انگشت';
+
+  @override
+  String get idleLockSetting => 'قفل شدن پس از بی‌کاری';
+
+  @override
+  String idleLockMinutes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString دقیقه',
+      one: '$countString دقیقه',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get idleLockManagersOnly =>
+      'فقط مالک یا مدیر می‌تواند این را تغییر دهد.';
 
   @override
   String get confirmPasswordTitle => 'رمز عبور خود را تأیید کنید';

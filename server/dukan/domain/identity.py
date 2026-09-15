@@ -25,6 +25,7 @@ class Permission(StrEnum):
     SALE_DISCOUNT = "sale.discount"
     CUSTOMER_CREDIT = "customer.credit"
     PURCHASE_COST = "purchase.cost"
+    SETTINGS_MANAGE = "settings.manage"  # a device's own settings (idle lock)
 
 
 # Built-in role name -> permission set. Single source for PermissionPolicy.
@@ -34,7 +35,7 @@ BUILTIN_ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
         Permission.SALE_CREATE, Permission.PRICE_CHANGE, Permission.STOCK_ADJUST,
         Permission.PRODUCT_MANAGE, Permission.REPORT_VIEW, Permission.DEBT_WRITE_OFF,
         Permission.SALE_VOID, Permission.SALE_DISCOUNT, Permission.CUSTOMER_CREDIT,
-        Permission.PURCHASE_COST,
+        Permission.PURCHASE_COST, Permission.SETTINGS_MANAGE,
     }),
     "cashier": frozenset({Permission.SALE_CREATE}),
     "stock_keeper": frozenset({Permission.STOCK_ADJUST}),

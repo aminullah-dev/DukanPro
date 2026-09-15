@@ -6,7 +6,7 @@
 
 - **User** — `{ id, username, display_name, password_hash, status(active|disabled), default_branch_id }`. Employees are Users with roles + branch assignments.
 - **Role** — `{ id, name, permissions: set<Permission> }`. Built-in roles: `owner`, `manager`, `cashier`, `stock_keeper`, `accountant`.
-- **Permission** — a value object, dotted code: `sale.create`, `price.change`, `stock.adjust`, `product.manage`, `user.manage`, `report.view`, `branch.manage`, `debt.write_off`, `audit.view`, and the money actions `sale.void`, `sale.discount`, `customer.credit`, `purchase.cost` (owner and manager only).
+- **Permission** — a value object, dotted code: `sale.create`, `price.change`, `stock.adjust`, `product.manage`, `user.manage`, `report.view`, `branch.manage`, `debt.write_off`, `audit.view`, and the money actions `sale.void`, `sale.discount`, `customer.credit`, `purchase.cost` (owner and manager only), and `settings.manage` for a device's own settings such as the idle lock (owner and manager).
 - **BranchAssignment** — `{ user_id, branch_id, role_id }` (a user may work in several branches, with a role per branch).
 - **Session** — `{ id, user_id, device_id, issued_at, expires_at, refresh_token_hash, prev_refresh_hash }`. A refresh rotates the hash in place; `expires_at` is never extended. Presenting the rotated-out token again revokes the session, except within 60 seconds of that rotation: a device whose refresh answer was lost may retry once, and the retry rotates again. A sign-out ends the session with either token, since a renewal may still be in flight when the device signs out.
 
@@ -77,7 +77,9 @@ The server is authoritative; the device keeps just enough to work offline.
   - If secure storage cannot be read at startup, or a sign-in cannot be saved, the sign-in screen says so (`STORAGE_UNAVAILABLE`) instead of an endless spinner.
 - **Offline window.** Offline unlock works for 30 days after the server last confirmed the user, then fails with `OFFLINE_EXPIRED`.
   - The device remembers the latest time it has seen. A clock set back more than 5 minutes behind it also fails with `OFFLINE_EXPIRED`, so winding the clock back cannot keep the window open.
-- **Lock.** There is a Lock action, and the app locks itself when it goes to the background or sits idle for 10 minutes.
+- **Lock.** There is a Lock action, and the app locks itself when it goes to the background or sits idle.
+  - The idle time is a setting of the device. An owner or manager (`settings.manage`) chooses 1, 2, 5, 10, 15 or 30 minutes, and it is 10 minutes until they do. Everyone else sees the setting but cannot change it.
+  - A new idle time counts from the moment it is chosen.
   - Any touch, scroll or key anywhere in the app counts as activity, including screens and dialogs opened over the shell.
   - Locking keeps the saved sign-in and the POS cart.
   - When another user signs in, session state (cart, admin lists, notifications) starts empty.

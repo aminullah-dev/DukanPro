@@ -18,7 +18,10 @@ enum Permission {
   saleVoid('sale.void'),
   saleDiscount('sale.discount'),
   customerCredit('customer.credit'),
-  purchaseCost('purchase.cost');
+  purchaseCost('purchase.cost'),
+
+  /// This device's own settings, such as how soon an idle app locks.
+  settingsManage('settings.manage');
 
   const Permission(this.code);
   final String code;
@@ -65,6 +68,7 @@ final Map<BuiltinRole, Set<Permission>> kBuiltinRolePermissions = {
     Permission.saleDiscount,
     Permission.customerCredit,
     Permission.purchaseCost,
+    Permission.settingsManage,
   },
   BuiltinRole.cashier: {Permission.saleCreate},
   BuiltinRole.stockKeeper: {Permission.stockAdjust},
