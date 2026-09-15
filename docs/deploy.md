@@ -29,6 +29,15 @@ flutter build apk --dart-define=DUKAN_API=https://api.yourshop.af
 
 The same `--dart-define` goes on `flutter build ios`, `macos` and `windows`. Devices keep working without the server and sync when they reach it (docs/sync-protocol.md).
 
+### TestFlight (iPhone and iPad)
+
+`tools/build_ios_testflight.sh` builds the iOS app against `https://api.linumic.com` (set `DUKAN_API` for another server). It gives the build a number from the clock, then archives and signs it for team 27RXPRW77S.
+
+- With `--upload` it goes to App Store Connect, and appears under TestFlight once Apple has processed it. `--no-codesign` only checks that the release build compiles.
+- It needs:
+  - the app in App Store Connect, with bundle id `com.dukanpro.dukanpro`;
+  - either Xcode signed in to the team, or an App Store Connect API key named in `ASC_KEY_PATH`, `ASC_KEY_ID` and `ASC_ISSUER_ID`.
+
 ## Updating
 
 ```bash
