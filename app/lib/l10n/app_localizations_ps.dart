@@ -538,6 +538,33 @@ class AppLocalizationsPs extends AppLocalizations {
   String get voided => 'باطل شوی';
 
   @override
+  String get voidSale => 'پلور باطلول';
+
+  @override
+  String get voidSaleTitle => 'دا پلور دې باطل شي؟';
+
+  @override
+  String get voidSaleBody =>
+      'زېرمه بېرته راځي، او څه چې پېرودونکی یې لا پوروړی دی د هغه له حساب څخه لرې کېږي. دا کار بېرته نه راګرځي.';
+
+  @override
+  String get voidReason => 'دلیل';
+
+  @override
+  String get saleVoidedOk => 'پلور باطل شو.';
+
+  @override
+  String get errSaleNotSynced =>
+      'دا پلور لا سرور ته نه دی رسېدلی. همغږي یې کړئ او بیا هڅه وکړئ.';
+
+  @override
+  String get errVoidReasonRequired => 'ولیکئ چې پلور ولې باطلېږي.';
+
+  @override
+  String get errVoidShiftClosed =>
+      'د دې پلور شفټ تړل شوی او دې پلور نغدې پیسې اخیستې، نو نه باطلېږي.';
+
+  @override
   String get language => 'ژبه';
 
   @override

@@ -971,6 +971,54 @@ abstract class AppLocalizations {
   /// **'Voided'**
   String get voided;
 
+  /// No description provided for @voidSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Void sale'**
+  String get voidSale;
+
+  /// No description provided for @voidSaleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Void this sale?'**
+  String get voidSaleTitle;
+
+  /// No description provided for @voidSaleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The stock comes back, and what the customer still owes for it is taken off their account. This can\'t be undone.'**
+  String get voidSaleBody;
+
+  /// No description provided for @voidReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get voidReason;
+
+  /// No description provided for @saleVoidedOk.
+  ///
+  /// In en, this message translates to:
+  /// **'The sale was voided.'**
+  String get saleVoidedOk;
+
+  /// No description provided for @errSaleNotSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'This sale hasn\'t reached the server yet. Sync, then try again.'**
+  String get errSaleNotSynced;
+
+  /// No description provided for @errVoidReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Write why the sale is being voided.'**
+  String get errVoidReasonRequired;
+
+  /// No description provided for @errVoidShiftClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'This sale\'s shift is already closed and the sale took cash, so it can\'t be voided.'**
+  String get errVoidShiftClosed;
+
   /// No description provided for @language.
   ///
   /// In en, this message translates to:

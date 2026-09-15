@@ -24,6 +24,7 @@ import '../read_models.dart';
 import 'pos_providers.dart';
 import 'receipt_builder.dart';
 import 'receipt_raster.dart';
+import 'void_sale.dart';
 
 String _afn(int minor) => formatQuantity(minor, 2);
 
@@ -975,6 +976,7 @@ class _ReceiptDialog extends ConsumerStatefulWidget {
 
 class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
   bool _printing = false;
+  late String _status = widget.sale.status; // voided from here, too
 
   void _say(String message) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -994,7 +996,7 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
       final image = await rasterReceipt(
         l: l, data: data, occurredAt: widget.sale.occurredAt, zone: zone,
         paperMm: ref.read(printerSettingsControllerProvider).asData?.value.paperMm ?? 80,
-        voided: widget.sale.status == 'voided',
+        voided: _status == 'voided',
       );
       // A printer that stops answering must not hold the till.
       await printer.printRaw(const EscPosEncoder().encodeRaster(image)).timeout(const Duration(seconds: 10));
@@ -1024,7 +1026,7 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
       title: Column(children: [
         Text(l.receipt),
         Text(sale.number, style: Theme.of(context).textTheme.bodySmall),
-        if (sale.status == 'voided')
+        if (_status == 'voided')
           Text(l.voided, style: TextStyle(color: Theme.of(context).colorScheme.error)),
       ]),
       content: SizedBox(
@@ -1054,6 +1056,13 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
         ),
       ),
       actions: [
+        VoidSaleButton(
+          saleId: sale.id,
+          settled: _status == 'settled',
+          onVoided: () {
+            if (mounted) setState(() => _status = 'voided');
+          },
+        ),
         TextButton.icon(
           onPressed: _printing ? null : () => _print(l),
           icon: _printing

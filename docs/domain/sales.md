@@ -25,6 +25,7 @@
    - It takes the sale's charge back off the customer's ledger, but only as far as the customer still owes it. A write-off already forgave the debt, and money they paid against it is a refund to make by hand (`debt_not_reversed` in the audit entry). A void never leaves the shop owing the customer.
    - A sale whose shift is closed cannot be voided if it took cash (`SALE_SHIFT_CLOSED`: that cash was counted). One that took none (on credit, by card or transfer) can.
    - Two voids of one sale, or a void and its shift's close, take turns (row locks).
+   - The till voids online, from the sale's receipt (also under recent sales). It syncs first, so the server has the sale (`SALE_NOT_FOUND` otherwise), asks for the void with the reason, then pulls the reversal back. Offline, it says it needs the server.
 10. **Shifts and drawers.**
     - A till sells into the shift it opened itself.
     - The same seller may have a shift open on each of two tills (two drawers). The server keeps both and flags the second one's `shift.opened` entry (`another_open_shift`).

@@ -540,6 +540,33 @@ class AppLocalizationsFa extends AppLocalizations {
   String get voided => 'باطل‌شده';
 
   @override
+  String get voidSale => 'باطل کردن فروش';
+
+  @override
+  String get voidSaleTitle => 'این فروش باطل شود؟';
+
+  @override
+  String get voidSaleBody =>
+      'موجودی برمی‌گردد و آنچه مشتری هنوز بابت آن بدهکار است از حسابش برداشته می‌شود. این کار برگشت ندارد.';
+
+  @override
+  String get voidReason => 'دلیل';
+
+  @override
+  String get saleVoidedOk => 'فروش باطل شد.';
+
+  @override
+  String get errSaleNotSynced =>
+      'این فروش هنوز به سرور نرسیده است. همگام‌سازی کنید و دوباره تلاش کنید.';
+
+  @override
+  String get errVoidReasonRequired => 'بنویسید که فروش چرا باطل می‌شود.';
+
+  @override
+  String get errVoidShiftClosed =>
+      'شیفت این فروش بسته شده و این فروش پول نقد گرفته است، پس باطل نمی‌شود.';
+
+  @override
   String get language => 'زبان';
 
   @override
@@ -1697,6 +1724,33 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get voided => 'باطل‌شده';
+
+  @override
+  String get voidSale => 'باطل کردن فروش';
+
+  @override
+  String get voidSaleTitle => 'این فروش باطل شود؟';
+
+  @override
+  String get voidSaleBody =>
+      'موجودی برمی‌گردد و آنچه مشتری هنوز بابت آن بدهکار است از حسابش برداشته می‌شود. این کار برگشت ندارد.';
+
+  @override
+  String get voidReason => 'دلیل';
+
+  @override
+  String get saleVoidedOk => 'فروش باطل شد.';
+
+  @override
+  String get errSaleNotSynced =>
+      'این فروش هنوز به سرور نرسیده است. همگام‌سازی کنید و دوباره تلاش کنید.';
+
+  @override
+  String get errVoidReasonRequired => 'بنویسید که فروش چرا باطل می‌شود.';
+
+  @override
+  String get errVoidShiftClosed =>
+      'شیفت این فروش بسته شده و این فروش پول نقد گرفته است، پس باطل نمی‌شود.';
 
   @override
   String get language => 'زبان';

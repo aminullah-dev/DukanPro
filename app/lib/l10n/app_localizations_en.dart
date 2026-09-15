@@ -542,6 +542,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voided => 'Voided';
 
   @override
+  String get voidSale => 'Void sale';
+
+  @override
+  String get voidSaleTitle => 'Void this sale?';
+
+  @override
+  String get voidSaleBody =>
+      'The stock comes back, and what the customer still owes for it is taken off their account. This can\'t be undone.';
+
+  @override
+  String get voidReason => 'Reason';
+
+  @override
+  String get saleVoidedOk => 'The sale was voided.';
+
+  @override
+  String get errSaleNotSynced =>
+      'This sale hasn\'t reached the server yet. Sync, then try again.';
+
+  @override
+  String get errVoidReasonRequired => 'Write why the sale is being voided.';
+
+  @override
+  String get errVoidShiftClosed =>
+      'This sale\'s shift is already closed and the sale took cash, so it can\'t be voided.';
+
+  @override
   String get language => 'Language';
 
   @override
