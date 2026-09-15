@@ -105,7 +105,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   /// comes back out of the field and its product goes in.
   void _scanIntoSearch(String code) {
     final text = _search.text;
-    if (text.length > code.length && latinDigits(text).endsWith(code)) {
+    // A Dari layout types a code's letters as Persian letters (endsWithScan).
+    if (endsWithScan(text, code)) {
       final rest = text.substring(0, text.length - code.length);
       _search.value = TextEditingValue(text: rest, selection: TextSelection.collapsed(offset: rest.length));
       setState(() => _query = rest);
@@ -225,7 +226,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     }
     // The scanner's code landed after a typed search: take it back out, add it.
     final recent = scanned != null && DateTime.now().difference(scanned.at) < const Duration(seconds: 2);
-    if (recent && text.length > scanned.code.length && latinDigits(text).endsWith(scanned.code)) {
+    if (recent && endsWithScan(text, scanned.code)) {
       final rest = text.substring(0, text.length - scanned.code.length);
       _search.value = TextEditingValue(text: rest, selection: TextSelection.collapsed(offset: rest.length));
       setState(() => _query = rest);
@@ -580,7 +581,8 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   void _stripScan(ScanEvent e) {
     for (final field in [for (final t in _lines) t.amount, ?_customerField]) {
       final text = field.text;
-      if (text.length >= e.code.length && latinDigits(text).endsWith(e.code)) {
+      // Every field is checked, focused or not: a letters-only code must match exactly.
+      if (endsWithScan(text, e.code, needDigit: true)) {
         final rest = text.substring(0, text.length - e.code.length);
         field.value = TextEditingValue(text: rest, selection: TextSelection.collapsed(offset: rest.length));
       }
