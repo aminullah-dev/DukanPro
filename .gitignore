@@ -4,8 +4,11 @@
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
-pubspec.lock
-!app/pubspec.lock      # Flutter apps commit their lockfile; packages don't
+# Every pubspec.lock is committed. CI resolves the app and each package on its
+# own, and an unlocked resolve tests versions nobody here has run. None of these
+# packages is published, so "libraries leave their lockfile out" does not apply.
+# (Git takes `#` as a comment only at the start of a line: a comment after a
+# pattern becomes part of it, which is how `!app/pubspec.lock` never matched.)
 **/doc/api/
 .fvm/
 
