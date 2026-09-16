@@ -14,10 +14,13 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # The version the lockfiles were resolved and tested with.
+          flutter-version: 3.47.3
       - name: dukan_core (pure Dart) — analyze + test + no-flutter check
         working-directory: packages/dukan_core
         run: |
-          dart pub get
+          # The committed versions or nothing: fail rather than resolve new ones.
+          dart pub get --enforce-lockfile
           dart analyze
           dart test
           # A dependency named flutter, not the "Flutter SDK" banner pub prints.
@@ -28,14 +31,14 @@ jobs:
           fi
       - name: dukan_data (Drift codegen) + sync + hardware
         run: |
-          (cd packages/dukan_data && dart pub get && dart run build_runner build && dart analyze && dart test)
+          (cd packages/dukan_data && dart pub get --enforce-lockfile && dart run build_runner build && dart analyze && dart test)
           for p in dukan_sync dukan_hardware; do
-            (cd "packages/$p" && dart pub get && dart analyze)
+            (cd "packages/$p" && dart pub get --enforce-lockfile && dart analyze)
           done
       - name: App — analyze + test
         working-directory: app
         run: |
-          flutter pub get
+          flutter pub get --enforce-lockfile
           flutter gen-l10n
           flutter analyze
           flutter test
