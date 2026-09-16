@@ -4,14 +4,18 @@ Offline-first, cross-platform retail point-of-sale for the Afghan market
 (Dari / Pashto / English · AFN · Hijri Shamsi). iPhone · iPad · Android
 phone/tablet · macOS (Windows next).
 
-> **Status: Phase 0 — architecture, product, UX, and skeleton.** See
+> **Status: all ten phases of [`docs/roadmap.md`](docs/roadmap.md) are built.**
+> The till sells, voids and takes goods back without a server, syncs when there
+> is one, and a whole shop can run on a single device. What is still missing
+> before a real shop uses it is in [Not finished](#not-finished). See
 > [`docs/architecture-decision.md`](docs/architecture-decision.md) for the
 > stack decision and [`docs/`](docs/) for the full design.
 
 ## Stack
 
 - **Client:** Flutter (Dart) — one codebase for all platforms. Riverpod + go_router.
-- **Local store:** SQLite via Drift (wired Phase 1).
+- **Local store:** SQLite via Drift, encrypted with SQLCipher under a key only
+  the device holds.
 - **Sync:** offline-first operation queue + idempotent push/pull ([`docs/sync-protocol.md`](docs/sync-protocol.md)).
 - **Backend:** Python 3.12 + FastAPI + SQLAlchemy + Alembic, **PostgreSQL**.
 - **Two ways to run a shop:** with a server behind it (staff, branches, audit
@@ -23,8 +27,8 @@ phone/tablet · macOS (Windows next).
 
 ```
 packages/dukan_core/      pure Dart: domain + application ports + shared primitives (no framework)
-packages/dukan_data/      SQLite/Drift repositories (Phase 0: in-memory)
-packages/dukan_sync/      sync engine contracts (engine: Phase 6)
+packages/dukan_data/      SQLite/Drift repositories, the outbox, the encrypted database
+packages/dukan_sync/      the sync engine: push, pull, watermarks, conflicts
 packages/dukan_hardware/  scanner / ESC-POS printer / cash-drawer ports
 app/                      Flutter app (ios, android, macos, windows runners)
 server/                   FastAPI backend (Clean Architecture, import-linter enforced)
@@ -49,7 +53,7 @@ cd app && flutter pub get && flutter gen-l10n && flutter run -d macos
 
 # Server
 cd server && python3.12 -m venv .venv && ./.venv/bin/pip install -e ".[dev]"
-./.venv/bin/uvicorn dukan.ui.app:app --reload   # GET /health
+./.venv/bin/uvicorn dukan.composition:app --reload   # GET /health
 ```
 
 Run every check at once:
@@ -60,6 +64,22 @@ bash tools/verify.sh
 
 Melos (optional monorepo orchestration): `dart pub global activate melos` then
 `melos run analyze` / `melos run test`.
+
+## Not finished
+
+Built does not mean shipped. What is still open:
+
+- **Not on `main` yet.** The encrypted database and the idle lock wait in PR #2;
+  the pilot work — receipts in Dari and Pashto, void and returns at the till,
+  sign-in lockout, the deployment kit, and the no-server mode — waits in PR #3.
+- **Deferred on purpose.** Push notifications (the app keeps its own in-app
+  feed instead), camera scanning and Bluetooth/USB printers (a keyboard-wedge
+  scanner and network ESC/POS printers do work), and a real language model
+  behind the insight narrator, which is template-based today.
+- **Before a shop uses it.** A server and a domain for the multi-device setup;
+  an app icon, because both platforms still show Flutter's; release signing for
+  Android and TestFlight for iOS; and a run on real phones, tablets and a real
+  receipt printer, which has not happened yet.
 
 ## License
 
