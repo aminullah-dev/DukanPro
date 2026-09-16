@@ -647,6 +647,12 @@ abstract class AppLocalizations {
   /// **'This device\'s secure storage could not be read. Sign in again; if it keeps happening, restart the device.'**
   String get errStorage;
 
+  /// No description provided for @errLocalDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'The data on this device could not be opened. Close the app and open it again; if it keeps happening, restart the device.'**
+  String get errLocalDatabase;
+
   /// No description provided for @errTotalTooLarge.
   ///
   /// In en, this message translates to:
@@ -982,6 +988,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock with fingerprint'**
   String get biometricUnlockSetting;
+
+  /// No description provided for @idleLockSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock when idle for'**
+  String get idleLockSetting;
+
+  /// No description provided for @idleLockMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{count} minute} other{{count} minutes}}'**
+  String idleLockMinutes(int count);
+
+  /// No description provided for @idleLockManagersOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only an owner or a manager can change this.'**
+  String get idleLockManagersOnly;
 
   /// No description provided for @confirmPasswordTitle.
   ///

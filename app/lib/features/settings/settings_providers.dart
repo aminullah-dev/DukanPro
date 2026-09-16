@@ -1,10 +1,12 @@
 import 'dart:convert';
 
+import 'package:dukan_core/dukan_core.dart' show Permission, PermissionDeniedError, ValidationError;
 import 'package:dukan_data/dukan_data.dart';
 import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/providers.dart';
+import '../auth/session.dart';
 
 /// Device-local thermal-printer configuration (ESC/POS over TCP).
 class PrinterConfig {
@@ -66,3 +68,35 @@ final receiptPrinterProvider = Provider<ReceiptPrinter?>((ref) {
   if (config == null || !config.isReady) return null;
   return TcpReceiptPrinter(host: config.host.trim(), port: config.port);
 });
+
+/// How soon an idle app locks, in minutes: a setting of this device, chosen by
+/// an owner or a manager (settings.manage). A till several people share wants
+/// it short, a one-person shop longer; until someone chooses, it is 10 minutes.
+const kIdleLockChoices = [1, 2, 5, 10, 15, 30];
+const kDefaultIdleLockMinutes = 10;
+const idleLockSettingKey = 'idle_lock_minutes';
+
+class IdleLockController extends AsyncNotifier<int> {
+  SettingsStore get _store => ref.read(settingsStoreProvider);
+
+  @override
+  Future<int> build() async {
+    final saved = int.tryParse(await _store.get(idleLockSettingKey) ?? '');
+    return kIdleLockChoices.contains(saved) ? saved! : kDefaultIdleLockMinutes;
+  }
+
+  /// Keeps [minutes] for this device. The screen offers the choice only to an
+  /// owner or a manager; this holds whoever calls it.
+  Future<void> save(int minutes) async {
+    if (!(ref.read(sessionActorProvider)?.can(Permission.settingsManage) ?? false)) {
+      throw PermissionDeniedError('ACCESS_DENIED', {'permission': Permission.settingsManage.code});
+    }
+    if (!kIdleLockChoices.contains(minutes)) {
+      throw ValidationError('IDLE_LOCK_INVALID', {'minutes': minutes});
+    }
+    await _store.set(idleLockSettingKey, '$minutes');
+    state = AsyncData(minutes);
+  }
+}
+
+final idleLockProvider = AsyncNotifierProvider<IdleLockController, int>(IdleLockController.new);

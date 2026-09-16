@@ -354,6 +354,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device\'s secure storage could not be read. Sign in again; if it keeps happening, restart the device.';
 
   @override
+  String get errLocalDatabase =>
+      'The data on this device could not be opened. Close the app and open it again; if it keeps happening, restart the device.';
+
+  @override
   String get errTotalTooLarge =>
       'This total is too large to record. Check the quantity and price.';
 
@@ -546,6 +550,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get biometricUnlockSetting => 'Unlock with fingerprint';
+
+  @override
+  String get idleLockSetting => 'Lock when idle for';
+
+  @override
+  String idleLockMinutes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString minutes',
+      one: '$countString minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get idleLockManagersOnly =>
+      'Only an owner or a manager can change this.';
 
   @override
   String get confirmPasswordTitle => 'Confirm your password';

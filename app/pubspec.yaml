@@ -52,3 +52,10 @@ flutter:
   #       - asset: fonts/NotoNaskhArabic-Regular.ttf
   #       - asset: fonts/NotoNaskhArabic-Bold.ttf
   #         weight: 700
+
+# The device database is encrypted: link SQLCipher instead of plain SQLite
+# (docs/domain/identity-access.md, "Backups"). dukan_data's pubspec says the same.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlcipher

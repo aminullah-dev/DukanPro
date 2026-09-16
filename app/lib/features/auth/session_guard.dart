@@ -4,8 +4,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-/// Locks the app when it goes to the background or sits idle, so an unattended
-/// till never stays open as its last user. Locking keeps the saved sign-in.
+/// Locks the app when it goes to the background or sits idle for [idleLock], so
+/// an unattended till never stays open as its last user. Locking keeps the
+/// saved sign-in. The idle time is a device setting (see `idleLockProvider`).
 ///
 /// Every pointer or key event anywhere in the app counts as activity, including
 /// screens and dialogs pushed above the shell: they are not inside this widget,
@@ -37,6 +38,13 @@ class _SessionGuardState extends State<SessionGuard> {
     HardwareKeyboard.instance.addHandler(_onKey);
     GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
     _touch();
+  }
+
+  @override
+  void didUpdateWidget(SessionGuard old) {
+    super.didUpdateWidget(old);
+    // A new idle time, chosen in settings, counts from the moment it is chosen.
+    if (old.idleLock != widget.idleLock) _touch();
   }
 
   @override

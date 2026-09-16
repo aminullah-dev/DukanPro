@@ -98,6 +98,14 @@ void main() {
       });
     });
 
+    test("a device's settings belong to owner and manager", () {
+      const allowed = {'owner': true, 'manager': true, 'cashier': false, 'stock_keeper': false, 'accountant': false};
+      allowed.forEach((role, can) {
+        final u = userWith([BranchAssignment(branchId: 'B1', roleName: role)]);
+        expect(policy.can(u, Permission.settingsManage, 'B1'), can, reason: role);
+      });
+    });
+
     test('duplicate username rejected', () {
       expect(
         () => assertUsernameAvailable(username: 'ahmad', taken: true),
