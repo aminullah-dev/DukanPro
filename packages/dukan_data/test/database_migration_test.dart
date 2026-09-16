@@ -109,4 +109,39 @@ void main() {
     final row = await (db.select(db.syncStates)..where((t) => t.deviceId.equals('d1'))).getSingle();
     expect((row.lastPulledSeq, row.watermarkToken, row.scope), (7, null, null));
   });
+
+  test('upgrading to v13 gives sales a refund_of, keeping every sale', () async {
+    final dir = await Directory.systemTemp.createTemp('dukan_migration');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/app.db');
+    final old = AppDatabase(NativeDatabase(file));
+    final id = newId();
+    await old.into(old.sales).insert(SalesCompanion.insert(id: id, number: 'INV-1', branchId: 'B1'));
+    await old.customStatement('ALTER TABLE sales DROP COLUMN refund_of');
+    await old.customStatement('PRAGMA user_version = 12');
+    await old.close();
+
+    final db = AppDatabase(NativeDatabase(file));
+    addTearDown(db.close);
+    final sale = await (db.select(db.sales)..where((t) => t.id.equals(id))).getSingle();
+    expect((sale.number, sale.refundOf), ('INV-1', null));
+  });
+
+  test('upgrading to v14 gives outbox ops a tx id, keeping every pending op', () async {
+    final dir = await Directory.systemTemp.createTemp('dukan_migration');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/app.db');
+    final old = AppDatabase(NativeDatabase(file));
+    await SyncRecorder(old).record(
+      table: 'customers', rowId: newId(), op: 'insert', data: const {}, actorId: 'u1', deviceId: 'd1',
+    );
+    await old.customStatement('ALTER TABLE outbox_entries DROP COLUMN tx_id');
+    await old.customStatement('PRAGMA user_version = 13');
+    await old.close();
+
+    final db = AppDatabase(NativeDatabase(file));
+    addTearDown(db.close);
+    final ops = await DriftSyncOutbox(db).pending();
+    expect((ops.length, ops.single.txId), (1, null));
+  });
 }

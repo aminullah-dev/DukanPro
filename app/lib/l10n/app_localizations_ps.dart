@@ -89,6 +89,15 @@ class AppLocalizationsPs extends AppLocalizations {
   String get loginFailed => 'ننوتل ناکام شول. کارن نوم او پټنوم وګورئ.';
 
   @override
+  String errLoginLocked(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'پټنوم څو ځله غلط ولیکل شو. $minutesString دقیقې صبر وکړئ او بیا هڅه وکړئ.';
+  }
+
+  @override
   String get wrongSecret => 'سم نه دی — بیا هڅه وکړئ.';
 
   @override
@@ -309,6 +318,20 @@ class AppLocalizationsPs extends AppLocalizations {
   @override
   String get setupCodeHelp =>
       'کله چې سرور پیلېږي، د سرور په کنسول کې ښودل کېږي';
+
+  @override
+  String get standaloneSetup => 'پرته له سرور چمتو کول';
+
+  @override
+  String get standaloneSetupHelp =>
+      'هر څه پر همدې وسیله پاتې کېږي. نه سرور نصبولو ته اړتیا شته او نه انټرنټ ته. یو حساب: ستاسو حساب.';
+
+  @override
+  String get standalonePasswordWarning =>
+      'دا پټنوم هیڅوک بېرته ترلاسه کولی نشي، حتی موږ. ولیکئ یې او په خوندي ځای کې یې وساتئ.';
+
+  @override
+  String get standaloneMode => 'یوازې همدا وسیله';
 
   @override
   String get errSetupCode => 'د تنظیم کوډ سم نه دی. د سرور کنسول وګورئ.';
@@ -538,6 +561,87 @@ class AppLocalizationsPs extends AppLocalizations {
   String get voided => 'باطل شوی';
 
   @override
+  String get voidSale => 'پلور باطلول';
+
+  @override
+  String get voidSaleTitle => 'دا پلور دې باطل شي؟';
+
+  @override
+  String get voidSaleBody =>
+      'زېرمه بېرته راځي، او څه چې پېرودونکی یې لا پوروړی دی د هغه له حساب څخه لرې کېږي. دا کار بېرته نه راګرځي.';
+
+  @override
+  String get voidReason => 'دلیل';
+
+  @override
+  String get saleVoidedOk => 'پلور باطل شو.';
+
+  @override
+  String get returnItems => 'توکي ستنول';
+
+  @override
+  String get returnTitle => 'توکي بېرته اخیستل';
+
+  @override
+  String returnUpTo(String qty) {
+    return 'تر $qty پورې';
+  }
+
+  @override
+  String get returnPayBack => 'بېرته ورکړه په';
+
+  @override
+  String returnWorth(String amount) {
+    return 'ارزښت: $amount';
+  }
+
+  @override
+  String get returnConfirm => 'بېرته اخیستل';
+
+  @override
+  String returnDoneGiveBack(String amount) {
+    return 'توکي بېرته واخیستل شول. $amount بېرته ورکړئ.';
+  }
+
+  @override
+  String get returnDoneAccount =>
+      'توکي بېرته واخیستل شول او د پېرودونکي له حساب کم شول.';
+
+  @override
+  String get returnNothingLeft =>
+      'د دې پلور ټول توکي مخکې بېرته اخیستل شوي دي.';
+
+  @override
+  String get returnLabel => 'ستنول شوی';
+
+  @override
+  String returnOf(String number) {
+    return 'د $number ستنول';
+  }
+
+  @override
+  String get errRefundQty =>
+      'دا له هغه څه ډېر دی چې د بېرته اخیستلو لپاره پاتې دي.';
+
+  @override
+  String get errSaleNotRefundable =>
+      'له دې پلور څخه توکي نه شي بېرته اخیستل کېدای.';
+
+  @override
+  String get errRefundReason => 'ولیکئ چې توکي ولې بېرته اخیستل کېږي.';
+
+  @override
+  String get errSaleNotSynced =>
+      'دا پلور لا سرور ته نه دی رسېدلی. همغږي یې کړئ او بیا هڅه وکړئ.';
+
+  @override
+  String get errVoidReasonRequired => 'ولیکئ چې پلور ولې باطلېږي.';
+
+  @override
+  String get errVoidShiftClosed =>
+      'د دې پلور شفټ تړل شوی او دې پلور نغدې پیسې اخیستې، نو نه باطلېږي. توکي د «توکي ستنول» له لارې بېرته واخلئ.';
+
+  @override
   String get language => 'ژبه';
 
   @override
@@ -721,6 +825,19 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get printerSettings => 'د رسید چاپګر';
+
+  @override
+  String get paperWidth => 'د کاغذ پلنوالی';
+
+  @override
+  String paperMillimetres(int mm) {
+    final intl.NumberFormat mmNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String mmString = mmNumberFormat.format(mm);
+
+    return '$mmString ملي متره';
+  }
 
   @override
   String get enablePrinting => 'د رسیدونو چاپ';

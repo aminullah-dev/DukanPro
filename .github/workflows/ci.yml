@@ -94,3 +94,26 @@ jobs:
       - name: Migrations + integration suite
         working-directory: server
         run: pytest -q
+
+  server-image:
+    name: Server image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t dukanpro-server server
+      - name: It migrates, starts and answers /health
+        run: |
+          key=$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')
+          docker run -d --name api -p 8000:8000 -e DUKAN_SECRET_KEY="$key" \
+            -e DUKAN_DATABASE_URL=sqlite:////tmp/dukan.db dukanpro-server
+          # The port answers before the server inside does (a reset connection):
+          # ask again for up to a minute, then show what the container said.
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs api
+          exit 1

@@ -41,6 +41,12 @@ class PermissionDeniedError(AppError):
     http_status = 403
 
 
+class RateLimitedError(AppError):
+    """Too many attempts; try again later (the sign-in lockout)."""
+
+    http_status = 429
+
+
 class LicenseError(AppError):
     http_status = 402
 

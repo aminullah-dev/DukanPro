@@ -1,5 +1,6 @@
 import 'package:dukan_core/dukan_core.dart' show formatQuantity;
 
+import 'raster.dart';
 import 'receipt.dart';
 
 /// Encodes a [ReceiptData] into ESC/POS printer bytes (text mode). Pure and
@@ -7,7 +8,7 @@ import 'receipt.dart';
 ///
 /// Text mode covers ASCII/numerics (totals, invoice number, date) reliably.
 /// Non-Latin-1 runes (e.g. Persian/Pashto product names) are replaced with `?`
-/// — full Persian glyphs require raster/image mode, which is a later phase.
+/// in text mode; receipts print through [encodeRaster], which draws them.
 final class EscPosEncoder {
   const EscPosEncoder({this.width = 48});
 
@@ -46,6 +47,25 @@ final class EscPosEncoder {
     out.addAll(const [_gs, 0x56, 0x00]); // GS V 0 — full cut
     return out;
   }
+
+  /// Prints [image] (the whole receipt drawn as a picture) in raster bands of
+  /// GS v 0, then feeds and cuts. Every language prints as it looks on screen.
+  List<int> encodeRaster(RasterImage image) {
+    final out = <int>[_esc, 0x40];
+    final perRow = image.bytesPerRow;
+    for (var top = 0; top < image.height; top += _bandRows) {
+      final rows = image.height - top < _bandRows ? image.height - top : _bandRows;
+      // GS v 0 m xL xH yL yH: normal density, bytes a row, rows in this band.
+      out.addAll([_gs, 0x76, 0x30, 0x00, perRow & 0xFF, perRow >> 8, rows & 0xFF, rows >> 8]);
+      out.addAll(image.bits.sublist(top * perRow, (top + rows) * perRow));
+    }
+    _feed(out, 3);
+    out.addAll(const [_gs, 0x56, 0x00]); // GS V 0 — full cut
+    return out;
+  }
+
+  /// Rows sent per raster command: many printers buffer no more than this.
+  static const _bandRows = 256;
 
   /// The cash-drawer kick pulse (ESC p m t1 t2) — sent out-of-band on cash sales.
   static List<int> drawerKick() => const [_esc, 0x70, 0x00, 0x19, 0xFA];

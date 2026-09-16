@@ -119,6 +119,11 @@ class $OutboxEntriesTable extends OutboxEntries
   late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
       'last_error', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _txIdMeta = const VerificationMeta('txId');
+  @override
+  late final GeneratedColumn<String> txId = GeneratedColumn<String>(
+      'tx_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -137,7 +142,8 @@ class $OutboxEntriesTable extends OutboxEntries
         actorId,
         status,
         baseVersion,
-        lastError
+        lastError,
+        txId
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -238,6 +244,10 @@ class $OutboxEntriesTable extends OutboxEntries
       context.handle(_lastErrorMeta,
           lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta));
     }
+    if (data.containsKey('tx_id')) {
+      context.handle(
+          _txIdMeta, txId.isAcceptableOrUnknown(data['tx_id']!, _txIdMeta));
+    }
     return context;
   }
 
@@ -281,6 +291,8 @@ class $OutboxEntriesTable extends OutboxEntries
           .read(DriftSqlType.int, data['${effectivePrefix}base_version']),
       lastError: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}last_error']),
+      txId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tx_id']),
     );
   }
 
@@ -310,6 +322,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
 
   /// The server's code for an op it conflicted or rejected (shown for review).
   final String? lastError;
+
+  /// The local transaction it was written in (see [currentOutboxTx]).
+  final String? txId;
   const OutboxRow(
       {required this.id,
       required this.createdAt,
@@ -327,7 +342,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       required this.actorId,
       required this.status,
       this.baseVersion,
-      this.lastError});
+      this.lastError,
+      this.txId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -357,6 +373,9 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
     }
     if (!nullToAbsent || lastError != null) {
       map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || txId != null) {
+      map['tx_id'] = Variable<String>(txId);
     }
     return map;
   }
@@ -390,6 +409,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       lastError: lastError == null && nullToAbsent
           ? const Value.absent()
           : Value(lastError),
+      txId: txId == null && nullToAbsent ? const Value.absent() : Value(txId),
     );
   }
 
@@ -414,6 +434,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       status: serializer.fromJson<String>(json['status']),
       baseVersion: serializer.fromJson<int?>(json['baseVersion']),
       lastError: serializer.fromJson<String?>(json['lastError']),
+      txId: serializer.fromJson<String?>(json['txId']),
     );
   }
   @override
@@ -437,6 +458,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       'status': serializer.toJson<String>(status),
       'baseVersion': serializer.toJson<int?>(baseVersion),
       'lastError': serializer.toJson<String?>(lastError),
+      'txId': serializer.toJson<String?>(txId),
     };
   }
 
@@ -457,7 +479,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           String? actorId,
           String? status,
           Value<int?> baseVersion = const Value.absent(),
-          Value<String?> lastError = const Value.absent()}) =>
+          Value<String?> lastError = const Value.absent(),
+          Value<String?> txId = const Value.absent()}) =>
       OutboxRow(
         id: id ?? this.id,
         createdAt: createdAt ?? this.createdAt,
@@ -476,6 +499,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
         status: status ?? this.status,
         baseVersion: baseVersion.present ? baseVersion.value : this.baseVersion,
         lastError: lastError.present ? lastError.value : this.lastError,
+        txId: txId.present ? txId.value : this.txId,
       );
   OutboxRow copyWithCompanion(OutboxEntriesCompanion data) {
     return OutboxRow(
@@ -500,6 +524,7 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       baseVersion:
           data.baseVersion.present ? data.baseVersion.value : this.baseVersion,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      txId: data.txId.present ? data.txId.value : this.txId,
     );
   }
 
@@ -522,7 +547,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           ..write('actorId: $actorId, ')
           ..write('status: $status, ')
           ..write('baseVersion: $baseVersion, ')
-          ..write('lastError: $lastError')
+          ..write('lastError: $lastError, ')
+          ..write('txId: $txId')
           ..write(')'))
         .toString();
   }
@@ -545,7 +571,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
       actorId,
       status,
       baseVersion,
-      lastError);
+      lastError,
+      txId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -566,7 +593,8 @@ class OutboxRow extends DataClass implements Insertable<OutboxRow> {
           other.actorId == this.actorId &&
           other.status == this.status &&
           other.baseVersion == this.baseVersion &&
-          other.lastError == this.lastError);
+          other.lastError == this.lastError &&
+          other.txId == this.txId);
 }
 
 class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
@@ -587,6 +615,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
   final Value<String> status;
   final Value<int?> baseVersion;
   final Value<String?> lastError;
+  final Value<String?> txId;
   final Value<int> rowid;
   const OutboxEntriesCompanion({
     this.id = const Value.absent(),
@@ -606,6 +635,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     this.status = const Value.absent(),
     this.baseVersion = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.txId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   OutboxEntriesCompanion.insert({
@@ -626,6 +656,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     this.status = const Value.absent(),
     this.baseVersion = const Value.absent(),
     this.lastError = const Value.absent(),
+    this.txId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         aggregateType = Value(aggregateType),
@@ -653,6 +684,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     Expression<String>? status,
     Expression<int>? baseVersion,
     Expression<String>? lastError,
+    Expression<String>? txId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -673,6 +705,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       if (status != null) 'status': status,
       if (baseVersion != null) 'base_version': baseVersion,
       if (lastError != null) 'last_error': lastError,
+      if (txId != null) 'tx_id': txId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -695,6 +728,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       Value<String>? status,
       Value<int?>? baseVersion,
       Value<String?>? lastError,
+      Value<String?>? txId,
       Value<int>? rowid}) {
     return OutboxEntriesCompanion(
       id: id ?? this.id,
@@ -714,6 +748,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
       status: status ?? this.status,
       baseVersion: baseVersion ?? this.baseVersion,
       lastError: lastError ?? this.lastError,
+      txId: txId ?? this.txId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -772,6 +807,9 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
     if (lastError.present) {
       map['last_error'] = Variable<String>(lastError.value);
     }
+    if (txId.present) {
+      map['tx_id'] = Variable<String>(txId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -798,6 +836,7 @@ class OutboxEntriesCompanion extends UpdateCompanion<OutboxRow> {
           ..write('status: $status, ')
           ..write('baseVersion: $baseVersion, ')
           ..write('lastError: $lastError, ')
+          ..write('txId: $txId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3497,6 +3536,17 @@ class $StockMovementsTable extends StockMovements
   late final GeneratedColumn<String> reason = GeneratedColumn<String>(
       'reason', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _refTypeMeta =
+      const VerificationMeta('refType');
+  @override
+  late final GeneratedColumn<String> refType = GeneratedColumn<String>(
+      'ref_type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _refIdMeta = const VerificationMeta('refId');
+  @override
+  late final GeneratedColumn<String> refId = GeneratedColumn<String>(
+      'ref_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _occurredAtMeta =
       const VerificationMeta('occurredAt');
   @override
@@ -3518,6 +3568,8 @@ class $StockMovementsTable extends StockMovements
         branchId,
         qtyDelta,
         reason,
+        refType,
+        refId,
         occurredAt
       ];
   @override
@@ -3583,6 +3635,14 @@ class $StockMovementsTable extends StockMovements
     } else if (isInserting) {
       context.missing(_reasonMeta);
     }
+    if (data.containsKey('ref_type')) {
+      context.handle(_refTypeMeta,
+          refType.isAcceptableOrUnknown(data['ref_type']!, _refTypeMeta));
+    }
+    if (data.containsKey('ref_id')) {
+      context.handle(
+          _refIdMeta, refId.isAcceptableOrUnknown(data['ref_id']!, _refIdMeta));
+    }
     if (data.containsKey('occurred_at')) {
       context.handle(
           _occurredAtMeta,
@@ -3620,6 +3680,10 @@ class $StockMovementsTable extends StockMovements
           .read(DriftSqlType.int, data['${effectivePrefix}qty_delta'])!,
       reason: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}reason'])!,
+      refType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}ref_type']),
+      refId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}ref_id']),
       occurredAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}occurred_at'])!,
     );
@@ -3644,6 +3708,10 @@ class StockMovementRow extends DataClass
   final String branchId;
   final int qtyDelta;
   final String reason;
+
+  /// What moved the stock: a sale, or the void or return that brings it back.
+  final String? refType;
+  final String? refId;
   final DateTime occurredAt;
   const StockMovementRow(
       {required this.id,
@@ -3657,6 +3725,8 @@ class StockMovementRow extends DataClass
       required this.branchId,
       required this.qtyDelta,
       required this.reason,
+      this.refType,
+      this.refId,
       required this.occurredAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3678,6 +3748,12 @@ class StockMovementRow extends DataClass
     map['branch_id'] = Variable<String>(branchId);
     map['qty_delta'] = Variable<int>(qtyDelta);
     map['reason'] = Variable<String>(reason);
+    if (!nullToAbsent || refType != null) {
+      map['ref_type'] = Variable<String>(refType);
+    }
+    if (!nullToAbsent || refId != null) {
+      map['ref_id'] = Variable<String>(refId);
+    }
     map['occurred_at'] = Variable<DateTime>(occurredAt);
     return map;
   }
@@ -3701,6 +3777,11 @@ class StockMovementRow extends DataClass
       branchId: Value(branchId),
       qtyDelta: Value(qtyDelta),
       reason: Value(reason),
+      refType: refType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(refType),
+      refId:
+          refId == null && nullToAbsent ? const Value.absent() : Value(refId),
       occurredAt: Value(occurredAt),
     );
   }
@@ -3720,6 +3801,8 @@ class StockMovementRow extends DataClass
       branchId: serializer.fromJson<String>(json['branchId']),
       qtyDelta: serializer.fromJson<int>(json['qtyDelta']),
       reason: serializer.fromJson<String>(json['reason']),
+      refType: serializer.fromJson<String?>(json['refType']),
+      refId: serializer.fromJson<String?>(json['refId']),
       occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
     );
   }
@@ -3738,6 +3821,8 @@ class StockMovementRow extends DataClass
       'branchId': serializer.toJson<String>(branchId),
       'qtyDelta': serializer.toJson<int>(qtyDelta),
       'reason': serializer.toJson<String>(reason),
+      'refType': serializer.toJson<String?>(refType),
+      'refId': serializer.toJson<String?>(refId),
       'occurredAt': serializer.toJson<DateTime>(occurredAt),
     };
   }
@@ -3754,6 +3839,8 @@ class StockMovementRow extends DataClass
           String? branchId,
           int? qtyDelta,
           String? reason,
+          Value<String?> refType = const Value.absent(),
+          Value<String?> refId = const Value.absent(),
           DateTime? occurredAt}) =>
       StockMovementRow(
         id: id ?? this.id,
@@ -3767,6 +3854,8 @@ class StockMovementRow extends DataClass
         branchId: branchId ?? this.branchId,
         qtyDelta: qtyDelta ?? this.qtyDelta,
         reason: reason ?? this.reason,
+        refType: refType.present ? refType.value : this.refType,
+        refId: refId.present ? refId.value : this.refId,
         occurredAt: occurredAt ?? this.occurredAt,
       );
   StockMovementRow copyWithCompanion(StockMovementsCompanion data) {
@@ -3782,6 +3871,8 @@ class StockMovementRow extends DataClass
       branchId: data.branchId.present ? data.branchId.value : this.branchId,
       qtyDelta: data.qtyDelta.present ? data.qtyDelta.value : this.qtyDelta,
       reason: data.reason.present ? data.reason.value : this.reason,
+      refType: data.refType.present ? data.refType.value : this.refType,
+      refId: data.refId.present ? data.refId.value : this.refId,
       occurredAt:
           data.occurredAt.present ? data.occurredAt.value : this.occurredAt,
     );
@@ -3801,6 +3892,8 @@ class StockMovementRow extends DataClass
           ..write('branchId: $branchId, ')
           ..write('qtyDelta: $qtyDelta, ')
           ..write('reason: $reason, ')
+          ..write('refType: $refType, ')
+          ..write('refId: $refId, ')
           ..write('occurredAt: $occurredAt')
           ..write(')'))
         .toString();
@@ -3819,6 +3912,8 @@ class StockMovementRow extends DataClass
       branchId,
       qtyDelta,
       reason,
+      refType,
+      refId,
       occurredAt);
   @override
   bool operator ==(Object other) =>
@@ -3835,6 +3930,8 @@ class StockMovementRow extends DataClass
           other.branchId == this.branchId &&
           other.qtyDelta == this.qtyDelta &&
           other.reason == this.reason &&
+          other.refType == this.refType &&
+          other.refId == this.refId &&
           other.occurredAt == this.occurredAt);
 }
 
@@ -3850,6 +3947,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
   final Value<String> branchId;
   final Value<int> qtyDelta;
   final Value<String> reason;
+  final Value<String?> refType;
+  final Value<String?> refId;
   final Value<DateTime> occurredAt;
   final Value<int> rowid;
   const StockMovementsCompanion({
@@ -3864,6 +3963,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
     this.branchId = const Value.absent(),
     this.qtyDelta = const Value.absent(),
     this.reason = const Value.absent(),
+    this.refType = const Value.absent(),
+    this.refId = const Value.absent(),
     this.occurredAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3879,6 +3980,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
     required String branchId,
     required int qtyDelta,
     required String reason,
+    this.refType = const Value.absent(),
+    this.refId = const Value.absent(),
     this.occurredAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -3898,6 +4001,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
     Expression<String>? branchId,
     Expression<int>? qtyDelta,
     Expression<String>? reason,
+    Expression<String>? refType,
+    Expression<String>? refId,
     Expression<DateTime>? occurredAt,
     Expression<int>? rowid,
   }) {
@@ -3913,6 +4018,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
       if (branchId != null) 'branch_id': branchId,
       if (qtyDelta != null) 'qty_delta': qtyDelta,
       if (reason != null) 'reason': reason,
+      if (refType != null) 'ref_type': refType,
+      if (refId != null) 'ref_id': refId,
       if (occurredAt != null) 'occurred_at': occurredAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3930,6 +4037,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
       Value<String>? branchId,
       Value<int>? qtyDelta,
       Value<String>? reason,
+      Value<String?>? refType,
+      Value<String?>? refId,
       Value<DateTime>? occurredAt,
       Value<int>? rowid}) {
     return StockMovementsCompanion(
@@ -3944,6 +4053,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
       branchId: branchId ?? this.branchId,
       qtyDelta: qtyDelta ?? this.qtyDelta,
       reason: reason ?? this.reason,
+      refType: refType ?? this.refType,
+      refId: refId ?? this.refId,
       occurredAt: occurredAt ?? this.occurredAt,
       rowid: rowid ?? this.rowid,
     );
@@ -3985,6 +4096,12 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
     if (reason.present) {
       map['reason'] = Variable<String>(reason.value);
     }
+    if (refType.present) {
+      map['ref_type'] = Variable<String>(refType.value);
+    }
+    if (refId.present) {
+      map['ref_id'] = Variable<String>(refId.value);
+    }
     if (occurredAt.present) {
       map['occurred_at'] = Variable<DateTime>(occurredAt.value);
     }
@@ -4008,6 +4125,8 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovementRow> {
           ..write('branchId: $branchId, ')
           ..write('qtyDelta: $qtyDelta, ')
           ..write('reason: $reason, ')
+          ..write('refType: $refType, ')
+          ..write('refId: $refId, ')
           ..write('occurredAt: $occurredAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4164,6 +4283,12 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _refundOfMeta =
+      const VerificationMeta('refundOf');
+  @override
+  late final GeneratedColumn<String> refundOf = GeneratedColumn<String>(
+      'refund_of', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4185,7 +4310,8 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
         totalMinor,
         paidMinor,
         changeMinor,
-        occurredAt
+        occurredAt,
+        refundOf
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4294,6 +4420,10 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
           occurredAt.isAcceptableOrUnknown(
               data['occurred_at']!, _occurredAtMeta));
     }
+    if (data.containsKey('refund_of')) {
+      context.handle(_refundOfMeta,
+          refundOf.isAcceptableOrUnknown(data['refund_of']!, _refundOfMeta));
+    }
     return context;
   }
 
@@ -4343,6 +4473,8 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, SaleRow> {
           .read(DriftSqlType.int, data['${effectivePrefix}change_minor'])!,
       occurredAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}occurred_at'])!,
+      refundOf: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}refund_of']),
     );
   }
 
@@ -4373,6 +4505,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
   final int paidMinor;
   final int changeMinor;
   final DateTime occurredAt;
+
+  /// A return: the sale it takes goods back from. Only the server writes returns.
+  final String? refundOf;
   const SaleRow(
       {required this.id,
       required this.createdAt,
@@ -4393,7 +4528,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       required this.totalMinor,
       required this.paidMinor,
       required this.changeMinor,
-      required this.occurredAt});
+      required this.occurredAt,
+      this.refundOf});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4427,6 +4563,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
     map['paid_minor'] = Variable<int>(paidMinor);
     map['change_minor'] = Variable<int>(changeMinor);
     map['occurred_at'] = Variable<DateTime>(occurredAt);
+    if (!nullToAbsent || refundOf != null) {
+      map['refund_of'] = Variable<String>(refundOf);
+    }
     return map;
   }
 
@@ -4462,6 +4601,9 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       paidMinor: Value(paidMinor),
       changeMinor: Value(changeMinor),
       occurredAt: Value(occurredAt),
+      refundOf: refundOf == null && nullToAbsent
+          ? const Value.absent()
+          : Value(refundOf),
     );
   }
 
@@ -4489,6 +4631,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       paidMinor: serializer.fromJson<int>(json['paidMinor']),
       changeMinor: serializer.fromJson<int>(json['changeMinor']),
       occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
+      refundOf: serializer.fromJson<String?>(json['refundOf']),
     );
   }
   @override
@@ -4515,6 +4658,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
       'paidMinor': serializer.toJson<int>(paidMinor),
       'changeMinor': serializer.toJson<int>(changeMinor),
       'occurredAt': serializer.toJson<DateTime>(occurredAt),
+      'refundOf': serializer.toJson<String?>(refundOf),
     };
   }
 
@@ -4538,7 +4682,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           int? totalMinor,
           int? paidMinor,
           int? changeMinor,
-          DateTime? occurredAt}) =>
+          DateTime? occurredAt,
+          Value<String?> refundOf = const Value.absent()}) =>
       SaleRow(
         id: id ?? this.id,
         createdAt: createdAt ?? this.createdAt,
@@ -4560,6 +4705,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
         paidMinor: paidMinor ?? this.paidMinor,
         changeMinor: changeMinor ?? this.changeMinor,
         occurredAt: occurredAt ?? this.occurredAt,
+        refundOf: refundOf.present ? refundOf.value : this.refundOf,
       );
   SaleRow copyWithCompanion(SalesCompanion data) {
     return SaleRow(
@@ -4591,6 +4737,7 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           data.changeMinor.present ? data.changeMinor.value : this.changeMinor,
       occurredAt:
           data.occurredAt.present ? data.occurredAt.value : this.occurredAt,
+      refundOf: data.refundOf.present ? data.refundOf.value : this.refundOf,
     );
   }
 
@@ -4616,33 +4763,36 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           ..write('totalMinor: $totalMinor, ')
           ..write('paidMinor: $paidMinor, ')
           ..write('changeMinor: $changeMinor, ')
-          ..write('occurredAt: $occurredAt')
+          ..write('occurredAt: $occurredAt, ')
+          ..write('refundOf: $refundOf')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      createdAt,
-      updatedAt,
-      deletedAt,
-      createdBy,
-      updatedBy,
-      version,
-      number,
-      branchId,
-      shiftId,
-      customerId,
-      status,
-      currency,
-      discountMinor,
-      subtotalMinor,
-      taxMinor,
-      totalMinor,
-      paidMinor,
-      changeMinor,
-      occurredAt);
+  int get hashCode => Object.hashAll([
+        id,
+        createdAt,
+        updatedAt,
+        deletedAt,
+        createdBy,
+        updatedBy,
+        version,
+        number,
+        branchId,
+        shiftId,
+        customerId,
+        status,
+        currency,
+        discountMinor,
+        subtotalMinor,
+        taxMinor,
+        totalMinor,
+        paidMinor,
+        changeMinor,
+        occurredAt,
+        refundOf
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4666,7 +4816,8 @@ class SaleRow extends DataClass implements Insertable<SaleRow> {
           other.totalMinor == this.totalMinor &&
           other.paidMinor == this.paidMinor &&
           other.changeMinor == this.changeMinor &&
-          other.occurredAt == this.occurredAt);
+          other.occurredAt == this.occurredAt &&
+          other.refundOf == this.refundOf);
 }
 
 class SalesCompanion extends UpdateCompanion<SaleRow> {
@@ -4690,6 +4841,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
   final Value<int> paidMinor;
   final Value<int> changeMinor;
   final Value<DateTime> occurredAt;
+  final Value<String?> refundOf;
   final Value<int> rowid;
   const SalesCompanion({
     this.id = const Value.absent(),
@@ -4712,6 +4864,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     this.paidMinor = const Value.absent(),
     this.changeMinor = const Value.absent(),
     this.occurredAt = const Value.absent(),
+    this.refundOf = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SalesCompanion.insert({
@@ -4735,6 +4888,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     this.paidMinor = const Value.absent(),
     this.changeMinor = const Value.absent(),
     this.occurredAt = const Value.absent(),
+    this.refundOf = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         number = Value(number),
@@ -4760,6 +4914,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     Expression<int>? paidMinor,
     Expression<int>? changeMinor,
     Expression<DateTime>? occurredAt,
+    Expression<String>? refundOf,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4783,6 +4938,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       if (paidMinor != null) 'paid_minor': paidMinor,
       if (changeMinor != null) 'change_minor': changeMinor,
       if (occurredAt != null) 'occurred_at': occurredAt,
+      if (refundOf != null) 'refund_of': refundOf,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4808,6 +4964,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       Value<int>? paidMinor,
       Value<int>? changeMinor,
       Value<DateTime>? occurredAt,
+      Value<String?>? refundOf,
       Value<int>? rowid}) {
     return SalesCompanion(
       id: id ?? this.id,
@@ -4830,6 +4987,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
       paidMinor: paidMinor ?? this.paidMinor,
       changeMinor: changeMinor ?? this.changeMinor,
       occurredAt: occurredAt ?? this.occurredAt,
+      refundOf: refundOf ?? this.refundOf,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4897,6 +5055,9 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
     if (occurredAt.present) {
       map['occurred_at'] = Variable<DateTime>(occurredAt.value);
     }
+    if (refundOf.present) {
+      map['refund_of'] = Variable<String>(refundOf.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4926,6 +5087,7 @@ class SalesCompanion extends UpdateCompanion<SaleRow> {
           ..write('paidMinor: $paidMinor, ')
           ..write('changeMinor: $changeMinor, ')
           ..write('occurredAt: $occurredAt, ')
+          ..write('refundOf: $refundOf, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10237,6 +10399,7 @@ typedef $$OutboxEntriesTableCreateCompanionBuilder = OutboxEntriesCompanion
   Value<String> status,
   Value<int?> baseVersion,
   Value<String?> lastError,
+  Value<String?> txId,
   Value<int> rowid,
 });
 typedef $$OutboxEntriesTableUpdateCompanionBuilder = OutboxEntriesCompanion
@@ -10258,6 +10421,7 @@ typedef $$OutboxEntriesTableUpdateCompanionBuilder = OutboxEntriesCompanion
   Value<String> status,
   Value<int?> baseVersion,
   Value<String?> lastError,
+  Value<String?> txId,
   Value<int> rowid,
 });
 
@@ -10320,6 +10484,9 @@ class $$OutboxEntriesTableFilterComposer
 
   ColumnFilters<String> get lastError => $composableBuilder(
       column: $table.lastError, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get txId => $composableBuilder(
+      column: $table.txId, builder: (column) => ColumnFilters(column));
 }
 
 class $$OutboxEntriesTableOrderingComposer
@@ -10382,6 +10549,9 @@ class $$OutboxEntriesTableOrderingComposer
 
   ColumnOrderings<String> get lastError => $composableBuilder(
       column: $table.lastError, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get txId => $composableBuilder(
+      column: $table.txId, builder: (column) => ColumnOrderings(column));
 }
 
 class $$OutboxEntriesTableAnnotationComposer
@@ -10443,6 +10613,9 @@ class $$OutboxEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get lastError =>
       $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<String> get txId =>
+      $composableBuilder(column: $table.txId, builder: (column) => column);
 }
 
 class $$OutboxEntriesTableTableManager extends RootTableManager<
@@ -10485,6 +10658,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             Value<String> status = const Value.absent(),
             Value<int?> baseVersion = const Value.absent(),
             Value<String?> lastError = const Value.absent(),
+            Value<String?> txId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               OutboxEntriesCompanion(
@@ -10505,6 +10679,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             status: status,
             baseVersion: baseVersion,
             lastError: lastError,
+            txId: txId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -10525,6 +10700,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             Value<String> status = const Value.absent(),
             Value<int?> baseVersion = const Value.absent(),
             Value<String?> lastError = const Value.absent(),
+            Value<String?> txId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               OutboxEntriesCompanion.insert(
@@ -10545,6 +10721,7 @@ class $$OutboxEntriesTableTableManager extends RootTableManager<
             status: status,
             baseVersion: baseVersion,
             lastError: lastError,
+            txId: txId,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -11833,6 +12010,8 @@ typedef $$StockMovementsTableCreateCompanionBuilder = StockMovementsCompanion
   required String branchId,
   required int qtyDelta,
   required String reason,
+  Value<String?> refType,
+  Value<String?> refId,
   Value<DateTime> occurredAt,
   Value<int> rowid,
 });
@@ -11849,6 +12028,8 @@ typedef $$StockMovementsTableUpdateCompanionBuilder = StockMovementsCompanion
   Value<String> branchId,
   Value<int> qtyDelta,
   Value<String> reason,
+  Value<String?> refType,
+  Value<String?> refId,
   Value<DateTime> occurredAt,
   Value<int> rowid,
 });
@@ -11894,6 +12075,12 @@ class $$StockMovementsTableFilterComposer
 
   ColumnFilters<String> get reason => $composableBuilder(
       column: $table.reason, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get refType => $composableBuilder(
+      column: $table.refType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get refId => $composableBuilder(
+      column: $table.refId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnFilters(column));
@@ -11941,6 +12128,12 @@ class $$StockMovementsTableOrderingComposer
   ColumnOrderings<String> get reason => $composableBuilder(
       column: $table.reason, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get refType => $composableBuilder(
+      column: $table.refType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get refId => $composableBuilder(
+      column: $table.refId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnOrderings(column));
 }
@@ -11987,6 +12180,12 @@ class $$StockMovementsTableAnnotationComposer
   GeneratedColumn<String> get reason =>
       $composableBuilder(column: $table.reason, builder: (column) => column);
 
+  GeneratedColumn<String> get refType =>
+      $composableBuilder(column: $table.refType, builder: (column) => column);
+
+  GeneratedColumn<String> get refId =>
+      $composableBuilder(column: $table.refId, builder: (column) => column);
+
   GeneratedColumn<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => column);
 }
@@ -12029,6 +12228,8 @@ class $$StockMovementsTableTableManager extends RootTableManager<
             Value<String> branchId = const Value.absent(),
             Value<int> qtyDelta = const Value.absent(),
             Value<String> reason = const Value.absent(),
+            Value<String?> refType = const Value.absent(),
+            Value<String?> refId = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -12044,6 +12245,8 @@ class $$StockMovementsTableTableManager extends RootTableManager<
             branchId: branchId,
             qtyDelta: qtyDelta,
             reason: reason,
+            refType: refType,
+            refId: refId,
             occurredAt: occurredAt,
             rowid: rowid,
           ),
@@ -12059,6 +12262,8 @@ class $$StockMovementsTableTableManager extends RootTableManager<
             required String branchId,
             required int qtyDelta,
             required String reason,
+            Value<String?> refType = const Value.absent(),
+            Value<String?> refId = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -12074,6 +12279,8 @@ class $$StockMovementsTableTableManager extends RootTableManager<
             branchId: branchId,
             qtyDelta: qtyDelta,
             reason: reason,
+            refType: refType,
+            refId: refId,
             occurredAt: occurredAt,
             rowid: rowid,
           ),
@@ -12124,6 +12331,7 @@ typedef $$SalesTableCreateCompanionBuilder = SalesCompanion Function({
   Value<int> paidMinor,
   Value<int> changeMinor,
   Value<DateTime> occurredAt,
+  Value<String?> refundOf,
   Value<int> rowid,
 });
 typedef $$SalesTableUpdateCompanionBuilder = SalesCompanion Function({
@@ -12147,6 +12355,7 @@ typedef $$SalesTableUpdateCompanionBuilder = SalesCompanion Function({
   Value<int> paidMinor,
   Value<int> changeMinor,
   Value<DateTime> occurredAt,
+  Value<String?> refundOf,
   Value<int> rowid,
 });
 
@@ -12217,6 +12426,9 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
 
   ColumnFilters<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get refundOf => $composableBuilder(
+      column: $table.refundOf, builder: (column) => ColumnFilters(column));
 }
 
 class $$SalesTableOrderingComposer
@@ -12289,6 +12501,9 @@ class $$SalesTableOrderingComposer
 
   ColumnOrderings<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get refundOf => $composableBuilder(
+      column: $table.refundOf, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SalesTableAnnotationComposer
@@ -12359,6 +12574,9 @@ class $$SalesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get occurredAt => $composableBuilder(
       column: $table.occurredAt, builder: (column) => column);
+
+  GeneratedColumn<String> get refundOf =>
+      $composableBuilder(column: $table.refundOf, builder: (column) => column);
 }
 
 class $$SalesTableTableManager extends RootTableManager<
@@ -12404,6 +12622,7 @@ class $$SalesTableTableManager extends RootTableManager<
             Value<int> paidMinor = const Value.absent(),
             Value<int> changeMinor = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
+            Value<String?> refundOf = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SalesCompanion(
@@ -12427,6 +12646,7 @@ class $$SalesTableTableManager extends RootTableManager<
             paidMinor: paidMinor,
             changeMinor: changeMinor,
             occurredAt: occurredAt,
+            refundOf: refundOf,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -12450,6 +12670,7 @@ class $$SalesTableTableManager extends RootTableManager<
             Value<int> paidMinor = const Value.absent(),
             Value<int> changeMinor = const Value.absent(),
             Value<DateTime> occurredAt = const Value.absent(),
+            Value<String?> refundOf = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SalesCompanion.insert(
@@ -12473,6 +12694,7 @@ class $$SalesTableTableManager extends RootTableManager<
             paidMinor: paidMinor,
             changeMinor: changeMinor,
             occurredAt: occurredAt,
+            refundOf: refundOf,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

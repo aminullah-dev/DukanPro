@@ -9,6 +9,88 @@ import '../auth/session.dart';
 
 final localSalesProvider = Provider<LocalSales>((ref) => LocalSales(ref.watch(databaseProvider)));
 
+/// A return the till recorded: the sale that names the one it takes goods back
+/// from. Amounts are positive here: what the goods were worth, and what the shop
+/// handed back (the rest came off the customer's account).
+final class RefundDone {
+  const RefundDone({
+    required this.id,
+    required this.number,
+    required this.totalMinor,
+    required this.moneyBackMinor,
+  });
+  final String id;
+  final String number;
+  final int totalMinor;
+  final int moneyBackMinor;
+}
+
+/// Voids a sale from the till, with or without a connection: the till writes the
+/// void, the stock coming back and the debt coming off in one transaction, and
+/// sync carries them to the server together (docs/domain/sales.md).
+class TillVoid {
+  TillVoid({required this.sales, required this.actorId, required this.deviceId});
+  final LocalSales sales;
+  final String? actorId;
+  final String deviceId;
+
+  Future<void> call(String saleId, {required String reason}) {
+    final actor = actorId;
+    if (actor == null) {
+      throw PermissionDeniedError('ACCESS_DENIED', {'permission': Permission.saleVoid.code});
+    }
+    return sales.voidSale(saleId: saleId, reason: reason, actorId: actor, deviceId: deviceId);
+  }
+}
+
+final tillVoidProvider = Provider<TillVoid>((ref) => TillVoid(
+      sales: ref.watch(localSalesProvider),
+      actorId: ref.watch(sessionActorProvider)?.user.id,
+      deviceId: ref.watch(deviceIdProvider),
+    ));
+
+/// Takes goods back from a sale at the till, with or without a connection. Cash
+/// handed back comes out of this till's open drawer.
+class TillRefund {
+  TillRefund({
+    required this.sales,
+    required this.actorId,
+    required this.deviceId,
+    required this.openShift,
+  });
+  final LocalSales sales;
+  final String? actorId;
+  final String deviceId;
+  final Future<String?> Function() openShift;
+
+  Future<RefundDone> call(
+    String saleId, {
+    required Map<String, int> lines,
+    required String reason,
+    required String method,
+  }) async {
+    final actor = actorId;
+    if (actor == null) {
+      throw PermissionDeniedError('ACCESS_DENIED', {'permission': Permission.saleVoid.code});
+    }
+    final refund = await sales.refund(
+      saleId: saleId, lines: lines, reason: reason, method: method, shiftId: await openShift(),
+      actorId: actor, deviceId: deviceId,
+    );
+    return RefundDone(
+      id: refund.id, number: refund.number, totalMinor: -refund.totalMinor,
+      moneyBackMinor: -refund.paidMinor,
+    );
+  }
+}
+
+final tillRefundProvider = Provider<TillRefund>((ref) => TillRefund(
+      sales: ref.watch(localSalesProvider),
+      actorId: ref.watch(sessionActorProvider)?.user.id,
+      deviceId: ref.watch(deviceIdProvider),
+      openShift: () async => (await ref.read(currentShiftProvider.future))?.id,
+    ));
+
 final localShiftsProvider = Provider<LocalShifts>((ref) => LocalShifts(ref.watch(databaseProvider)));
 
 /// The signed-in seller's open shift in their branch, or null: the POS sells

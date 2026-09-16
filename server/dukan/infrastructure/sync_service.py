@@ -15,19 +15,21 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, true, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from dukan.application.sync import ChangeItem, OpInput, OpResult, PullResult, SyncService
 from dukan.application.sync_policy import (
+    LEDGER_TABLES,
     MASTER_TABLES,
     READ_FIELDS,
     CustomerRef,
     ProductRef,
     PullScope,
     RowSnapshot,
+    SaleLineRef,
     SaleRef,
     ShiftRef,
     SupplierRef,
@@ -211,7 +213,8 @@ class _SqlSyncReader:
         return SaleRef(
             id=s.id, branch_id=s.branch_id, created_by=s.created_by, customer_id=s.customer_id,
             currency=s.currency, subtotal_minor=s.subtotal_minor, total_minor=s.total_minor,
-            paid_minor=s.paid_minor, occurred_at=_aware(s.occurred_at),
+            paid_minor=s.paid_minor, occurred_at=_aware(s.occurred_at), status=s.status,
+            refund_of=s.refund_of, shift_id=s.shift_id,
         )
 
     def sale_lines_total(self, sale_id: str) -> int:
@@ -246,6 +249,74 @@ class _SqlSyncReader:
             CustomerLedgerModel.amount_minor,
             CustomerLedgerModel.type == "charge", CustomerLedgerModel.ref_type == "sale",
             CustomerLedgerModel.ref_id == sale_id, CustomerLedgerModel.deleted_at.is_(None),
+        )
+
+    def _refunds_of(self, sale_id: str) -> Any:
+        return select(SaleModel.id).where(
+            SaleModel.refund_of == sale_id, SaleModel.deleted_at.is_(None)
+        )
+
+    def sale_has_refunds(self, sale_id: str) -> bool:
+        return self._s.scalar(self._refunds_of(sale_id).limit(1)) is not None
+
+    def sale_refunds_total(self, sale_id: str) -> int:
+        return self._sum(
+            SaleModel.total_minor, SaleModel.refund_of == sale_id, SaleModel.deleted_at.is_(None)
+        )
+
+    def sale_line_ref(self, sale_id: str, product_id: str) -> SaleLineRef | None:
+        lines = self._s.scalars(
+            select(SaleLineModel)
+            .where(
+                SaleLineModel.sale_id == sale_id, SaleLineModel.product_id == product_id,
+                SaleLineModel.deleted_at.is_(None),
+            )
+            .order_by(SaleLineModel.created_at)
+        ).all()
+        if not lines:
+            return None
+        first = lines[0]
+        return SaleLineRef(
+            qty_minor=sum(line.qty_minor for line in lines),
+            value_minor=sum(line.line_total_minor for line in lines),
+            unit_price_minor=first.unit_price_minor, unit_cost_minor=first.unit_cost_minor,
+            decimal_places=first.decimal_places,
+        )
+
+    def refunded_qty(self, sale_id: str, product_id: str) -> int:
+        return -self._sum(
+            SaleLineModel.qty_minor,
+            SaleLineModel.sale_id.in_(self._refunds_of(sale_id)),
+            SaleLineModel.product_id == product_id, SaleLineModel.deleted_at.is_(None),
+        )
+
+    def returned_stock_qty(self, ref_type: str, ref_id: str, product_id: str) -> int:
+        return self._sum(
+            StockMovementModel.qty_delta,
+            StockMovementModel.reason == "returned", StockMovementModel.ref_type == ref_type,
+            StockMovementModel.ref_id == ref_id, StockMovementModel.product_id == product_id,
+            StockMovementModel.deleted_at.is_(None),
+        )
+
+    def sale_reversed_debt(self, sale_id: str) -> int:
+        return -self._sum(
+            CustomerLedgerModel.amount_minor,
+            CustomerLedgerModel.type == "adjustment",
+            or_(
+                and_(CustomerLedgerModel.ref_type == "void", CustomerLedgerModel.ref_id == sale_id),
+                and_(
+                    CustomerLedgerModel.ref_type == "refund",
+                    CustomerLedgerModel.ref_id.in_(self._refunds_of(sale_id)),
+                ),
+            ),
+            CustomerLedgerModel.deleted_at.is_(None),
+        )
+
+    def sale_cash_taken(self, sale_id: str) -> int:
+        return self._sum(
+            PaymentModel.amount_minor,
+            PaymentModel.sale_id == sale_id, PaymentModel.method == "cash",
+            PaymentModel.deleted_at.is_(None),
         )
 
     def branch_active(self, branch_id: str) -> bool:
@@ -297,6 +368,18 @@ def _breaks_chain(op: OpInput, result: OpResult) -> bool:
     return result.outcome == "rejected" and op.op == "insert"
 
 
+def _transactions(ops: list[OpInput]) -> list[list[int]]:
+    """The ops' positions, grouped by device transaction: consecutive ops with one
+    tx_id. An op without a tx_id (from an older app) is alone."""
+    groups: list[list[int]] = []
+    for i, op in enumerate(ops):
+        if groups and op.tx_id is not None and ops[groups[-1][-1]].tx_id == op.tx_id:
+            groups[-1].append(i)
+        else:
+            groups.append([i])
+    return groups
+
+
 class SqlSyncService(SyncService):
     def __init__(self, session: Session) -> None:
         self._s = session
@@ -306,26 +389,112 @@ class SqlSyncService(SyncService):
     def push(
         self, *, actor: User, device_id: str, branch_id: str | None, ops: list[OpInput]
     ) -> list[OpResult]:
-        results: list[OpResult] = []
         # Rows where an earlier op in this push broke the device's chain (see
         # _breaks_chain). A later op on such a row was made on top of it: it takes the
         # same verdict, or it would overwrite the server's row without review. The
         # device does the same across pushes.
         failed: dict[tuple[str, str], OpResult] = {}
-        for op in ops:
-            row = (op.table, op.row_id)
-            earlier = failed.get(row)
-            fresh = is_uuid(op.op_id) and self._s.get(ProcessedOpModel, op.op_id) is None
-            if earlier is not None and earlier.code is not None and fresh:
-                result = self._settle(op, actor, device_id, earlier.outcome, earlier.code)
+        results: dict[int, OpResult] = {}
+        for group in _transactions(ops):
+            # A device transaction's ledger rows apply together or not at all. Its
+            # master edits apply one at a time, first: a lost compare-and-set goes to
+            # review without undoing the facts beside it (docs/sync-protocol.md).
+            ledger = [i for i in group if ops[i].table in LEDGER_TABLES]
+            together = set(ledger) if len(ledger) > 1 else set()
+            for i in group:
+                if i not in together:
+                    results[i] = self._push_single(actor, device_id, branch_id, ops[i], failed)
+            if together:
+                answers = self._push_together(actor, device_id, branch_id, [ops[i] for i in ledger])
+                for i, result in zip(ledger, answers, strict=True):
+                    results[i] = result
+                    if result.code and is_cacheable(result.code) and _breaks_chain(ops[i], result):
+                        failed[(ops[i].table, ops[i].row_id)] = result
+        return [results[i] for i in range(len(ops))]
+
+    def _push_single(
+        self, actor: User, device_id: str, branch_id: str | None, op: OpInput,
+        failed: dict[tuple[str, str], OpResult],
+    ) -> OpResult:
+        row = (op.table, op.row_id)
+        earlier = failed.get(row)
+        fresh = is_uuid(op.op_id) and self._s.get(ProcessedOpModel, op.op_id) is None
+        if earlier is not None and earlier.code is not None and fresh:
+            result = self._settle(op, actor, device_id, earlier.outcome, earlier.code)
+            if result.outcome == "conflict":
+                result = replace(result, current=self._current(actor, op))
+        else:
+            result = self._push_one(actor, device_id, branch_id, op)
+        if result.code and is_cacheable(result.code) and _breaks_chain(op, result):
+            failed[row] = result
+        return result
+
+    def _push_together(
+        self, actor: User, device_id: str, branch_id: str | None, ops: list[OpInput]
+    ) -> list[OpResult]:
+        """A device transaction's ledger rows, in one database transaction: all of
+        them or none. The op that fails keeps its verdict. The others are rejected
+        SYNC_TX_ABORTED, recorded, when the failure is final; when it may pass later
+        they take its code, so the device sends them all again."""
+        if any(not is_uuid(o.op_id) for o in ops):
+            return [
+                OpResult(op_id=o.op_id, outcome="rejected", code="SYNC_OP_INVALID")
+                if not is_uuid(o.op_id)
+                else self._settle(o, actor, device_id, "rejected", "SYNC_TX_ABORTED")
+                for o in ops
+            ]
+        if any(self._s.get(ProcessedOpModel, o.op_id) is not None for o in ops):
+            # Recorded before (this push again, or ops an older app sent one by one):
+            # each answers as it did.
+            return [self._push_one(actor, device_id, branch_id, o) for o in ops]
+        current = ops[0]
+        applied: list[tuple[OpInput, int | None, int | None]] = []
+        try:
+            for current in ops:
+                seq, version = self._apply(actor, device_id, branch_id, current)
+                applied.append((current, seq, version))
+            for o, seq, version in applied:
+                self._s.add(
+                    ProcessedOpModel(
+                        op_id=o.op_id, result="applied", server_seq=seq, version=version,
+                        actor_id=actor.id, device_id=device_id,
+                    )
+                )
+            self._s.commit()
+            return [
+                OpResult(op_id=o.op_id, outcome="applied", server_seq=seq, version=version)
+                for o, seq, version in applied
+            ]
+        except SyncConflict as e:
+            self._s.rollback()
+            outcome, code = "conflict", e.code
+        except AppError as e:
+            self._s.rollback()
+            outcome, code = "rejected", e.code
+        except IntegrityError:
+            self._s.rollback()
+            if any(self._s.get(ProcessedOpModel, o.op_id) is not None for o in ops):
+                # A concurrent push of the same transaction won the race.
+                return [self._push_one(actor, device_id, branch_id, o) for o in ops]
+            outcome, code = "rejected", "ROW_INVALID"
+        except OperationalError as e:
+            self._s.rollback()
+            raise InfrastructureError("SYNC_UNAVAILABLE") from e
+        except Exception:  # noqa: BLE001 - a bad row must not 500 the batch
+            self._s.rollback()
+            _log.exception("sync tx %s failed unexpectedly at op %s", current.tx_id, current.op_id)
+            outcome, code = "rejected", "ROW_INVALID"
+        sibling = "SYNC_TX_ABORTED" if is_cacheable(code) else code
+        answers: list[OpResult] = []
+        for o in ops:
+            if o is current:
+                result = self._settle(o, actor, device_id, outcome, code)
                 if result.outcome == "conflict":
-                    result = replace(result, current=self._current(actor, op))
+                    result = replace(result, current=self._current(actor, o))
             else:
-                result = self._push_one(actor, device_id, branch_id, op)
-            if result.code and is_cacheable(result.code) and _breaks_chain(op, result):
-                failed[row] = result
-            results.append(result)
-        return results
+                result = self._settle(o, actor, device_id, "rejected", sibling)
+            answers.append(result)
+        return answers
 
     def _push_one(
         self, actor: User, device_id: str, branch_id: str | None, op: OpInput
@@ -461,7 +630,8 @@ class SqlSyncService(SyncService):
                     update(model)
                     .where(
                         model.id == op.row_id,
-                        model.version == op.base_version,
+                        # A one-way change (a void) takes no compare-and-set.
+                        model.version == op.base_version if plan.compare_version else true(),
                         model.deleted_at.is_(None),
                     )
                     .values(

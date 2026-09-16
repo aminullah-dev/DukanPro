@@ -3,7 +3,7 @@
          Debug builds get this from src/debug; release builds need it here. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="dukanpro"
+        android:label="DukanPro"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"

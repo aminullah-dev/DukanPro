@@ -77,6 +77,10 @@ The server is authoritative; the device keeps just enough to work offline.
   - If secure storage cannot be read at startup, or a sign-in cannot be saved, the sign-in screen says so (`STORAGE_UNAVAILABLE`) instead of an endless spinner.
 - **Offline window.** Offline unlock works for 30 days after the server last confirmed the user, then fails with `OFFLINE_EXPIRED`.
   - The device remembers the latest time it has seen. A clock set back more than 5 minutes behind it also fails with `OFFLINE_EXPIRED`, so winding the clock back cannot keep the window open.
+- **Wrong passwords.** After 5 wrong passwords in a row (since the last good sign-in, all within 15 minutes), online sign-in to that account is refused for 15 minutes, even with the right password (`LOGIN_LOCKED`, HTTP 429). Each refusal is audited as `user.login_locked`.
+  - The count lives in the audit trail (`user.login_failed`, `user.authenticated`), so every server worker sees the same count.
+  - A device that already holds the sign-in still unlocks offline.
+  - Someone who knows a username can keep that account's online sign-in closed, 15 minutes at a time. The owner sees the attempts in the audit log.
 - **Lock.** There is a Lock action, and the app locks itself when it goes to the background or sits idle.
   - The idle time is a setting of the device. An owner or manager (`settings.manage`) chooses 1, 2, 5, 10, 15 or 30 minutes, and it is 10 minutes until they do. Everyone else sees the setting but cannot change it.
   - A new idle time counts from the moment it is chosen.
@@ -94,10 +98,24 @@ The server is authoritative; the device keeps just enough to work offline.
   - If the key cannot be read at all, the app says so instead of starting. It never opens the database unencrypted.
   - The SQLCipher build is the community edition that `package:sqlite3` ships (BSD licence; on Android, Windows and Linux it links OpenSSL).
 
+## A shop with no server
+
+One device can be the whole shop. "Set up without a server" sits beside first-run setup on the sign-in screen, and the choice is kept on the device (`app.mode`); everything below follows from it.
+
+- The device writes its own owner: a UUIDv7 user and one branch, named after the shop, with the built-in `owner` role. Nothing is asked of a server, so the device holds no session from one.
+- **No offline window.** The window is the server's rule — how long a device may keep unlocking before the server confirms the user again. With no server there is nothing to confirm against, so `OFFLINE_EXPIRED` cannot happen.
+- **A PIN and a fingerprint always have a session behind them.** They wait for a live session only because a server can end one; here the device is the authority.
+- **No sign-out.** It would wipe the only account on the only device and leave the shop locked out of its own books, with no server to let it back in. The shell offers Lock instead, and the controller refuses it.
+- **Nothing is recoverable.** A forgotten password is a shop locked out of its books, so the setup screen says so while the password is still being chosen.
+- What a server would own is not offered at all: staff, branches, the audit trail, insights and notifications, and sync — the device never syncs on its own and shows no sync control.
+- Everything else is unchanged, because it was already the device's: the till, products, customers and debt, suppliers, shifts, receipts, reports, voids and returns, the idle lock, the encrypted database.
+- The device still records every change in its outbox, so a shop that later grows into a server has its history ready. Moving a standalone shop onto a server is not built yet.
+
 ## Server secrets and first run
 
 - `DUKAN_SECRET_KEY` signs access tokens: at least 32 random characters, or the server refuses to start. Placeholder text such as `change-me` is refused too; `server/.env.example` leaves the key empty and shows how to generate one.
 - The first owner account needs the server's **setup code**: `DUKAN_BOOTSTRAP_TOKEN` (12+ characters) or, when unset, a code the server logs at startup. Nobody who cannot read the server's console can claim a fresh server.
+  - The logged code comes from `DUKAN_SECRET_KEY`, so every server worker and every restart shows the same one.
 
 ## Sync class
 

@@ -53,6 +53,11 @@ Each client write appends an operation to a local `outbox` table **inside the sa
    10. **Record** the op_id with its outcome, code, `server_seq`, actor and device (see "Outcome caching").
 3. The response is HTTP 200 with one result per op: `{op_id, outcome: applied|conflict|rejected, server_seq?, code?}`. One bad op never fails the batch.
 4. A request-level failure fails the whole request; nothing is marked on the device, and it re-sends everything next time (replays make that safe): `401` (token), `422 REQUEST_INVALID` (malformed body, e.g. `device_id` over 128 chars), `500 SYNC_UNAVAILABLE` (the database failed mid-batch; ops before it stay applied and replay).
+5. **Device transactions.** The ops a device records in one local transaction carry the same `tx_id`, and the device never splits them across two pushes (unless they alone pass the 500-op cap).
+   - The server applies such a group's master edits one at a time, first, as above. A lost compare-and-set goes to review without undoing the facts written beside it.
+   - It applies the group's ledger rows (sales, lines, payments, stock movements, customer and supplier ledger entries) in one database transaction: all of them or none.
+   - The op that fails keeps its verdict. The others are rejected `SYNC_TX_ABORTED`, recorded, when the failure is final. When it may pass later (a parent not there yet, a permission), they take its code instead, and the device sends them all again.
+   - Ops without a `tx_id` (from older apps) apply one at a time.
 5. The client acks `applied` ops and marks `conflict` ops. A `rejected` op is marked rejected and counted on the sync card, unless the server did not record the rejection (see "Outcome caching"): then it stays pending and is re-sent.
 
 ## Push validation and authorization
@@ -89,6 +94,12 @@ Each client write appends an operation to a local `outbox` table **inside the sa
 | customer_ledger insert, `adjustment` | debt.write_off (active) | a write-off: a negative amount, `ref_type` `write_off`, no `ref_id`; the customer's currency; one past the balance is **flagged** (`exceeds_balance`), not refused |
 | supplier_ledger insert, `bill` | purchase.cost (active) | the supplier exists; the supplier's currency |
 | supplier_ledger insert, `payment` | purchase.cost (active) | the supplier exists; the supplier's currency; `method` (cash, card, transfer) and a `shift_id` naming the pusher's own shift in the branch; one past the balance is **flagged** (`overpaid`), not refused |
+| sales update (a void) | sale.void (active) in the sale's branch | the only edit a sale takes: settled → voided, with `void_reason`. One-way, so no compare-and-set; a sale voided already is a no-op, and a return, or a sale with returns, is refused `SALE_NOT_VOIDABLE` |
+| sales insert with `refund_of` (a return) | sale.void (active) in the sale's branch | the sale it names is settled and not itself a return; negative amounts; the same customer and currency; no more than the sale's total less earlier returns; `refund_reason` |
+| sale_lines insert on a return | sale.void (active) | a negative quantity of something the sale sold, no more than is left of it (`REFUND_QTY_INVALID`), worth its share of what the sale's lines of it came to |
+| payments insert on a return | sale.void (active) | negative, no more than the return says was handed back; cash only out of the drawer the return names |
+| stock_movements insert, `returned` | sale.void (active) | `ref_type` void (a voided sale) or refund (a return), a positive quantity, and no more than the sale took from stock |
+| customer_ledger insert, `adjustment` with `ref_type` void or refund | sale.void (active) | negative, no more than the sale charged less what earlier voids and returns took back; one that outruns the balance is kept and flagged `exceeds_balance` |
 
 Everything else is `SYNC_OP_UNSUPPORTED` until an app flow needs it: categories, updates of anything but products and customers, stock transfers, counts and returns, customer opening balances and adjustments, supplier payments. Offline ledger entries that break a limit online would enforce still apply, because two tills can both act while offline; the audit flag is what the owner reviews.
 
@@ -186,7 +197,7 @@ Two rules keep one user's pull from undoing another's work on a shared device:
 ## Known limitations
 
 - No tombstones yet: soft deletes do not reach devices.
-- No document atomicity: a sale's rows apply one op at a time. A header counts in reports as soon as it arrives, even while its lines are still queued; money against it (payments, charges) waits for the lines. Grouping a device transaction into one all-or-nothing push is still to do.
+- Document atomicity holds for a device transaction's ledger rows (see Push, device transactions): a sale's header, lines, payments and stock movements reach the server together or not at all.
 - A rejected append-only op (a sale line, a payment) is not undone on the device: it is listed for review, and its local effect stays until someone acts on it.
 - Line prices are the device's price at sale time. The server does not reprice them; the audit entry records the catalog price next to it, and flags a line under it (`below_catalog`). A line under every price the product had in the 45 days before the sale needs sale.discount or price.change (`ACCESS_DENIED`, retried: granting the role lets it apply). The price history comes from the audit trail's `product.price_changed` entries.
 - Business numbers are not leased yet (decision B below); device-prefixed numbers keep devices from colliding.

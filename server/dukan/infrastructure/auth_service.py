@@ -8,7 +8,7 @@ import hmac
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -19,10 +19,12 @@ from dukan.config import Settings
 from dukan.domain.catalog import BUILTIN_UNITS
 from dukan.domain.identity import (
     BUILTIN_ROLE_PERMISSIONS,
+    LOGIN_LOCK_MINUTES,
     BranchAssignment,
     User,
     UserStatus,
     assert_password_strong,
+    login_locked,
 )
 from dukan.infrastructure.change_feed import record_change
 from dukan.infrastructure.db.models import (
@@ -35,7 +37,7 @@ from dukan.infrastructure.db.models import (
     UserModel,
 )
 from dukan.infrastructure.security import passwords, tokens
-from dukan.shared.errors import AuthError, ConflictError
+from dukan.shared.errors import AuthError, ConflictError, RateLimitedError
 from dukan.shared.ids import new_id
 
 
@@ -170,12 +172,42 @@ class SqlAuthService(AuthService):
             raise ConflictError("BOOTSTRAP_ALREADY_DONE") from e
         return AuthResult(user=self.profile(user), tokens=toks)
 
+    def _sign_in_closed(self, user_id: str) -> bool:
+        """Whether the user's online sign-in is closed: LOGIN_ATTEMPTS wrong
+        passwords since their last good one, all within LOGIN_LOCK_MINUTES."""
+        since = datetime.now(UTC) - timedelta(minutes=LOGIN_LOCK_MINUTES)
+        last_ok = self._s.scalar(
+            select(func.max(AuditEntryModel.occurred_at)).where(
+                AuditEntryModel.action == "user.authenticated",
+                AuditEntryModel.entity_id == user_id,
+            )
+        )
+        if last_ok is not None and _as_utc(last_ok) > since:
+            since = _as_utc(last_ok)
+        failures = self._s.scalar(
+            select(func.count()).select_from(AuditEntryModel).where(
+                AuditEntryModel.action == "user.login_failed",
+                AuditEntryModel.entity_id == user_id,
+                AuditEntryModel.occurred_at > since,
+            )
+        ) or 0
+        return login_locked(failures_since_success=int(failures))
+
     def authenticate(self, *, username: str, password: str, device_id: str) -> AuthResult:
         m = self._s.scalar(
             select(UserModel).where(
                 UserModel.username == username, UserModel.deleted_at.is_(None)
             )
         )
+        if m is not None and self._sign_in_closed(m.id):
+            # Too many wrong passwords: closed for a while, even to the right one,
+            # so guessing gets nowhere. A device's offline unlock is unaffected.
+            self._audit(
+                "user.login_locked", actor_id=m.id, entity_type="user", entity_id=m.id,
+                after={"username": username},
+            )
+            self._s.commit()
+            raise RateLimitedError("LOGIN_LOCKED", retry_after_minutes=LOGIN_LOCK_MINUTES)
         if m is None or not passwords.verify_password(m.password_hash, password):
             # Audit the failed attempt for security visibility, then reject.
             self._audit(

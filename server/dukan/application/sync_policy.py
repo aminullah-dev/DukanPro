@@ -38,6 +38,7 @@ from dukan.domain.sales import (
     assert_sale_not_overpaid,
     assert_shift_cash_valid,
     line_total_minor,
+    returned_value_minor,
 )
 from dukan.shared.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
 from dukan.shared.limits import INT32_MAX, INT32_MIN, MONEY_MAX
@@ -86,7 +87,7 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
     "sales": (
         "number", "branch_id", "shift_id", "customer_id", "status", "currency",
         "discount_minor", "subtotal_minor", "tax_minor", "total_minor", "paid_minor",
-        "change_minor", "occurred_at",
+        "change_minor", "occurred_at", "refund_of",
     ),
     "sale_lines": (
         "sale_id", "product_id", "name", "qty_minor", "decimal_places", "unit_price_minor",
@@ -197,7 +198,8 @@ _INSERT: dict[str, dict[str, _Field]] = {
         "branch_id": _uuid(required=True),
         "qty_delta": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),
         "reason": _enum([r.value for r in StockReason], required=True),
-        "ref_type": _enum(["sale"], nullable=True),
+        # A sale's movement names the sale; stock coming back names its void or return.
+        "ref_type": _enum(["sale", "void", "refund"], nullable=True),
         "ref_id": _uuid(nullable=True),
     },
     "sales": {
@@ -207,29 +209,33 @@ _INSERT: dict[str, dict[str, _Field]] = {
         "customer_id": _uuid(nullable=True),
         "status": _enum(["settled"]),
         "currency": _CURRENCY_F,
-        "discount_minor": _int(lo=0, hi=MONEY_MAX),
-        "subtotal_minor": _int(lo=0, hi=MONEY_MAX, required=True),
+        # Signed: a return (refund_of set) is a sale with negative amounts. The
+        # handlers hold each kind to its sign.
+        "discount_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX),
+        "subtotal_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),
         "tax_minor": _int(lo=0, hi=MONEY_MAX),
-        "total_minor": _int(lo=0, hi=MONEY_MAX, required=True),
-        "paid_minor": _int(lo=0, hi=MONEY_MAX, required=True),
+        "total_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),
+        "paid_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),
         "change_minor": _int(lo=0, hi=MONEY_MAX),
+        "refund_of": _uuid(nullable=True),  # a return: the sale it takes goods back from
+        "refund_reason": _str(200, nullable=True),  # a return's reason, for its audit entry
     },
     "sale_lines": {
         "sale_id": _uuid(required=True),
         "product_id": _uuid(required=True),
         "name": _str(200, required=True),
-        "qty_minor": _int(lo=1, hi=MONEY_MAX, required=True),
+        "qty_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),  # < 0 on a return
         "decimal_places": _int(lo=0, hi=6),
         "unit_price_minor": _int(lo=0, hi=MONEY_MAX, required=True),
         # accepted but ignored: the server re-derives it
         "unit_cost_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX),
-        "line_total_minor": _int(lo=0, hi=MONEY_MAX, required=True),
+        "line_total_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),
         "currency": _CURRENCY_F,
     },
     "payments": {
         "sale_id": _uuid(required=True),
         "method": _enum([m.value for m in PaymentMethod], required=True),
-        "amount_minor": _int(lo=1, hi=MONEY_MAX, required=True),
+        "amount_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),  # < 0 on a return
         "currency": _CURRENCY_F,
         "tendered_minor": _int(lo=0, hi=MONEY_MAX, nullable=True),
         "change_minor": _int(lo=0, hi=MONEY_MAX, nullable=True),
@@ -240,7 +246,7 @@ _INSERT: dict[str, dict[str, _Field]] = {
         # Signed: an adjustment (a write-off) lowers the debt with a negative amount.
         "amount_minor": _int(lo=-MONEY_MAX, hi=MONEY_MAX, required=True),
         "currency": _CURRENCY_F,
-        "ref_type": _enum(["sale", "manual", "write_off"], nullable=True),
+        "ref_type": _enum(["sale", "manual", "write_off", "void", "refund"], nullable=True),
         "ref_id": _uuid(nullable=True),
         # A payment's: the drawer it went into, and how it was paid.
         "shift_id": _uuid(nullable=True),
@@ -290,6 +296,11 @@ _UPDATE: dict[str, dict[str, _Field]] = {
         "counted_cash_minor": _int(lo=0, hi=MONEY_MAX),
     },
     "barcodes": {"deleted": _BOOL},  # a removal: the only edit a barcode takes
+    # A void: the only edit a sale takes, with its reason for the audit entry.
+    "sales": {
+        "status": _enum(["voided"], required=True),
+        "void_reason": _str(200, required=True),
+    },
 }
 
 
@@ -449,6 +460,20 @@ class SaleRef:
     total_minor: int
     paid_minor: int
     occurred_at: datetime  # the sale's time, as its header recorded it
+    status: str = "settled"
+    refund_of: str | None = None  # a return: the sale it takes goods back from
+    shift_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SaleLineRef:
+    """One product's lines on a sale, taken together."""
+
+    qty_minor: int
+    value_minor: int  # what the lines came to
+    unit_price_minor: int
+    unit_cost_minor: int
+    decimal_places: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -498,6 +523,20 @@ class SyncReader(Protocol):
 
     def sale_charges_total(self, sale_id: str) -> int: ...
 
+    def sale_has_refunds(self, sale_id: str) -> bool: ...
+
+    def sale_refunds_total(self, sale_id: str) -> int: ...  # its returns' totals, negative
+
+    def sale_line_ref(self, sale_id: str, product_id: str) -> SaleLineRef | None: ...
+
+    def refunded_qty(self, sale_id: str, product_id: str) -> int: ...  # taken back by returns
+
+    def returned_stock_qty(self, ref_type: str, ref_id: str, product_id: str) -> int: ...
+
+    def sale_reversed_debt(self, sale_id: str) -> int: ...  # what its void and returns took off
+
+    def sale_cash_taken(self, sale_id: str) -> int: ...
+
     def branch_active(self, branch_id: str) -> bool: ...
 
     def sale_number_taken(self, branch_id: str, number: str) -> bool: ...
@@ -533,6 +572,9 @@ class ApplyPlan:
     # The op's intent already holds (the removal of a barcode another till removed):
     # recorded as applied, nothing written.
     noop: bool = False
+    # An update written without its compare-and-set: a one-way change (a void)
+    # that no edit made elsewhere can have raced.
+    compare_version: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -770,13 +812,53 @@ _STOCK_ACTIONS = {
     StockReason.ADJUSTMENT: "stock.adjusted",
     StockReason.PURCHASE: "stock.received",
     StockReason.SALE: "stock.sold",
+    StockReason.RETURNED: "stock.returned",
 }
+
+
+def _stock_returned(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    """Stock coming back from a void or a return, as the till recorded it: only
+    what the sale took from stock, and once (docs/domain/sales.md)."""
+    ref_type, ref_id = v.get("ref_type"), v.get("ref_id")
+    if ref_type not in ("void", "refund") or ref_id is None:
+        raise ValidationError("SYNC_FIELD_REQUIRED", table="stock_movements", field="ref_id")
+    qty: int = v["qty_delta"]
+    if qty <= 0:
+        raise ValidationError("STOCK_INVALID_QTY", qty=qty)
+    sale = ctx.reader.sale(ref_id)
+    if sale is None:
+        raise NotFoundError("SALE_NOT_FOUND", sale_id=ref_id)
+    _need(ctx, Permission.SALE_VOID, sale.branch_id)
+    _guard_insert(ctx)
+    branch: str = v["branch_id"]
+    if branch != sale.branch_id:
+        raise ValidationError("SYNC_REF_MISMATCH", field="branch_id", reason="sale_branch")
+    product_id: str = v["product_id"]
+    if ref_type == "void":
+        if sale.status != "voided":
+            raise ValidationError("SYNC_REF_MISMATCH", field="ref_id", reason="sale_not_voided")
+        took = ctx.reader.sale_stock_out_qty(sale.id, product_id)
+    else:
+        if sale.refund_of is None:
+            raise ValidationError("SYNC_REF_MISMATCH", field="ref_id", reason="not_a_return")
+        if ctx.reader.sale_stock_out_qty(sale.refund_of, product_id) <= 0:
+            # Goods the sale never took from stock do not come back to it.
+            raise ValidationError(
+                "SYNC_REF_MISMATCH", field="product_id", reason="took_no_stock"
+            )
+        took = -ctx.reader.sale_line_qty(sale.id, product_id)
+    if ctx.reader.returned_stock_qty(ref_type, sale.id, product_id) + qty > took:
+        raise ValidationError("SYNC_REF_MISMATCH", field="qty_delta", reason="exceeds_taken")
+    after = _pick(v, "product_id", "branch_id", "qty_delta", "reason", "ref_type", "ref_id")
+    return ApplyPlan(v, branch, branch, AuditIntent("stock.returned", "stock_movement", after))
 
 
 def _stock_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     reason = StockReason(v["reason"])
     if reason not in _STOCK_ACTIONS:
         raise ValidationError("SYNC_OP_UNSUPPORTED", table="stock_movements", reason=reason.value)
+    if reason is StockReason.RETURNED:
+        return _stock_returned(ctx, v)
     branch: str = v["branch_id"]
     needed = Permission.SALE_CREATE if reason is StockReason.SALE else Permission.STOCK_ADJUST
     _need(ctx, needed, branch)
@@ -826,7 +908,63 @@ def _stock_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     )
 
 
+def _refund_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    """A return from the till: a new sale with negative amounts naming the sale it
+    takes goods back from. The rules of POST /sales/{id}/refunds, checked as the
+    rows arrive (docs/domain/sales.md, Returns)."""
+    original = ctx.reader.sale(v["refund_of"])
+    if original is None:
+        raise NotFoundError("SALE_NOT_FOUND", sale_id=v["refund_of"])
+    _need(ctx, Permission.SALE_VOID, original.branch_id)
+    _guard_insert(ctx)
+    reason = (v.get("refund_reason") or "").strip()
+    if not reason:
+        raise ValidationError("REFUND_REASON_REQUIRED")
+    branch: str = v["branch_id"]
+    if branch != original.branch_id:
+        raise ValidationError("SYNC_REF_MISMATCH", field="branch_id", reason="sale_branch")
+    if original.status != "settled" or original.refund_of is not None:
+        raise ConflictError("SALE_NOT_REFUNDABLE", status=original.status)
+    if v.get("customer_id") != original.customer_id:
+        raise ValidationError("SYNC_REF_MISMATCH", field="customer_id", reason="sale_customer")
+    currency = v.get("currency", DEFAULT_CURRENCY)
+    if currency != original.currency:
+        raise ConflictError("SALE_CURRENCY_MISMATCH", expected=original.currency, got=currency)
+    subtotal: int = v["subtotal_minor"]
+    total: int = v["total_minor"]
+    paid: int = v["paid_minor"]
+    if subtotal > 0 or total > 0 or paid > 0 or v.get("change_minor") or v.get("tax_minor"):
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="sales", field="total_minor", reason="refund_sign"
+        )
+    if total != subtotal - v.get("discount_minor", 0):
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="sales", field="total_minor", reason="arithmetic"
+        )
+    if paid < total:
+        # The money handed back is never more than the goods are worth.
+        raise ValidationError("SYNC_REF_MISMATCH", field="paid_minor", reason="exceeds_refund")
+    if -total > original.total_minor + ctx.reader.sale_refunds_total(original.id):
+        raise ValidationError("SYNC_REF_MISMATCH", field="total_minor", reason="exceeds_sale")
+    shift_id = v.get("shift_id")
+    # Cash out of a drawer that closed before the return arrived: kept, flagged.
+    after_close = shift_id is not None and _own_shift(ctx, shift_id, branch).status != "open"
+    after = {
+        **_pick(v, "number", "customer_id", "currency", "total_minor", "paid_minor", "refund_of"),
+        "reason": reason,
+        **({"after_shift_close": True} if after_close else {}),
+    }
+    values = {k: val for k, val in v.items() if k != "refund_reason"}
+    return ApplyPlan(values, branch, branch, AuditIntent("sale.refunded", "sale", after))
+
+
 def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    if v.get("refund_of") is not None:
+        return _refund_insert(ctx, v)
+    for field in ("discount_minor", "subtotal_minor", "total_minor", "paid_minor"):
+        if v.get(field, 0) < 0:
+            raise ValidationError("SYNC_FIELD_INVALID", table="sales", field=field, reason="range")
+    v = {k: val for k, val in v.items() if k != "refund_reason"}
     branch: str = v["branch_id"]
     _need(ctx, Permission.SALE_CREATE, branch)
     _guard_insert(ctx)
@@ -865,8 +1003,58 @@ def _sales_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
 _DISCOUNTERS = (Permission.SALE_DISCOUNT, Permission.PRICE_CHANGE)
 
 
+def _refund_line(ctx: _Ctx, v: dict[str, Any], refund: SaleRef) -> ApplyPlan:
+    """A line of a return: a negative quantity of something the sale sold, worth
+    its share of what the sale's lines of it came to (returned_value_minor)."""
+    _need(ctx, Permission.SALE_VOID, refund.branch_id)
+    _guard_insert(ctx)
+    original_id = refund.refund_of
+    if original_id is None:
+        raise ValidationError("SYNC_REF_MISMATCH", field="sale_id", reason="not_a_return")
+    qty: int = v["qty_minor"]
+    if qty >= 0:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="sale_lines", field="qty_minor", reason="refund_sign"
+        )
+    product_id: str = v["product_id"]
+    sold = ctx.reader.sale_line_ref(original_id, product_id)
+    if sold is None or sold.qty_minor <= 0:
+        raise ValidationError("SYNC_REF_MISMATCH", field="product_id", reason="not_sold")
+    left = sold.qty_minor - ctx.reader.refunded_qty(original_id, product_id)
+    if -qty > left:
+        raise ConflictError("REFUND_QTY_INVALID", product_id=product_id, returnable=left)
+    worth = returned_value_minor(
+        line_total_minor=sold.value_minor, sold_qty_minor=sold.qty_minor, returned_qty_minor=-qty
+    )
+    if v["line_total_minor"] != -worth or v["unit_price_minor"] != sold.unit_price_minor:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="sale_lines", field="line_total_minor",
+            reason="arithmetic",
+        )
+    currency = v.get("currency", DEFAULT_CURRENCY)
+    if currency != refund.currency:
+        raise ConflictError("SALE_CURRENCY_MISMATCH", expected=refund.currency, got=currency)
+    if ctx.reader.sale_lines_total(refund.id) + v["line_total_minor"] < refund.subtotal_minor:
+        raise ValidationError(
+            "SYNC_REF_MISMATCH", field="line_total_minor", reason="exceeds_subtotal"
+        )
+    # The sale's unit and cost snapshot, so profit comes back as it went.
+    values = {**v, "decimal_places": sold.decimal_places, "unit_cost_minor": sold.unit_cost_minor}
+    after = _pick(v, "sale_id", "product_id", "qty_minor", "line_total_minor")
+    return ApplyPlan(
+        values, refund.branch_id, refund.branch_id,
+        AuditIntent("sale.line_returned", "sale_line", after),
+    )
+
+
 def _sale_lines_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     sale = _own_sale(ctx, v["sale_id"])
+    if sale.refund_of is not None:
+        return _refund_line(ctx, v, sale)
+    if v["qty_minor"] <= 0 or v["line_total_minor"] < 0:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="sale_lines", field="qty_minor", reason="range"
+        )
     _guard_insert(ctx)
     product = _product(ctx, v["product_id"], allow_deleted=True)
     places = product.decimal_places
@@ -912,8 +1100,45 @@ def _sale_lines_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     )
 
 
+def _refund_payment(ctx: _Ctx, v: dict[str, Any], refund: SaleRef) -> ApplyPlan:
+    """Money handed back on a return: negative, never more than the return says
+    was paid out, and cash only out of the drawer the return names."""
+    _need(ctx, Permission.SALE_VOID, refund.branch_id)
+    _guard_insert(ctx)
+    amount: int = v["amount_minor"]
+    method: str = v["method"]
+    if amount >= 0:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="payments", field="amount_minor", reason="refund_sign"
+        )
+    if method == PaymentMethod.CREDIT.value:  # the customer's account: an adjustment, not money
+        raise ValidationError("REFUND_METHOD_INVALID", method=method)
+    if v.get("tendered_minor") is not None or v.get("change_minor") is not None:
+        raise ValidationError(
+            "SYNC_FIELD_NOT_ALLOWED", table="payments", field="tendered_minor", reason="refund"
+        )
+    if method == PaymentMethod.CASH.value and refund.shift_id is None:
+        raise ConflictError("SHIFT_NOT_OPEN", shift_id=None)
+    currency = v.get("currency", DEFAULT_CURRENCY)
+    if currency != refund.currency:
+        raise ConflictError("SALE_CURRENCY_MISMATCH", expected=refund.currency, got=currency)
+    _require_complete_lines(ctx, refund)
+    if ctx.reader.sale_payments_total(refund.id) + amount < refund.paid_minor:
+        raise ValidationError("SYNC_REF_MISMATCH", field="amount_minor", reason="exceeds_paid")
+    after = _pick(v, "sale_id", "method", "amount_minor", "currency")
+    return ApplyPlan(
+        v, refund.branch_id, refund.branch_id, AuditIntent("payment.refunded", "payment", after)
+    )
+
+
 def _payments_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
     sale = _own_sale(ctx, v["sale_id"])
+    if sale.refund_of is not None:
+        return _refund_payment(ctx, v, sale)
+    if v["amount_minor"] <= 0:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="payments", field="amount_minor", reason="range"
+        )
     _guard_insert(ctx)
     amount: int = v["amount_minor"]
     currency = v.get("currency", DEFAULT_CURRENCY)
@@ -944,6 +1169,8 @@ def _customer_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
             "SYNC_FIELD_NOT_ALLOWED", table="customer_ledger", field="shift_id", reason=entry.value
         )
     if entry is LedgerEntryType.ADJUSTMENT:
+        if v.get("ref_type") in ("void", "refund"):
+            return _debt_reversal(ctx, v, amount, currency)
         return _write_off(ctx, v, amount, currency)
     if entry is not LedgerEntryType.CHARGE and entry is not LedgerEntryType.PAYMENT:
         # An opening balance: no app flow pushes one.
@@ -1045,6 +1272,87 @@ def _write_off(ctx: _Ctx, v: dict[str, Any], amount: int, currency: str) -> Appl
         "exceeds_balance": -amount > balance,
     }
     return ApplyPlan(v, branch, None, AuditIntent("debt.written_off", "customer_ledger", after))
+
+
+def _debt_reversal(ctx: _Ctx, v: dict[str, Any], amount: int, currency: str) -> ApplyPlan:
+    """A void's or a return's debt coming off the customer, as the till worked it
+    out: never more than the sale charged less what earlier voids and returns took
+    back. One that outruns the balance by the time it arrives (another till took a
+    payment meanwhile) is kept and flagged, like a payment."""
+    ref_type: str = v["ref_type"]
+    ref_id = v.get("ref_id")
+    if ref_id is None:
+        raise ValidationError("SYNC_FIELD_REQUIRED", table="customer_ledger", field="ref_id")
+    if amount >= 0:
+        raise ValidationError(
+            "SYNC_FIELD_INVALID", table="customer_ledger", field="amount_minor", reason="range"
+        )
+    source = ctx.reader.sale(ref_id)
+    if source is None:
+        raise NotFoundError("SALE_NOT_FOUND", sale_id=ref_id)
+    _need(ctx, Permission.SALE_VOID, source.branch_id)
+    _guard_insert(ctx)
+    if ref_type == "void":
+        if source.status != "voided":
+            raise ValidationError("SYNC_REF_MISMATCH", field="ref_id", reason="sale_not_voided")
+        sale = source
+    else:
+        if source.refund_of is None:
+            raise ValidationError("SYNC_REF_MISMATCH", field="ref_id", reason="not_a_return")
+        if -amount > -source.total_minor:
+            raise ValidationError(
+                "SYNC_REF_MISMATCH", field="amount_minor", reason="exceeds_refund"
+            )
+        original = ctx.reader.sale(source.refund_of)
+        if original is None:
+            raise NotFoundError("SALE_NOT_FOUND", sale_id=source.refund_of)
+        sale = original
+    customer = _customer(ctx, v["customer_id"])
+    if sale.customer_id != customer.id:
+        raise ValidationError("SYNC_REF_MISMATCH", field="customer_id", reason="sale_customer")
+    if currency != customer.currency:
+        raise ConflictError("DEBT_CURRENCY_MISMATCH", expected=customer.currency, got=currency)
+    if ctx.reader.sale_reversed_debt(sale.id) - amount > ctx.reader.sale_charges_total(sale.id):
+        raise ValidationError("SYNC_REF_MISMATCH", field="amount_minor", reason="exceeds_charge")
+    balance = ctx.reader.customer_balance(customer.id)
+    after = {
+        **_pick(v, "customer_id", "currency", "ref_type", "ref_id"), "amount": -amount,
+        "exceeds_balance": -amount > balance,
+    }
+    return ApplyPlan(
+        v, source.branch_id, None, AuditIntent("debt.charge_reversed", "customer_ledger", after)
+    )
+
+
+def _sales_update(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
+    """A void from the till: the one edit a sale takes, settled to voided. Its stock
+    and the customer's debt come back as rows of the same device transaction. A
+    one-way change, so no compare-and-set: a sale another till voided already is a
+    no-op, and a sale with returns, or a return, is past voiding."""
+    sale = ctx.reader.sale(ctx.op.row_id)
+    if sale is None:
+        raise NotFoundError("SALE_NOT_FOUND", sale_id=ctx.op.row_id)
+    _need(ctx, Permission.SALE_VOID, sale.branch_id)
+    if sale.status == "voided":
+        return ApplyPlan(
+            {}, sale.branch_id, sale.branch_id, AuditIntent("sale.voided", "sale", {}), noop=True
+        )
+    if sale.status != "settled" or sale.refund_of is not None or ctx.reader.sale_has_refunds(
+        sale.id
+    ):
+        raise ConflictError("SALE_NOT_VOIDABLE", status=sale.status)
+    shift = ctx.reader.shift(sale.shift_id) if sale.shift_id is not None else None
+    # Its cash was in that drawer's count already: kept, and flagged for the drawer.
+    late = shift is not None and shift.status != "open" and ctx.reader.sale_cash_taken(sale.id) > 0
+    after = {
+        "status": "voided", "reason": str(v["void_reason"]).strip(),
+        **({"after_shift_close": True} if late else {}),
+    }
+    return ApplyPlan(
+        {"status": "voided"}, sale.branch_id, sale.branch_id,
+        AuditIntent("sale.voided", "sale", after, before={"status": "settled"}),
+        compare_version=False,
+    )
 
 
 def _supplier_ledger_insert(ctx: _Ctx, v: dict[str, Any]) -> ApplyPlan:
@@ -1155,6 +1463,7 @@ _HANDLERS: dict[tuple[str, str], Callable[[_Ctx, dict[str, Any]], ApplyPlan]] = 
     ("suppliers", "insert"): _suppliers_insert,
     ("stock_movements", "insert"): _stock_insert,
     ("sales", "insert"): _sales_insert,
+    ("sales", "update"): _sales_update,
     ("sale_lines", "insert"): _sale_lines_insert,
     ("payments", "insert"): _payments_insert,
     ("shifts", "insert"): _shifts_insert,

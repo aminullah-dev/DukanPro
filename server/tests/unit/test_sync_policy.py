@@ -103,7 +103,10 @@ def test_envelope_rules() -> None:
     check_envelope(_op(base_version=0), actor)  # a stale read, decided as a conflict
     assert _code(lambda: check_envelope(_op(op="delete"), actor)) == "SYNC_OP_INVALID"
     assert _code(lambda: check_envelope(_op(table="users"), actor)) == "UNKNOWN_TABLE"
-    assert _code(lambda: check_envelope(_op(table="sales"), actor)) == "SYNC_OP_UNSUPPORTED"
+    # A sale takes one edit, a void; its lines take none.
+    assert _code(lambda: check_envelope(_op(table="sale_lines"), actor)) == (
+        "SYNC_OP_UNSUPPORTED"
+    )
     assert _code(lambda: check_envelope(_op(actor_id="other"), actor)) == "SYNC_ACTOR_MISMATCH"
     naive = _op(created_at="2026-09-12T08:00:00")
     assert _code(lambda: check_envelope(naive, actor)) == "SYNC_OP_INVALID"

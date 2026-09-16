@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 
-from dukan.application.sales import PaymentInput, SaleLineInput, SalesService
+from dukan.application.sales import PaymentInput, RefundLineInput, SaleLineInput, SalesService
 from dukan.domain.identity import User
 from dukan.ui.deps import active_branch, get_current_actor, get_sales_service
 from dukan.ui.fields import Id, Money, Str8, Str200
@@ -83,6 +83,32 @@ def get_sale(sale_id: str, actor: Actor, svc: Sales) -> dict:
 @router.post("/sales/{sale_id}/void")
 def void_sale(sale_id: str, body: VoidSaleRequest, actor: Actor, svc: Sales) -> dict:
     return sale_view_dict(svc.void_sale(actor=actor, sale_id=sale_id, reason=body.reason))
+
+
+class RefundLineReq(BaseModel):
+    product_id: Id
+    qty_minor: Money
+
+
+class RefundSaleRequest(BaseModel):
+    lines: list[RefundLineReq]
+    reason: Str200
+    method: Str8 = "cash"
+    shift_id: Id | None = None
+
+
+@router.post("/sales/{sale_id}/refunds")
+def refund_sale(sale_id: str, body: RefundSaleRequest, actor: Actor, svc: Sales) -> dict:
+    return sale_view_dict(
+        svc.refund_sale(
+            actor=actor, sale_id=sale_id,
+            lines=[
+                RefundLineInput(product_id=line.product_id, qty_minor=line.qty_minor)
+                for line in body.lines
+            ],
+            reason=body.reason, method=body.method, shift_id=body.shift_id,
+        )
+    )
 
 
 @router.post("/shifts")

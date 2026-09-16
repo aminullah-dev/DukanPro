@@ -90,6 +90,10 @@ final class SyncEngine {
   /// Ops per push request, below the server's cap of 500 (docs/sync-protocol.md).
   static const maxPushBatch = 200;
 
+  /// The server's cap on ops per push: only a device transaction bigger than
+  /// this is split.
+  static const serverPushCap = 500;
+
   /// Pulled changes this device could not apply, kept for support (newest last).
   static const quarantineKey = 'sync.quarantine';
   static const _quarantineMax = 50;
@@ -150,8 +154,14 @@ final class SyncEngine {
     var next = 0;
     while (next < pending.length) {
       final batch = <OutboxOp>[];
-      while (next < pending.length && batch.length < pushBatch) {
+      String? lastTx;
+      // A push ends at pushBatch ops, but not inside a device transaction: its
+      // ledger rows apply together (docs/sync-protocol.md).
+      while (next < pending.length &&
+          batch.length < serverPushCap &&
+          (batch.length < pushBatch || (lastTx != null && pending[next].txId == lastTx))) {
         final o = pending[next++];
+        lastTx = o.txId;
         final verdict = failed[rowOf(o)];
         if (verdict == null) {
           batch.add(o);
@@ -401,6 +411,7 @@ final class SyncEngine {
           id: Value(id), productId: _opt(d, 'product_id', _s), branchId: _opt(d, 'branch_id', _s),
           qtyDelta: _opt(d, 'qty_delta', _i), reason: _opt(d, 'reason', _s),
           occurredAt: _opt(d, 'occurred_at', _t),
+          refType: _opt(d, 'ref_type', _sN), refId: _opt(d, 'ref_id', _sN),
         ));
       case 'sales':
         await _write(_db.sales, id, exists, SalesCompanion(
@@ -410,7 +421,7 @@ final class SyncEngine {
           discountMinor: _opt(d, 'discount_minor', _i), subtotalMinor: _opt(d, 'subtotal_minor', _i),
           taxMinor: _opt(d, 'tax_minor', _i), totalMinor: _opt(d, 'total_minor', _i),
           paidMinor: _opt(d, 'paid_minor', _i), changeMinor: _opt(d, 'change_minor', _i),
-          occurredAt: _opt(d, 'occurred_at', _t),
+          occurredAt: _opt(d, 'occurred_at', _t), refundOf: _opt(d, 'refund_of', _sN),
         ));
       case 'sale_lines':
         await _write(_db.saleLines, id, exists, SaleLinesCompanion(

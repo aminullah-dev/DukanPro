@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:dukan_core/dukan_core.dart' show ValidationError, assertPasswordStrong, newId;
 import 'package:dukan_data/dukan_data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../composition.dart';
 import '../../infrastructure/auth_api.dart';
 import '../../infrastructure/http.dart';
 import '../../infrastructure/secure_store.dart';
@@ -40,6 +42,9 @@ class AuthController extends Notifier<AuthState> {
   PasswordVerifier get _verifier => ref.read(verifierProvider);
   DateTime _now() => ref.read(clockProvider)().toUtc();
   ProfileStore get _profiles => ProfileStore(ref.read(databaseProvider));
+
+  /// Whether this device is the whole shop, with no server behind it.
+  bool get _standalone => ref.read(standaloneProvider);
 
   /// Dismiss a lingering sign-in error (e.g. when switching to setup mode).
   void clearError() {
@@ -115,6 +120,47 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Set up a shop that has no server: this device keeps the owner account and
+  /// the shop's books, and never calls anywhere. The mode is written before the
+  /// account, so a device interrupted halfway starts over rather than coming
+  /// back as a half-built shop with a server.
+  ///
+  /// Nothing set up here can be recovered from a server afterwards, because
+  /// there is none: a forgotten password is a shop locked out of its own books.
+  /// The setup screen says so before this is chosen.
+  Future<void> setupStandalone({
+    required String username,
+    required String password,
+    required String displayName,
+    required String shopName,
+  }) async {
+    try {
+      assertPasswordStrong(password: password);
+      ref.read(appModeProvider.notifier).set(AppMode.standalone);
+      final userId = newId();
+      final branchId = newId();
+      await _dropQuickUnlocksOf(userId);
+      await _store.write(SecureKeys.passwordVerifier, await _verifier.derive(password));
+      await _markValidated();
+      await _profiles.replace(
+        userId: userId,
+        username: username,
+        displayName: displayName,
+        defaultBranchId: branchId,
+        // The shop is its own single branch, and whoever sets it up owns it.
+        branches: [
+          {'branch_id': branchId, 'branch_name': shopName, 'role_name': 'owner'},
+        ],
+      );
+      final profile = await _profiles.current();
+      if (profile != null) state = AuthLoggedIn(profile);
+    } on ValidationError catch (e) {
+      state = AuthLoggedOut(error: e.code);
+    } catch (e, st) {
+      state = AuthLoggedOut(error: _notSaved(e, st));
+    }
+  }
+
   CachedProfileRow? get _returnTo {
     final s = state;
     return s is AuthLoggedOut ? s.returnTo : null;
@@ -134,7 +180,10 @@ class AuthController extends Notifier<AuthState> {
     await _unlock(SecureKeys.pinVerifier, pin);
   }
 
-  Future<bool> _hasSession() async => await _store.read(SecureKeys.refreshToken) != null;
+  /// In a shop with no server nothing can end a session: the device itself is
+  /// the authority, so a PIN or a fingerprint always has one behind it.
+  Future<bool> _hasSession() async =>
+      _standalone || await _store.read(SecureKeys.refreshToken) != null;
 
   Future<void> _unlock(String key, String secret) async {
     final profile = await _profiles.current();
@@ -154,6 +203,10 @@ class AuthController extends Notifier<AuthState> {
 
   /// Whether the server confirmed this user recently enough to unlock offline.
   Future<bool> _offlineAllowed() async {
+    // The window is the server's rule: how long a device may keep unlocking
+    // before the server confirms the user again. A shop with no server has
+    // nothing to confirm against, and so no window to run out.
+    if (_standalone) return true;
     final raw = await _store.read(SecureKeys.validatedAt);
     if (raw == null) {
       // A device from before this rule starts its offline window now.
@@ -239,6 +292,7 @@ class AuthController extends Notifier<AuthState> {
   /// a session that simply ended (expired or revoked) then renews by signing in
   /// again with it.
   Future<void> revalidate({String? password}) {
+    if (_standalone) return Future.value(); // nothing to confirm against
     if (password == null) return _revalidate(null);
     // Meanwhile, a request that finds the old session over waits for this
     // (see sessionEnded).
@@ -344,6 +398,10 @@ class AuthController extends Notifier<AuthState> {
   /// bad connection never keeps the app signed in. The server ends the session
   /// with this token, or with the one a renewal still in flight rotates it to.
   Future<void> logout() async {
+    // In a shop with no server this is the only account on the only device, and
+    // wiping it would lock the shop out of its own books with nobody left to
+    // let it back in. The shell offers Lock there instead of sign-out.
+    if (_standalone) return;
     final refresh = await _store.read(SecureKeys.refreshToken);
     await _forget();
     state = const AuthLoggedOut();
@@ -369,13 +427,17 @@ class AuthController extends Notifier<AuthState> {
     await _profiles.clear();
   }
 
-  Future<CachedProfileRow?> _persist(ApiAuthResult res, String password) async {
+  /// A PIN and a fingerprint belong to the one user who set them up on this
+  /// device: when somebody else takes it over, they go.
+  Future<void> _dropQuickUnlocksOf(String userId) async {
     final previous = await _profiles.current();
-    if (previous != null && previous.userId != res.user.id) {
-      // The quick unlocks belonged to the previous user.
-      await _store.delete(SecureKeys.pinVerifier);
-      await _store.delete(SecureKeys.biometricUser);
-    }
+    if (previous == null || previous.userId == userId) return;
+    await _store.delete(SecureKeys.pinVerifier);
+    await _store.delete(SecureKeys.biometricUser);
+  }
+
+  Future<CachedProfileRow?> _persist(ApiAuthResult res, String password) async {
+    await _dropQuickUnlocksOf(res.user.id);
     await _refresher.newSession(() async {
       await _store.write(SecureKeys.refreshToken, res.tokens.refreshToken);
       await _store.write(SecureKeys.accessToken, res.tokens.accessToken);

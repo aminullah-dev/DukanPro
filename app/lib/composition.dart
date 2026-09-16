@@ -44,6 +44,51 @@ Locale? localeFromTag(String? tag, List<Locale> supported) {
 
 final localeProvider = NotifierProvider<LocaleNotifier, Locale>(LocaleNotifier.new);
 
+/// How this install works, chosen once when the shop is first set up.
+enum AppMode {
+  /// A shop with a server behind it: the server keeps the staff, the branches
+  /// and the audit trail, every device syncs to it, and it is what confirms a
+  /// user before a device's offline window runs out.
+  server,
+
+  /// One device is the whole shop: it keeps its own owner account and its own
+  /// books, and never calls a server. Nothing to install, nothing to reach.
+  standalone,
+}
+
+/// The mode saved on this device (main reads it before the first frame), or
+/// null on a device where no shop has been set up yet.
+final savedAppModeProvider = Provider<AppMode?>((ref) => null);
+
+/// Saves the chosen mode on the device (main wires it to the settings).
+final saveAppModeProvider = Provider<void Function(AppMode)>((ref) => (_) {});
+
+/// The device setting that holds the mode, as a name ('server', 'standalone').
+const appModeSettingKey = 'app.mode';
+
+AppMode appModeFromTag(String? tag) =>
+    tag == AppMode.standalone.name ? AppMode.standalone : AppMode.server;
+
+/// The mode this install runs in: the one saved on this device, else a shop
+/// with a server. Set once, by setting the shop up.
+final class AppModeNotifier extends Notifier<AppMode> {
+  @override
+  AppMode build() => ref.watch(savedAppModeProvider) ?? AppMode.server;
+
+  void set(AppMode mode) {
+    state = mode;
+    ref.read(saveAppModeProvider)(mode);
+  }
+}
+
+final appModeProvider = NotifierProvider<AppModeNotifier, AppMode>(AppModeNotifier.new);
+
+/// Whether this device runs the shop on its own, with no server behind it.
+/// What the server owns is then not offered at all: staff, branches, the audit
+/// trail, sync — and sign-out, which would wipe the only account there is.
+final standaloneProvider =
+    Provider<bool>((ref) => ref.watch(appModeProvider) == AppMode.standalone);
+
 /// Phase 0: in-memory implementations from dukan_data. Phase 1 swaps these for
 /// Drift (SQLite) repositories without touching call sites.
 final stockRepoProvider =

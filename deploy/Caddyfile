@@ -1,0 +1,10 @@
+# HTTPS for the DukanPro API. Caddy gets and renews the certificate for
+# DUKAN_DOMAIN by itself: ports 80 and 443 must reach this machine.
+{$DUKAN_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8000
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}

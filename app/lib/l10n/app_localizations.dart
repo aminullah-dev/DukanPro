@@ -233,6 +233,12 @@ abstract class AppLocalizations {
   /// **'Sign-in failed. Check your username and password.'**
   String get loginFailed;
 
+  /// No description provided for @errLoginLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong passwords. Wait {minutes} minutes, then try again.'**
+  String errLoginLocked(int minutes);
+
   /// No description provided for @wrongSecret.
   ///
   /// In en, this message translates to:
@@ -592,6 +598,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Shown in the server console when the server starts'**
   String get setupCodeHelp;
+
+  /// No description provided for @standaloneSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up without a server'**
+  String get standaloneSetup;
+
+  /// No description provided for @standaloneSetupHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything stays on this device. No server to install, no internet needed. One account: yours.'**
+  String get standaloneSetupHelp;
+
+  /// No description provided for @standalonePasswordWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody can recover this password, not even us. Write it down and keep it somewhere safe.'**
+  String get standalonePasswordWarning;
+
+  /// No description provided for @standaloneMode.
+  ///
+  /// In en, this message translates to:
+  /// **'This device only'**
+  String get standaloneMode;
 
   /// No description provided for @errSetupCode.
   ///
@@ -971,6 +1001,138 @@ abstract class AppLocalizations {
   /// **'Voided'**
   String get voided;
 
+  /// No description provided for @voidSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Void sale'**
+  String get voidSale;
+
+  /// No description provided for @voidSaleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Void this sale?'**
+  String get voidSaleTitle;
+
+  /// No description provided for @voidSaleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The stock comes back, and what the customer still owes for it is taken off their account. This can\'t be undone.'**
+  String get voidSaleBody;
+
+  /// No description provided for @voidReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get voidReason;
+
+  /// No description provided for @saleVoidedOk.
+  ///
+  /// In en, this message translates to:
+  /// **'The sale was voided.'**
+  String get saleVoidedOk;
+
+  /// No description provided for @returnItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Return items'**
+  String get returnItems;
+
+  /// No description provided for @returnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take goods back'**
+  String get returnTitle;
+
+  /// No description provided for @returnUpTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {qty}'**
+  String returnUpTo(String qty);
+
+  /// No description provided for @returnPayBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay back by'**
+  String get returnPayBack;
+
+  /// No description provided for @returnWorth.
+  ///
+  /// In en, this message translates to:
+  /// **'Worth {amount}'**
+  String returnWorth(String amount);
+
+  /// No description provided for @returnConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Take back'**
+  String get returnConfirm;
+
+  /// No description provided for @returnDoneGiveBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned. Give back {amount}.'**
+  String returnDoneGiveBack(String amount);
+
+  /// No description provided for @returnDoneAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned. It came off the customer\'s account.'**
+  String get returnDoneAccount;
+
+  /// No description provided for @returnNothingLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything from this sale has come back already.'**
+  String get returnNothingLeft;
+
+  /// No description provided for @returnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Return'**
+  String get returnLabel;
+
+  /// No description provided for @returnOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Return of {number}'**
+  String returnOf(String number);
+
+  /// No description provided for @errRefundQty.
+  ///
+  /// In en, this message translates to:
+  /// **'That is more than is left to take back.'**
+  String get errRefundQty;
+
+  /// No description provided for @errSaleNotRefundable.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods can\'t be taken back from this sale.'**
+  String get errSaleNotRefundable;
+
+  /// No description provided for @errRefundReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Write why the goods come back.'**
+  String get errRefundReason;
+
+  /// No description provided for @errSaleNotSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'This sale hasn\'t reached the server yet. Sync, then try again.'**
+  String get errSaleNotSynced;
+
+  /// No description provided for @errVoidReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Write why the sale is being voided.'**
+  String get errVoidReasonRequired;
+
+  /// No description provided for @errVoidShiftClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'This sale\'s shift is already closed and the sale took cash, so it can\'t be voided. Take the goods back with Return items instead.'**
+  String get errVoidShiftClosed;
+
   /// No description provided for @language.
   ///
   /// In en, this message translates to:
@@ -1306,6 +1468,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Receipt printer'**
   String get printerSettings;
+
+  /// No description provided for @paperWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper width'**
+  String get paperWidth;
+
+  /// No description provided for @paperMillimetres.
+  ///
+  /// In en, this message translates to:
+  /// **'{mm} mm'**
+  String paperMillimetres(int mm);
 
   /// No description provided for @enablePrinting.
   ///

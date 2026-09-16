@@ -46,3 +46,6 @@ __pycache__/
 .idea/
 .vscode/
 *.log
+
+# Server backups made by deploy/docker-compose.yml
+deploy/backups/

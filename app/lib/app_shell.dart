@@ -4,6 +4,7 @@ import 'package:dukan_core/dukan_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'composition.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/auth_state.dart';
 import 'features/audit/audit_log_screen.dart';
@@ -57,6 +58,11 @@ class AppShell extends ConsumerWidget {
     if (state is! AuthLoggedIn) return const SizedBox.shrink();
     final actor = ref.watch(sessionActorProvider);
     bool can(Permission p) => actor?.can(p) ?? false;
+    // A shop with no server has no staff to manage, no second branch, no audit
+    // trail to read and nothing to sync: those panes are the server's, and an
+    // owner who runs the till alone is not shown doors that open onto nothing.
+    final standalone = ref.watch(standaloneProvider);
+    bool canOnServer(Permission p) => !standalone && can(p);
 
     final features = <_Destination>[
       if (can(Permission.saleCreate)) _Destination('pos', Icons.point_of_sale, l.pos, const PosScreen()),
@@ -68,16 +74,16 @@ class AppShell extends ConsumerWidget {
         _Destination('suppliers', Icons.local_shipping_outlined, l.suppliers, const SuppliersScreen()),
       if (can(Permission.reportView))
         _Destination('dashboard', Icons.dashboard_outlined, l.dashboard, const DashboardScreen()),
-      if (can(Permission.userManage))
+      if (canOnServer(Permission.userManage))
         _Destination('employees', Icons.badge_outlined, l.employees, const EmployeesScreen()),
-      if (can(Permission.branchManage))
+      if (canOnServer(Permission.branchManage))
         _Destination('branches', Icons.store_mall_directory_outlined, l.branches, const BranchesScreen()),
-      if (can(Permission.auditView))
+      if (canOnServer(Permission.auditView))
         _Destination('audit', Icons.history, l.auditLog, const AuditLogScreen()),
       _Destination('settings', Icons.settings_outlined, l.settings, const PrinterSettingsScreen()),
     ];
 
-    final showBell = can(Permission.reportView);
+    final showBell = canOnServer(Permission.reportView);
     // Chosen per device by an owner or manager; 10 minutes until they do.
     final idleMinutes = ref.watch(idleLockProvider).asData?.value ?? kDefaultIdleLockMinutes;
     return SessionGuard(
@@ -206,7 +212,9 @@ class _ShellState extends ConsumerState<_Shell> {
     );
   }
 
-  Widget _rail(AppLocalizations l, List<_Destination> all, int index) => SingleChildScrollView(
+  Widget _rail(AppLocalizations l, List<_Destination> all, int index) {
+    final standalone = ref.watch(standaloneProvider);
+    return SingleChildScrollView(
         child: IntrinsicHeight(
           child: NavigationRail(
             extended: MediaQuery.sizeOf(context).width >= 1200,
@@ -222,18 +230,21 @@ class _ShellState extends ConsumerState<_Shell> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (widget.showBell) const NotificationsBell(),
-                      const SyncAction(),
+                      if (!standalone) const SyncAction(),
                       const LocaleToggle(),
                       IconButton(
                         tooltip: l.lock,
                         icon: const Icon(Icons.lock_outline),
                         onPressed: () => ref.read(authControllerProvider.notifier).lock(),
                       ),
-                      IconButton(
-                        tooltip: l.logout,
-                        icon: const Icon(Icons.logout),
-                        onPressed: () => confirmLogout(context, ref),
-                      ),
+                      // Signing out of a shop with no server would wipe the one
+                      // account it has, so there the app only locks.
+                      if (!standalone)
+                        IconButton(
+                          tooltip: l.logout,
+                          icon: const Icon(Icons.logout),
+                          onPressed: () => confirmLogout(context, ref),
+                        ),
                     ],
                   ),
                 ),
@@ -244,7 +255,8 @@ class _ShellState extends ConsumerState<_Shell> {
             ],
           ),
         ),
-      );
+    );
+  }
 }
 
 /// A phone's navigation: the shell's destinations in a drawer.
@@ -301,6 +313,7 @@ class _HomePane extends ConsumerWidget {
     final state = ref.watch(authControllerProvider);
     if (state is! AuthLoggedIn) return const SizedBox.shrink();
     final profile = state.profile;
+    final standalone = ref.watch(standaloneProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -311,7 +324,7 @@ class _HomePane extends ConsumerWidget {
         actions: showShellActions
             ? [
                 if (showBell) const NotificationsBell(),
-                const SyncAction(),
+                if (!standalone) const SyncAction(),
                 const LocaleToggle(),
                 PopupMenuButton<_HomeAction>(
                   onSelected: (a) => switch (a) {
@@ -323,10 +336,11 @@ class _HomePane extends ConsumerWidget {
                       value: _HomeAction.lock,
                       child: ListTile(leading: const Icon(Icons.lock_outline), title: Text(l.lock)),
                     ),
-                    PopupMenuItem(
-                      value: _HomeAction.logout,
-                      child: ListTile(leading: const Icon(Icons.logout), title: Text(l.logout)),
-                    ),
+                    if (!standalone)
+                      PopupMenuItem(
+                        value: _HomeAction.logout,
+                        child: ListTile(leading: const Icon(Icons.logout), title: Text(l.logout)),
+                      ),
                   ],
                 ),
               ]
@@ -343,12 +357,19 @@ class _HomePane extends ConsumerWidget {
               Text(l.signedInAs(profile.displayName), style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
               Text(_branchLabel(l, profile.branches), style: Theme.of(context).textTheme.bodyMedium),
-              if (state.offline) ...[
+              // A shop with no server is not "offline": nothing is waiting to
+              // reach anywhere, so it says what it is instead.
+              if (standalone) ...[
                 const SizedBox(height: 12),
-                Chip(avatar: const Icon(Icons.cloud_off, size: 18), label: Text(l.offlineMode)),
+                Chip(avatar: const Icon(Icons.smartphone, size: 18), label: Text(l.standaloneMode)),
+              ] else ...[
+                if (state.offline) ...[
+                  const SizedBox(height: 12),
+                  Chip(avatar: const Icon(Icons.cloud_off, size: 18), label: Text(l.offlineMode)),
+                ],
+                const SizedBox(height: 16),
+                const SyncStatusCard(),
               ],
-              const SizedBox(height: 16),
-              const SyncStatusCard(),
               if (showTiles) ...[
                 const SizedBox(height: 24),
                 Wrap(

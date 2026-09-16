@@ -10,25 +10,30 @@ import '../auth/session.dart';
 
 /// Device-local thermal-printer configuration (ESC/POS over TCP).
 class PrinterConfig {
-  const PrinterConfig({this.enabled = false, this.host = '', this.port = 9100});
+  const PrinterConfig({this.enabled = false, this.host = '', this.port = 9100, this.paperMm = 80});
   final bool enabled;
   final String host;
   final int port;
 
+  /// The roll's width, 58 or 80 mm: the receipt is drawn to fit it.
+  final int paperMm;
+
   bool get isReady => enabled && host.trim().isNotEmpty;
 
-  PrinterConfig copyWith({bool? enabled, String? host, int? port}) => PrinterConfig(
+  PrinterConfig copyWith({bool? enabled, String? host, int? port, int? paperMm}) => PrinterConfig(
         enabled: enabled ?? this.enabled,
         host: host ?? this.host,
         port: port ?? this.port,
+        paperMm: paperMm ?? this.paperMm,
       );
 
-  Map<String, Object?> toJson() => {'enabled': enabled, 'host': host, 'port': port};
+  Map<String, Object?> toJson() => {'enabled': enabled, 'host': host, 'port': port, 'paper_mm': paperMm};
 
   factory PrinterConfig.fromJson(Map<String, Object?> j) => PrinterConfig(
         enabled: (j['enabled'] as bool?) ?? false,
         host: (j['host'] as String?) ?? '',
         port: (j['port'] as num?)?.toInt() ?? 9100,
+        paperMm: (j['paper_mm'] as num?)?.toInt() == 58 ? 58 : 80,
       );
 }
 
