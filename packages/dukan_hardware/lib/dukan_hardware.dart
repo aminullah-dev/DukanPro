@@ -6,6 +6,7 @@
 library;
 
 export 'src/escpos.dart';
+export 'src/pdf.dart';
 export 'src/raster.dart';
 export 'src/receipt.dart';
 export 'src/tcp_printer.dart';
