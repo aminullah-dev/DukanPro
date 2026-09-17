@@ -9,11 +9,13 @@ import '../../infrastructure/plugin_printers.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/bidi.dart';
 import '../../widgets/error_text.dart';
+import '../../widgets/password_dialog.dart';
 import '../pos/receipt_raster.dart';
 import '../auth/session.dart';
 import '../../widgets/shell_scope.dart';
 import '../auth/auth_controller.dart';
 import '../auth/providers.dart';
+import 'backup.dart';
 import 'settings_providers.dart';
 
 class PrinterSettingsScreen extends ConsumerStatefulWidget {
@@ -169,6 +171,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              const BackupTile(),
               const _BiometricTile(),
               const IdleLockTile(),
               Padding(
@@ -316,7 +319,7 @@ class _BiometricTileState extends ConsumerState<_BiometricTile> {
   Future<void> _toggle(bool on, AppLocalizations l) async {
     final controller = ref.read(authControllerProvider.notifier);
     if (on) {
-      final password = await showDialog<String>(context: context, builder: (_) => const _PasswordDialog());
+      final password = await showDialog<String>(context: context, builder: (_) => const PasswordDialog());
       if (password == null) return;
       if (!await controller.enableBiometric(password)) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.wrongSecret)));
@@ -389,41 +392,6 @@ class IdleLockTile extends ConsumerWidget {
           ),
         ),
         const Divider(height: 24),
-      ],
-    );
-  }
-}
-
-class _PasswordDialog extends StatefulWidget {
-  const _PasswordDialog();
-  @override
-  State<_PasswordDialog> createState() => _PasswordDialogState();
-}
-
-class _PasswordDialogState extends State<_PasswordDialog> {
-  final _field = TextEditingController();
-
-  @override
-  void dispose() {
-    _field.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return AlertDialog(
-      scrollable: true, // the keyboard can take half a phone's height
-      title: Text(l.confirmPasswordTitle),
-      content: TextField(
-        controller: _field,
-        obscureText: true,
-        autofocus: true,
-        decoration: InputDecoration(labelText: l.password),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.cancel)),
-        FilledButton(onPressed: () => Navigator.pop(context, _field.text), child: Text(l.save)),
       ],
     );
   }

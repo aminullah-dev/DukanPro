@@ -919,6 +919,87 @@ class AppLocalizationsEn extends AppLocalizations {
       'DukanPro may not use Bluetooth or USB. Allow it in this device\'s settings, then try again.';
 
   @override
+  String get backupShop => 'Back up this shop';
+
+  @override
+  String get backupHelp =>
+      'The whole shop in one file, locked with your password. Send it somewhere other than this device: WhatsApp, Telegram, email or a USB stick.';
+
+  @override
+  String get backupNever => 'Never backed up';
+
+  @override
+  String backupLast(String time) {
+    return 'Last backup: $time';
+  }
+
+  @override
+  String get backupPasswordTitle => 'The shop\'s password';
+
+  @override
+  String get backupAction => 'Back up';
+
+  @override
+  String get backupReady =>
+      'Backup made. Keep it somewhere other than this device.';
+
+  @override
+  String get backupFailed => 'The backup could not be made. Try again.';
+
+  @override
+  String get backupReminderNever =>
+      'This shop has never been backed up. If this device is lost or broken, the shop\'s books go with it.';
+
+  @override
+  String backupReminderOld(int days) {
+    final intl.NumberFormat daysNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String daysString = daysNumberFormat.format(days);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'The last backup is $daysString days old.',
+      one: 'The last backup is a day old.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupNow => 'Back up now';
+
+  @override
+  String get restoreFromBackup => 'Restore a shop from a backup';
+
+  @override
+  String get restoreAction => 'Restore';
+
+  @override
+  String get restoreFailed => 'The backup could not be restored. Try again.';
+
+  @override
+  String get errBackupPassword =>
+      'This password does not open the file. Use the password the shop had when the backup was made, and check that the file is a DukanPro backup.';
+
+  @override
+  String get errBackupTooNew =>
+      'This backup was made by a newer DukanPro. Update the app, then restore it.';
+
+  @override
+  String get errBackupNotAShop => 'There is no shop in this file.';
+
+  @override
+  String get errBackupDeviceNotEmpty =>
+      'This device already holds a shop. A backup restores only onto a device that holds none.';
+
+  @override
+  String get shareReceiptPdf => 'Send as PDF';
+
+  @override
+  String get receiptPdfFailed => 'The PDF could not be made. Try again.';
+
+  @override
   String get notifications => 'Notifications';
 
   @override

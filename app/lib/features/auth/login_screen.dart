@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:dukan_core/dukan_core.dart' show loginLockMinutes;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../infrastructure/file_share.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/locale_toggle.dart';
+import '../../widgets/password_dialog.dart';
 import 'auth_controller.dart';
 import 'auth_state.dart';
 
@@ -75,6 +79,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  /// A shop with no server, back from a backup: the person chooses the file,
+  /// then gives the password it was made with.
+  Future<void> _restore() async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final controller = ref.read(authControllerProvider.notifier)..clearError();
+    String? picked;
+    try {
+      final dir = await ref.read(workDirectoryProvider)();
+      picked = await ref.read(pickFileProvider)(dir);
+      if (picked == null || !mounted) return;
+      final password = await showDialog<String>(
+        context: context,
+        builder: (_) => PasswordDialog(title: l.backupPasswordTitle, action: l.restoreAction),
+      );
+      if (password == null || password.isEmpty || !mounted) return;
+      setState(() => _busy = true);
+      await controller.restoreStandalone(path: picked, password: password, workDirectory: dir);
+    } on Object {
+      messenger.showSnackBar(SnackBar(content: Text(l.restoreFailed)));
+    } finally {
+      if (picked != null) {
+        try {
+          File(picked).deleteSync();
+        } on FileSystemException {
+          // Already gone; the system empties this directory anyway.
+        }
+      }
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   /// Whether the shop's name and a username are there, marking what is missing.
   bool _setupFieldsFilled() {
     final required = AppLocalizations.of(context).errRequired;
@@ -114,6 +150,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         'STORAGE_UNAVAILABLE' => l.errStorage,
         'USER_DISABLED' => l.errAccountDisabled, // signing in again cannot help
         'SESSION_REVOKED' || 'REFRESH_INVALID' || 'TOKEN_INVALID' => l.errSessionEnded,
+        'BACKUP_PASSWORD_WRONG' => l.errBackupPassword,
+        'BACKUP_TOO_NEW' => l.errBackupTooNew,
+        'BACKUP_NOT_A_SHOP' => l.errBackupNotAShop,
+        'BACKUP_DEVICE_NOT_EMPTY' => l.errBackupDeviceNotEmpty,
+        'BACKUP_FAILED' => l.restoreFailed,
         _ => _settingUp ? l.setupFailed : l.loginFailed,
       };
 
@@ -214,6 +255,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: _busy ? null : () => _switchTo(other),
                     child: Text(_label(l, other)),
                   ),
+              // A shop whose device was lost or broken comes back here, from
+              // the backup its owner sent somewhere safe.
+              TextButton.icon(
+                onPressed: _busy ? null : _restore,
+                icon: const Icon(Icons.settings_backup_restore),
+                label: Text(l.restoreFromBackup),
+              ),
               if (state is AuthLoggedOut && state.canReturn)
                 TextButton(
                   onPressed: _busy ? null : () => ref.read(authControllerProvider.notifier).restore(),

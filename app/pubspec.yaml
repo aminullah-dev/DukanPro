@@ -34,6 +34,8 @@ dependencies:
   drift: ^2.35.0
   mobile_scanner: 7.4.2
   unified_esc_pos_printer: 3.4.0
+  share_plus: 13.3.0
+  file_picker: 13.1.0
 
 dev_dependencies:
   flutter_test:

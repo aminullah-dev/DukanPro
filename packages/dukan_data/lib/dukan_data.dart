@@ -13,3 +13,4 @@ export 'src/settings_store.dart';
 export 'src/shifts_store.dart';
 export 'src/sync_recorder.dart';
 export 'src/sync_service.dart';
+export 'src/shop_backup.dart';

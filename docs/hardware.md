@@ -15,6 +15,7 @@ Both kinds of hardware sit behind ports in `packages/dukan_hardware` (`BarcodeSc
 | Bluetooth LE printer | ✓ | ✓ | — | — |
 | USB printer | ✓ | — no iOS API | — | — |
 | Cash drawer, opened through the printer | with any printer above | with any printer above | with any printer above | with any printer above |
+| Receipt sent as PDF, through the share sheet | ✓ | ✓ | ✓ | not tried |
 
 **On iPhone and iPad, only BLE printers work over Bluetooth.**
 - Most small receipt printers speak Bluetooth Classic (SPP). iOS lets an app use SPP only through MFi accessories that the printer's maker has approved for that app.
@@ -60,3 +61,20 @@ Both kinds of hardware sit behind ports in `packages/dukan_hardware` (`BarcodeSc
   - The root Android build compiles every library against SDK 36, because `unified_esc_pos_printer` pins 34 while its dependencies require 36.
 - **Licence:** it compiles `libserialport` (LGPL-3.0-or-later) from source into Android builds. The built APK was checked: it is its own shared library (`liblibserialport_plus.so`), dynamically linked. LGPL allows use in a closed-source app but carries notice and relinking duties. **Have a lawyer confirm what distributing the APK requires.**
 - **Not yet tried against a physical Bluetooth or USB printer.** Test the shop's own printer, paired or plugged in, before a pilot. Print a receipt, reprint it, open the drawer, and switch the printer off and on between jobs.
+
+## Receipts as PDF
+
+For a customer who wants the receipt on their phone, or a shop with no printer yet: the receipt dialog's **Send as PDF** hands a one-page PDF to the share sheet (WhatsApp, Telegram, email).
+
+- The page is the picture the printer draws, on 80 mm paper at its printed size, drawn at three times the printer's 203 dpi so it stays sharp on a phone. Dari and Pashto look exactly as on paper, and no font is embedded.
+- The PDF is written by `dukan_hardware` itself (`imagePdf`: PDF 1.4, one Flate-compressed RGB image), with no PDF package.
+- Only the newest PDF is kept in the app's temporary directory; the share sheet copies what it sends.
+
+## Sharing and choosing files
+
+Backups ([`docs/domain/identity-access.md`](domain/identity-access.md#backing-up-a-shop-with-no-server)) and PDF receipts leave the device through the share sheet, and a backup comes back through the system file chooser.
+
+- **Packages:** `share_plus` 13.3.0 (BSD-3-Clause) and `file_picker` 13.1.0 (MIT), pinned exactly.
+- **Permissions:** none. Android's chooser needs no storage permission, and iOS opens the Files document picker, not the photo library.
+- **macOS:** the sandbox entitlement `com.apple.security.files.user-selected.read-only` lets the app read a file the person chose.
+- **iPad and Mac:** the share sheet points from the button that opened it.

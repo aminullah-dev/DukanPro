@@ -1619,6 +1619,126 @@ abstract class AppLocalizations {
   /// **'DukanPro may not use Bluetooth or USB. Allow it in this device\'s settings, then try again.'**
   String get printerPermissionDenied;
 
+  /// No description provided for @backupShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up this shop'**
+  String get backupShop;
+
+  /// No description provided for @backupHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'The whole shop in one file, locked with your password. Send it somewhere other than this device: WhatsApp, Telegram, email or a USB stick.'**
+  String get backupHelp;
+
+  /// No description provided for @backupNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never backed up'**
+  String get backupNever;
+
+  /// No description provided for @backupLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Last backup: {time}'**
+  String backupLast(String time);
+
+  /// No description provided for @backupPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The shop\'s password'**
+  String get backupPasswordTitle;
+
+  /// No description provided for @backupAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up'**
+  String get backupAction;
+
+  /// No description provided for @backupReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup made. Keep it somewhere other than this device.'**
+  String get backupReady;
+
+  /// No description provided for @backupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The backup could not be made. Try again.'**
+  String get backupFailed;
+
+  /// No description provided for @backupReminderNever.
+  ///
+  /// In en, this message translates to:
+  /// **'This shop has never been backed up. If this device is lost or broken, the shop\'s books go with it.'**
+  String get backupReminderNever;
+
+  /// No description provided for @backupReminderOld.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{The last backup is a day old.} other{The last backup is {days} days old.}}'**
+  String backupReminderOld(int days);
+
+  /// No description provided for @backupNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get backupNow;
+
+  /// No description provided for @restoreFromBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore a shop from a backup'**
+  String get restoreFromBackup;
+
+  /// No description provided for @restoreAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get restoreAction;
+
+  /// No description provided for @restoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The backup could not be restored. Try again.'**
+  String get restoreFailed;
+
+  /// No description provided for @errBackupPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'This password does not open the file. Use the password the shop had when the backup was made, and check that the file is a DukanPro backup.'**
+  String get errBackupPassword;
+
+  /// No description provided for @errBackupTooNew.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup was made by a newer DukanPro. Update the app, then restore it.'**
+  String get errBackupTooNew;
+
+  /// No description provided for @errBackupNotAShop.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no shop in this file.'**
+  String get errBackupNotAShop;
+
+  /// No description provided for @errBackupDeviceNotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This device already holds a shop. A backup restores only onto a device that holds none.'**
+  String get errBackupDeviceNotEmpty;
+
+  /// No description provided for @shareReceiptPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Send as PDF'**
+  String get shareReceiptPdf;
+
+  /// No description provided for @receiptPdfFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The PDF could not be made. Try again.'**
+  String get receiptPdfFailed;
+
   /// No description provided for @notifications.
   ///
   /// In en, this message translates to:

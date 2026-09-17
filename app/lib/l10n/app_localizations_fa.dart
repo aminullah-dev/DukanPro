@@ -915,6 +915,87 @@ class AppLocalizationsFa extends AppLocalizations {
       'دکان‌پرو اجازهٔ استفاده از بلوتوث یا USB را ندارد. در تنظیمات همین دستگاه اجازه بدهید و دوباره تلاش کنید.';
 
   @override
+  String get backupShop => 'پشتیبان‌گیری از این دکان';
+
+  @override
+  String get backupHelp =>
+      'همهٔ دکان در یک فایل، قفل‌شده با رمز عبور شما. آن را به جایی بیرون از این دستگاه بفرستید: واتس‌اپ، تلگرام، ایمیل یا فلش.';
+
+  @override
+  String get backupNever => 'هنوز پشتیبان گرفته نشده';
+
+  @override
+  String backupLast(String time) {
+    return 'آخرین پشتیبان: $time';
+  }
+
+  @override
+  String get backupPasswordTitle => 'رمز عبور دکان';
+
+  @override
+  String get backupAction => 'پشتیبان‌گیری';
+
+  @override
+  String get backupReady =>
+      'پشتیبان ساخته شد. آن را جایی بیرون از این دستگاه نگه دارید.';
+
+  @override
+  String get backupFailed => 'پشتیبان ساخته نشد. دوباره تلاش کنید.';
+
+  @override
+  String get backupReminderNever =>
+      'از این دکان هنوز پشتیبان گرفته نشده است. اگر این دستگاه گم یا خراب شود، حساب و کتاب دکان هم با آن از دست می‌رود.';
+
+  @override
+  String backupReminderOld(int days) {
+    final intl.NumberFormat daysNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String daysString = daysNumberFormat.format(days);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'آخرین پشتیبان $daysString روز پیش گرفته شده است.',
+      one: 'آخرین پشتیبان $daysString روز پیش گرفته شده است.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupNow => 'پشتیبان‌گیری همین حالا';
+
+  @override
+  String get restoreFromBackup => 'بازگردانی دکان از پشتیبان';
+
+  @override
+  String get restoreAction => 'بازگردانی';
+
+  @override
+  String get restoreFailed => 'پشتیبان بازگردانده نشد. دوباره تلاش کنید.';
+
+  @override
+  String get errBackupPassword =>
+      'این رمز عبور فایل را باز نمی‌کند. همان رمز عبوری را به کار ببرید که دکان هنگام گرفتن پشتیبان داشت، و ببینید که فایل پشتیبان دکان‌پرو باشد.';
+
+  @override
+  String get errBackupTooNew =>
+      'این پشتیبان با نسخهٔ تازه‌تر دکان‌پرو گرفته شده است. اول اپ را به‌روز کنید، بعد آن را بازگردانی کنید.';
+
+  @override
+  String get errBackupNotAShop => 'در این فایل هیچ دکانی نیست.';
+
+  @override
+  String get errBackupDeviceNotEmpty =>
+      'در این دستگاه از پیش یک دکان هست. پشتیبان فقط روی دستگاهی بازگردانده می‌شود که دکانی در آن نباشد.';
+
+  @override
+  String get shareReceiptPdf => 'فرستادن PDF';
+
+  @override
+  String get receiptPdfFailed => 'فایل PDF ساخته نشد. دوباره تلاش کنید.';
+
+  @override
   String get notifications => 'اعلان‌ها';
 
   @override
@@ -2222,6 +2303,87 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
   @override
   String get printerPermissionDenied =>
       'دکان‌پرو اجازهٔ استفاده از بلوتوث یا USB را ندارد. در تنظیمات همین دستگاه اجازه بدهید و دوباره تلاش کنید.';
+
+  @override
+  String get backupShop => 'پشتیبان‌گیری از این دکان';
+
+  @override
+  String get backupHelp =>
+      'همهٔ دکان در یک فایل، قفل‌شده با رمز عبور شما. آن را به جایی بیرون از این دستگاه بفرستید: واتس‌اپ، تلگرام، ایمیل یا فلش.';
+
+  @override
+  String get backupNever => 'هنوز پشتیبان گرفته نشده';
+
+  @override
+  String backupLast(String time) {
+    return 'آخرین پشتیبان: $time';
+  }
+
+  @override
+  String get backupPasswordTitle => 'رمز عبور دکان';
+
+  @override
+  String get backupAction => 'پشتیبان‌گیری';
+
+  @override
+  String get backupReady =>
+      'پشتیبان ساخته شد. آن را جایی بیرون از این دستگاه نگه دارید.';
+
+  @override
+  String get backupFailed => 'پشتیبان ساخته نشد. دوباره تلاش کنید.';
+
+  @override
+  String get backupReminderNever =>
+      'از این دکان هنوز پشتیبان گرفته نشده است. اگر این دستگاه گم یا خراب شود، حساب و کتاب دکان هم با آن از دست می‌رود.';
+
+  @override
+  String backupReminderOld(int days) {
+    final intl.NumberFormat daysNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String daysString = daysNumberFormat.format(days);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'آخرین پشتیبان $daysString روز پیش گرفته شده است.',
+      one: 'آخرین پشتیبان $daysString روز پیش گرفته شده است.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupNow => 'پشتیبان‌گیری همین حالا';
+
+  @override
+  String get restoreFromBackup => 'بازگردانی دکان از پشتیبان';
+
+  @override
+  String get restoreAction => 'بازگردانی';
+
+  @override
+  String get restoreFailed => 'پشتیبان بازگردانده نشد. دوباره تلاش کنید.';
+
+  @override
+  String get errBackupPassword =>
+      'این رمز عبور فایل را باز نمی‌کند. همان رمز عبوری را به کار ببرید که دکان هنگام گرفتن پشتیبان داشت، و ببینید که فایل پشتیبان دکان‌پرو باشد.';
+
+  @override
+  String get errBackupTooNew =>
+      'این پشتیبان با نسخهٔ تازه‌تر دکان‌پرو گرفته شده است. اول اپ را به‌روز کنید، بعد آن را بازگردانی کنید.';
+
+  @override
+  String get errBackupNotAShop => 'در این فایل هیچ دکانی نیست.';
+
+  @override
+  String get errBackupDeviceNotEmpty =>
+      'در این دستگاه از پیش یک دکان هست. پشتیبان فقط روی دستگاهی بازگردانده می‌شود که دکانی در آن نباشد.';
+
+  @override
+  String get shareReceiptPdf => 'فرستادن PDF';
+
+  @override
+  String get receiptPdfFailed => 'فایل PDF ساخته نشد. دوباره تلاش کنید.';
 
   @override
   String get notifications => 'اعلان‌ها';
