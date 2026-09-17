@@ -23,6 +23,9 @@ app/windows/flutter/ephemeral/
 app/android/.gradle/
 app/android/local.properties
 app/android/key.properties
+# Signing keys never enter git (docs/release-android.md).
+*.jks
+*.keystore
 *.iml
 
 # ── Python (server) ──────────────────────────────────────────────

@@ -17,6 +17,8 @@ API="${DUKAN_API:-https://api.linumic.com}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(date -u +%Y%m%d%H%M)}"
 MODE="${1:-}"
 cd "$ROOT/app"
+# What ships is what was tested: the committed dependency versions, or nothing.
+flutter pub get --enforce-lockfile
 
 if [ "$MODE" = "--no-codesign" ]; then
   flutter build ipa --release --no-codesign --dart-define=DUKAN_API="$API" --build-number="$BUILD_NUMBER"

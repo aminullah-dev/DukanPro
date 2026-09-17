@@ -77,9 +77,10 @@ Built does not mean shipped. What is still open:
   scanner and network ESC/POS printers do work), and a real language model
   behind the insight narrator, which is template-based today.
 - **Before a shop uses it.** A server and a domain for the multi-device setup;
-  an app icon, because both platforms still show Flutter's; release signing for
-  Android and TestFlight for iOS; and a run on real phones, tablets and a real
-  receipt printer, which has not happened yet.
+  the Android upload key, which only the app's owner should create and keep
+  ([`docs/release-android.md`](docs/release-android.md)); TestFlight for iOS; and
+  a run on real phones, tablets and a real receipt printer, which has not
+  happened yet.
 
 ## License
 
