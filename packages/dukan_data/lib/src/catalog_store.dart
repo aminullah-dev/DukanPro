@@ -74,10 +74,20 @@ final class ProductDao implements ProductRepository {
   }
 
   /// The sellable product a scan names: the oldest live barcode with that code on
-  /// an active product. Rows another till synced before codes were unique may
-  /// repeat a code; they never make a scan throw.
+  /// an active product, else with its UPC-A/EAN-13 twin ([barcodeLookupCodes]),
+  /// so a product scans the same from Android's camera, an iPhone's, or a
+  /// keyboard-wedge scanner. Rows another till synced before codes were unique
+  /// may repeat a code; they never make a scan throw.
   @override
   Future<Product?> findByBarcode(String code) async {
+    for (final candidate in barcodeLookupCodes(code)) {
+      final product = await _findByExactBarcode(candidate);
+      if (product != null) return product;
+    }
+    return null;
+  }
+
+  Future<Product?> _findByExactBarcode(String code) async {
     final query = _db.select(_db.barcodes).join([
       innerJoin(_db.products, _db.products.id.equalsExp(_db.barcodes.productId)),
     ])
