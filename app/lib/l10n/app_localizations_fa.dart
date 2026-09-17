@@ -867,6 +867,54 @@ class AppLocalizationsFa extends AppLocalizations {
   String get printFailed => 'دسترسی به چاپگر ممکن نشد.';
 
   @override
+  String get scanWithCamera => 'اسکن با کمره';
+
+  @override
+  String get cameraLight => 'چراغ';
+
+  @override
+  String get cameraPermissionDenied =>
+      'دکان‌پرو اجازهٔ استفاده از کمره را ندارد. در تنظیمات همین دستگاه اجازه بدهید و دوباره تلاش کنید.';
+
+  @override
+  String get cameraUnavailable => 'این دستگاه نمی‌تواند از کمره استفاده کند.';
+
+  @override
+  String get barcodeNoProduct => 'هیچ جنسی این بارکد را ندارد.';
+
+  @override
+  String get printerConnection => 'اتصال';
+
+  @override
+  String get printerTransportTcp => 'شبکه (وای‌فای یا کیبل)';
+
+  @override
+  String get printerTransportBluetooth => 'بلوتوث';
+
+  @override
+  String get printerTransportBle => 'بلوتوث کم‌مصرف (BLE)';
+
+  @override
+  String get printerTransportUsb => 'درگاه USB';
+
+  @override
+  String get findPrinters => 'پیدا کردن چاپگر';
+
+  @override
+  String get findingPrinters => 'در جستجوی چاپگر…';
+
+  @override
+  String get noPrintersFound =>
+      'چاپگری پیدا نشد. آن را روشن کنید و نزدیک‌تر بیاورید. چاپگر بلوتوثی شاید اول باید در تنظیمات بلوتوث همین دستگاه جفت شود.';
+
+  @override
+  String get noPrinterChosen => 'هنوز چاپگری انتخاب نشده است.';
+
+  @override
+  String get printerPermissionDenied =>
+      'دکان‌پرو اجازهٔ استفاده از بلوتوث یا USB را ندارد. در تنظیمات همین دستگاه اجازه بدهید و دوباره تلاش کنید.';
+
+  @override
   String get notifications => 'اعلان‌ها';
 
   @override
@@ -2126,6 +2174,54 @@ class AppLocalizationsFaAf extends AppLocalizationsFa {
 
   @override
   String get printFailed => 'دسترسی به چاپگر ممکن نشد.';
+
+  @override
+  String get scanWithCamera => 'اسکن با کمره';
+
+  @override
+  String get cameraLight => 'چراغ';
+
+  @override
+  String get cameraPermissionDenied =>
+      'دکان‌پرو اجازهٔ استفاده از کمره را ندارد. در تنظیمات همین دستگاه اجازه بدهید و دوباره تلاش کنید.';
+
+  @override
+  String get cameraUnavailable => 'این دستگاه نمی‌تواند از کمره استفاده کند.';
+
+  @override
+  String get barcodeNoProduct => 'هیچ جنسی این بارکد را ندارد.';
+
+  @override
+  String get printerConnection => 'اتصال';
+
+  @override
+  String get printerTransportTcp => 'شبکه (وای‌فای یا کیبل)';
+
+  @override
+  String get printerTransportBluetooth => 'بلوتوث';
+
+  @override
+  String get printerTransportBle => 'بلوتوث کم‌مصرف (BLE)';
+
+  @override
+  String get printerTransportUsb => 'درگاه USB';
+
+  @override
+  String get findPrinters => 'پیدا کردن چاپگر';
+
+  @override
+  String get findingPrinters => 'در جستجوی چاپگر…';
+
+  @override
+  String get noPrintersFound =>
+      'چاپگری پیدا نشد. آن را روشن کنید و نزدیک‌تر بیاورید. چاپگر بلوتوثی شاید اول باید در تنظیمات بلوتوث همین دستگاه جفت شود.';
+
+  @override
+  String get noPrinterChosen => 'هنوز چاپگری انتخاب نشده است.';
+
+  @override
+  String get printerPermissionDenied =>
+      'دکان‌پرو اجازهٔ استفاده از بلوتوث یا USB را ندارد. در تنظیمات همین دستگاه اجازه بدهید و دوباره تلاش کنید.';
 
   @override
   String get notifications => 'اعلان‌ها';

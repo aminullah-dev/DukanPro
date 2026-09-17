@@ -865,6 +865,54 @@ class AppLocalizationsPs extends AppLocalizations {
   String get printFailed => 'چاپګر ته لاسرسی ونشو.';
 
   @override
+  String get scanWithCamera => 'د کمرې سکن';
+
+  @override
+  String get cameraLight => 'څراغ';
+
+  @override
+  String get cameraPermissionDenied =>
+      'دوکان‌پرو د کمرې د کارولو اجازه نه لري. د همدې وسیلې په تنظیماتو کې اجازه ورکړئ او بیا هڅه وکړئ.';
+
+  @override
+  String get cameraUnavailable => 'دا وسیله کمره نشي کارولی.';
+
+  @override
+  String get barcodeNoProduct => 'هیڅ توکی دا بارکوډ نه لري.';
+
+  @override
+  String get printerConnection => 'اتصال';
+
+  @override
+  String get printerTransportTcp => 'شبکه (وای‌فای یا کېبل)';
+
+  @override
+  String get printerTransportBluetooth => 'بلوتوث';
+
+  @override
+  String get printerTransportBle => 'کم مصرفه بلوتوث (BLE)';
+
+  @override
+  String get printerTransportUsb => 'د USB پورټ';
+
+  @override
+  String get findPrinters => 'چاپګرونه موندل';
+
+  @override
+  String get findingPrinters => 'د چاپګرونو لټون روان دی…';
+
+  @override
+  String get noPrintersFound =>
+      'هیڅ چاپګر ونه موندل شو. روښانه یې کړئ او نږدې یې راوړئ. کېدای شي بلوتوثي چاپګر لومړی د همدې وسیلې د بلوتوث په تنظیماتو کې وصل شي.';
+
+  @override
+  String get noPrinterChosen => 'تر اوسه هیڅ چاپګر نه دی ټاکل شوی.';
+
+  @override
+  String get printerPermissionDenied =>
+      'دوکان‌پرو د بلوتوث یا USB د کارولو اجازه نه لري. د همدې وسیلې په تنظیماتو کې اجازه ورکړئ او بیا هڅه وکړئ.';
+
+  @override
   String get notifications => 'خبرتیاوې';
 
   @override

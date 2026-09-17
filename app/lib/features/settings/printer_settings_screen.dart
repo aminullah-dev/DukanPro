@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:dukan_core/dukan_core.dart' show Permission;
 import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../infrastructure/plugin_printers.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bidi.dart';
 import '../../widgets/error_text.dart';
 import '../pos/receipt_raster.dart';
 import '../auth/session.dart';
@@ -22,11 +26,21 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
   final _host = TextEditingController();
   final _port = TextEditingController(text: '9100');
   bool _enabled = false;
+  PrinterTransport _transport = PrinterTransport.tcp;
+  String _deviceId = '';
+  String _deviceName = '';
   int _paperMm = 80;
   bool _loaded = false;
 
+  /// What the latest search for Bluetooth, BLE or USB printers found so far.
+  List<FoundPrinter> _found = const [];
+  StreamSubscription<List<FoundPrinter>>? _search;
+  bool _searching = false;
+  String? _searchProblem;
+
   @override
   void dispose() {
+    _search?.cancel();
     _host.dispose();
     _port.dispose();
     super.dispose();
@@ -36,32 +50,82 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     if (_loaded) return;
     _loaded = true;
     _enabled = c.enabled;
+    // Settings only ever offer this device's transports; anything else reads as a network printer.
+    _transport = ref.read(printerTransportsProvider).contains(c.transport) ? c.transport : PrinterTransport.tcp;
     _host.text = c.host;
     _port.text = c.port.toString();
+    _deviceId = c.deviceId;
+    _deviceName = c.deviceName;
     _paperMm = c.paperMm;
   }
 
   PrinterConfig get _current => PrinterConfig(
         enabled: _enabled,
+        transport: _transport,
         host: _host.text.trim(),
         port: int.tryParse(_port.text.trim()) ?? 9100,
+        deviceId: _deviceId,
+        deviceName: _deviceName,
         paperMm: _paperMm,
       );
 
+  void _say(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+
   Future<void> _save(AppLocalizations l) async {
     await ref.read(printerSettingsControllerProvider.notifier).save(_current);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.savedOk)));
-    }
+    if (mounted) _say(l.savedOk);
+  }
+
+  void _chooseTransport(PrinterTransport transport) {
+    if (transport == _transport) return;
+    _search?.cancel();
+    setState(() {
+      _transport = transport;
+      // A printer found one way cannot be reached another way.
+      _deviceId = '';
+      _deviceName = '';
+      _found = const [];
+      _searching = false;
+      _searchProblem = null;
+    });
+  }
+
+  void _find(AppLocalizations l) {
+    _search?.cancel();
+    setState(() {
+      _found = const [];
+      _searching = true;
+      _searchProblem = null;
+    });
+    _search = ref.read(printerFinderProvider).find(_transport).listen(
+      (found) {
+        if (mounted) setState(() => _found = found);
+      },
+      onError: (Object e) {
+        if (!mounted) return;
+        setState(() {
+          _searching = false;
+          _searchProblem = e is PrinterAccessDenied ? l.printerPermissionDenied : l.noPrintersFound;
+        });
+      },
+      onDone: () {
+        if (!mounted) return;
+        setState(() {
+          _searching = false;
+          if (_found.isEmpty) _searchProblem = l.noPrintersFound;
+        });
+      },
+      cancelOnError: true,
+    );
   }
 
   Future<void> _testPrint(AppLocalizations l) async {
     final cfg = _current;
     if (!cfg.isReady) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.printerNotConfigured)));
+      _say(l.printerNotConfigured);
       return;
     }
-    final printer = TcpReceiptPrinter(host: cfg.host, port: cfg.port);
+    final printer = ref.read(printerForProvider)(cfg);
     try {
       // A sample in the reader's language: the page shows that Dari or Pashto prints.
       final image = await rasterReceipt(
@@ -73,16 +137,21 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
         ),
         occurredAt: DateTime.now(), zone: ref.read(branchZoneProvider), paperMm: cfg.paperMm,
       );
-      await printer.printRaw(const EscPosEncoder().encodeRaster(image));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.printSucceeded)));
-      }
+      await printer.printRaw(const EscPosEncoder().encodeRaster(image)).timeout(printJobTimeout(printer.transport));
+      if (mounted) _say(l.printSucceeded);
+    } on PrinterAccessDenied {
+      if (mounted) _say(l.printerPermissionDenied);
     } on Object {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.printFailed)));
-      }
+      if (mounted) _say(l.printFailed);
     }
   }
+
+  String _transportLabel(AppLocalizations l, PrinterTransport t) => switch (t) {
+        PrinterTransport.tcp => l.printerTransportTcp,
+        PrinterTransport.bluetooth => l.printerTransportBluetooth,
+        PrinterTransport.ble => l.printerTransportBle,
+        PrinterTransport.usb => l.printerTransportUsb,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +164,8 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
         error: (e, _) => ErrorMessage(e),
         data: (config) {
           _hydrate(config);
+          final theme = Theme.of(context);
+          final transports = ref.watch(printerTransportsProvider);
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -102,7 +173,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
               const IdleLockTile(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(l.printerSettings, style: Theme.of(context).textTheme.titleSmall),
+                child: Text(l.printerSettings, style: theme.textTheme.titleSmall),
               ),
               SwitchListTile(
                 title: Text(l.enablePrinting),
@@ -110,23 +181,73 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                 onChanged: (v) => setState(() => _enabled = v),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: _host,
-                enabled: _enabled,
-                keyboardType: TextInputType.url,
-                decoration: InputDecoration(
-                  labelText: l.printerHost, hintText: '192.168.1.50', border: const OutlineInputBorder(),
+              if (transports.length > 1) ...[
+                Text(l.printerConnection, style: theme.textTheme.bodyMedium),
+                DropdownButton<PrinterTransport>(
+                  isExpanded: true,
+                  value: _transport,
+                  items: [
+                    for (final t in transports) DropdownMenuItem(value: t, child: Text(_transportLabel(l, t))),
+                  ],
+                  onChanged: _enabled
+                      ? (t) {
+                          if (t != null) _chooseTransport(t);
+                        }
+                      : null,
                 ),
-              ),
+                const SizedBox(height: 12),
+              ],
+              if (_transport == PrinterTransport.tcp) ...[
+                TextField(
+                  controller: _host,
+                  enabled: _enabled,
+                  keyboardType: TextInputType.url,
+                  decoration: InputDecoration(
+                    labelText: l.printerHost, hintText: '192.168.1.50', border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _port,
+                  enabled: _enabled,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(labelText: l.printerPort, border: const OutlineInputBorder()),
+                ),
+              ] else ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.print_outlined),
+                  title: Text(_deviceId.isEmpty ? l.noPrinterChosen : _deviceName),
+                  // An address or a vendor:product pair reads left to right in any language.
+                  subtitle: _deviceId.isEmpty ? null : Text(ltr(_deviceId)),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _enabled && !_searching ? () => _find(l) : null,
+                  icon: _searching
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.search),
+                  label: Text(_searching ? l.findingPrinters : l.findPrinters),
+                ),
+                if (_searchProblem != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(_searchProblem!, style: TextStyle(color: theme.colorScheme.error)),
+                  ),
+                for (final p in _found)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    enabled: _enabled,
+                    leading: Icon(p.id == _deviceId ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                    title: Text(p.name),
+                    subtitle: Text(ltr(p.id)),
+                    onTap: () => setState(() {
+                      _deviceId = p.id;
+                      _deviceName = p.name;
+                    }),
+                  ),
+              ],
               const SizedBox(height: 12),
-              TextField(
-                controller: _port,
-                enabled: _enabled,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: l.printerPort, border: const OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              Text(l.paperWidth, style: Theme.of(context).textTheme.bodyMedium),
+              Text(l.paperWidth, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               SegmentedButton<int>(
                 segments: [

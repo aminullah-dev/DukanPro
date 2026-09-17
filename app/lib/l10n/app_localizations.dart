@@ -1529,6 +1529,96 @@ abstract class AppLocalizations {
   /// **'Couldn\'t reach the printer.'**
   String get printFailed;
 
+  /// No description provided for @scanWithCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan with camera'**
+  String get scanWithCamera;
+
+  /// No description provided for @cameraLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get cameraLight;
+
+  /// No description provided for @cameraPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'DukanPro may not use the camera. Allow it in this device\'s settings, then try again.'**
+  String get cameraPermissionDenied;
+
+  /// No description provided for @cameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This device can\'t use a camera.'**
+  String get cameraUnavailable;
+
+  /// No description provided for @barcodeNoProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'No product has this barcode.'**
+  String get barcodeNoProduct;
+
+  /// No description provided for @printerConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get printerConnection;
+
+  /// No description provided for @printerTransportTcp.
+  ///
+  /// In en, this message translates to:
+  /// **'Network (Wi-Fi or cable)'**
+  String get printerTransportTcp;
+
+  /// No description provided for @printerTransportBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth'**
+  String get printerTransportBluetooth;
+
+  /// No description provided for @printerTransportBle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth LE'**
+  String get printerTransportBle;
+
+  /// No description provided for @printerTransportUsb.
+  ///
+  /// In en, this message translates to:
+  /// **'USB'**
+  String get printerTransportUsb;
+
+  /// No description provided for @findPrinters.
+  ///
+  /// In en, this message translates to:
+  /// **'Find printers'**
+  String get findPrinters;
+
+  /// No description provided for @findingPrinters.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for printers…'**
+  String get findingPrinters;
+
+  /// No description provided for @noPrintersFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No printer found. Turn it on and bring it closer. A Bluetooth printer may first need pairing in this device\'s Bluetooth settings.'**
+  String get noPrintersFound;
+
+  /// No description provided for @noPrinterChosen.
+  ///
+  /// In en, this message translates to:
+  /// **'No printer chosen yet.'**
+  String get noPrinterChosen;
+
+  /// No description provided for @printerPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'DukanPro may not use Bluetooth or USB. Allow it in this device\'s settings, then try again.'**
+  String get printerPermissionDenied;
+
   /// No description provided for @notifications.
   ///
   /// In en, this message translates to:

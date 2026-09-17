@@ -6,7 +6,9 @@ import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../infrastructure/plugin_printers.dart' show PrinterAccessDenied;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/camera_scan_button.dart';
 import '../../widgets/digits.dart';
 import '../../widgets/bidi.dart';
 import '../../widgets/money.dart';
@@ -210,6 +212,19 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (p != null && mounted) _add(p);
   }
 
+  /// A code the camera read. The camera was aimed on purpose, so a code no
+  /// product has is said out loud, where a stray wedge scan stays quiet.
+  Future<void> _addByCamera(String code) async {
+    final p = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(code));
+    if (!mounted) return;
+    if (p == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).barcodeNoProduct)));
+      return;
+    }
+    _add(p);
+  }
+
   /// Typed or scanned into the search field: a barcode adds its product and
   /// clears the field; anything else stays a name search. (A scanner's keys land
   /// here while the field has focus, so the scan listener leaves them alone.)
@@ -285,6 +300,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             focusNode: _searchFocus,
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
+              suffixIcon: canSell && ref.watch(cameraScanProvider) != null
+                  ? CameraScanButton(onScanned: _addByCamera)
+                  : null,
               hintText: l.searchHint,
               border: const OutlineInputBorder(),
             ),
@@ -1028,7 +1046,11 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
         heading: widget.sale.refundOf == null ? null : l.returnLabel,
       );
       // A printer that stops answering must not hold the till.
-      await printer.printRaw(const EscPosEncoder().encodeRaster(image)).timeout(const Duration(seconds: 10));
+      await printer.printRaw(const EscPosEncoder().encodeRaster(image)).timeout(printJobTimeout(printer.transport));
+    } on PrinterAccessDenied {
+      _say(l.printerPermissionDenied);
+      if (mounted) setState(() => _printing = false);
+      return;
     } on Object {
       _say(l.printFailed);
       if (mounted) setState(() => _printing = false);
@@ -1037,7 +1059,10 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
     var drawerOk = true;
     if (widget.openDrawer) {
       try {
-        await printer.kickCashDrawer().timeout(const Duration(seconds: 5));
+        // A network printer's drawer answers at once; a Bluetooth or USB one connects again first.
+        final drawerTimeout =
+            printer.transport == PrinterTransport.tcp ? const Duration(seconds: 5) : printJobTimeout(printer.transport);
+        await printer.kickCashDrawer().timeout(drawerTimeout);
       } on Object {
         drawerOk = false; // the receipt did print: say that the drawer failed, not the print
       }

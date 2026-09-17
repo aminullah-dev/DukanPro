@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/camera_scan_button.dart';
 import '../../widgets/digits.dart';
 import '../../widgets/money.dart';
 import '../../widgets/labels.dart';
@@ -141,6 +142,24 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
                 },
                 decoration: InputDecoration(
                   labelText: l.products, hintText: l.searchHint, border: const OutlineInputBorder(),
+                  // The search matches names and SKUs; a barcode the camera read picks its product.
+                  suffixIcon: ref.watch(cameraScanProvider) == null
+                      ? null
+                      : CameraScanButton(
+                          onScanned: (code) async {
+                            final p = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(code));
+                            if (!mounted) return;
+                            if (p == null) {
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(content: Text(AppLocalizations.of(this.context).barcodeNoProduct)),
+                              );
+                              return;
+                            }
+                            controller.text = p.name;
+                            focus.unfocus();
+                            setState(() => _product = p);
+                          },
+                        ),
                 ),
               ),
             ),

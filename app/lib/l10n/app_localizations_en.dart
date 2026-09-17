@@ -871,6 +871,54 @@ class AppLocalizationsEn extends AppLocalizations {
   String get printFailed => 'Couldn\'t reach the printer.';
 
   @override
+  String get scanWithCamera => 'Scan with camera';
+
+  @override
+  String get cameraLight => 'Light';
+
+  @override
+  String get cameraPermissionDenied =>
+      'DukanPro may not use the camera. Allow it in this device\'s settings, then try again.';
+
+  @override
+  String get cameraUnavailable => 'This device can\'t use a camera.';
+
+  @override
+  String get barcodeNoProduct => 'No product has this barcode.';
+
+  @override
+  String get printerConnection => 'Connection';
+
+  @override
+  String get printerTransportTcp => 'Network (Wi-Fi or cable)';
+
+  @override
+  String get printerTransportBluetooth => 'Bluetooth';
+
+  @override
+  String get printerTransportBle => 'Bluetooth LE';
+
+  @override
+  String get printerTransportUsb => 'USB';
+
+  @override
+  String get findPrinters => 'Find printers';
+
+  @override
+  String get findingPrinters => 'Looking for printers…';
+
+  @override
+  String get noPrintersFound =>
+      'No printer found. Turn it on and bring it closer. A Bluetooth printer may first need pairing in this device\'s Bluetooth settings.';
+
+  @override
+  String get noPrinterChosen => 'No printer chosen yet.';
+
+  @override
+  String get printerPermissionDenied =>
+      'DukanPro may not use Bluetooth or USB. Allow it in this device\'s settings, then try again.';
+
+  @override
   String get notifications => 'Notifications';
 
   @override

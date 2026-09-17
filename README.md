@@ -73,9 +73,11 @@ Built does not mean shipped. What is still open:
   the pilot work — receipts in Dari and Pashto, void and returns at the till,
   sign-in lockout, the deployment kit, and the no-server mode — waits in PR #3.
 - **Deferred on purpose.** Push notifications (the app keeps its own in-app
-  feed instead), camera scanning and Bluetooth/USB printers (a keyboard-wedge
-  scanner and network ESC/POS printers do work), and a real language model
-  behind the insight narrator, which is template-based today.
+  feed instead), and a real language model behind the insight narrator, which
+  is template-based today.
+- **Built, not yet tried on real hardware.** Camera scanning on a device without
+  Google Play services, and Bluetooth, BLE and USB receipt printers
+  ([`docs/hardware.md`](docs/hardware.md)).
 - **Before a shop uses it.** A server and a domain for the multi-device setup;
   the Android upload key, which only the app's owner should create and keep
   ([`docs/release-android.md`](docs/release-android.md)); TestFlight for iOS; and

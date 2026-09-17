@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/camera_scan_button.dart';
 import '../../widgets/money.dart';
 import '../../widgets/labels.dart';
 import '../../widgets/error_text.dart';
@@ -175,7 +176,13 @@ class _ProductEditScreenState extends ConsumerState<ProductEditScreen> {
                 if (_isNew)
                   TextFormField(
                     controller: _barcode,
-                    decoration: InputDecoration(labelText: l.barcodeLabel, border: const OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: l.barcodeLabel,
+                      border: const OutlineInputBorder(),
+                      suffixIcon: ref.watch(cameraScanProvider) == null
+                          ? null
+                          : CameraScanButton(onScanned: (code) => _barcode.text = code),
+                    ),
                     validator: (v) => (v ?? '').trim().length > 64 ? l.errTooLong : null,
                   ),
                 const SizedBox(height: 4),
@@ -286,7 +293,14 @@ class _BarcodesState extends ConsumerState<_Barcodes> {
           Expanded(
             child: TextField(
               controller: _code,
-              decoration: InputDecoration(labelText: l.barcodeLabel, errorText: _error, isDense: true),
+              decoration: InputDecoration(
+                labelText: l.barcodeLabel,
+                errorText: _error,
+                isDense: true,
+                suffixIcon: ref.watch(cameraScanProvider) == null
+                    ? null
+                    : CameraScanButton(onScanned: (code) => _code.text = code),
+              ),
             ),
           ),
           IconButton(
