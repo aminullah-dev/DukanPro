@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show File;
 
 import 'package:dukan_core/dukan_core.dart';
 import 'package:dukan_data/dukan_data.dart';
@@ -6,12 +7,16 @@ import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../infrastructure/file_share.dart' show shareFileProvider, workDirectoryProvider;
+import '../../infrastructure/plugin_printers.dart' show PrinterAccessDenied;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/camera_scan_button.dart';
 import '../../widgets/digits.dart';
 import '../../widgets/bidi.dart';
 import '../../widgets/money.dart';
 import '../../widgets/dates.dart';
 import '../../widgets/labels.dart';
+import '../../widgets/share_origin.dart';
 import '../../widgets/shell_scope.dart';
 import '../../widgets/error_text.dart';
 import '../../widgets/number_input.dart';
@@ -210,6 +215,19 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (p != null && mounted) _add(p);
   }
 
+  /// A code the camera read. The camera was aimed on purpose, so a code no
+  /// product has is said out loud, where a stray wedge scan stays quiet.
+  Future<void> _addByCamera(String code) async {
+    final p = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(code));
+    if (!mounted) return;
+    if (p == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).barcodeNoProduct)));
+      return;
+    }
+    _add(p);
+  }
+
   /// Typed or scanned into the search field: a barcode adds its product and
   /// clears the field; anything else stays a name search. (A scanner's keys land
   /// here while the field has focus, so the scan listener leaves them alone.)
@@ -285,6 +303,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             focusNode: _searchFocus,
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
+              suffixIcon: canSell && ref.watch(cameraScanProvider) != null
+                  ? CameraScanButton(onScanned: _addByCamera)
+                  : null,
               hintText: l.searchHint,
               border: const OutlineInputBorder(),
             ),
@@ -980,6 +1001,7 @@ class _ReceiptDialog extends ConsumerStatefulWidget {
 
 class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
   bool _printing = false;
+  bool _sharing = false;
   late String _status = widget.sale.status; // voided from here, too
   bool _hasReturns = false; // a sale with returns is past voiding
   String? _returnOfNumber; // for a return: the sale it takes goods back from
@@ -1007,6 +1029,39 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  ReceiptData _receiptData(AppLocalizations l) => buildReceipt(
+        shopName: ref.read(shopNameProvider), sale: widget.sale, lines: widget.lines, zone: ref.read(branchZoneProvider),
+        footer: _returnOfNumber == null ? null : l.returnOf(ltr(_returnOfNumber!)),
+      );
+
+  /// The receipt as a PDF, for a customer who wants it on their phone.
+  Future<void> _sharePdf(AppLocalizations l, Rect? origin) async {
+    setState(() => _sharing = true);
+    try {
+      final pdf = await receiptPdf(
+        l: l, data: _receiptData(l), occurredAt: widget.sale.occurredAt, zone: ref.read(branchZoneProvider),
+        paperMm: 80, // the wider roll reads better on a screen, whatever this shop prints on
+        voided: _status == 'voided',
+        heading: widget.sale.refundOf == null ? null : l.returnLabel,
+      );
+      final dir = await ref.read(workDirectoryProvider)();
+      // Receipts sent before have gone on; only the newest is kept.
+      for (final old in dir.listSync().whereType<File>()) {
+        if (old.uri.pathSegments.last.startsWith(_receiptFilePrefix)) old.deleteSync();
+      }
+      final name = widget.sale.number.replaceAll(RegExp('[^A-Za-z0-9-]'), '-');
+      final file = File('${dir.path}/$_receiptFilePrefix$name.pdf');
+      await file.writeAsBytes(pdf, flush: true);
+      await ref.read(shareFileProvider)(file.path, mimeType: 'application/pdf', origin: origin);
+    } on Object {
+      _say(l.receiptPdfFailed);
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  static const _receiptFilePrefix = 'dukanpro-receipt-';
+
   Future<void> _print(AppLocalizations l) async {
     final printer = ref.read(receiptPrinterProvider);
     if (printer == null) {
@@ -1015,20 +1070,19 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
     }
     setState(() => _printing = true);
     try {
-      final zone = ref.read(branchZoneProvider);
-      final data = buildReceipt(
-        shopName: ref.read(shopNameProvider), sale: widget.sale, lines: widget.lines, zone: zone,
-        footer: _returnOfNumber == null ? null : l.returnOf(ltr(_returnOfNumber!)),
-      );
       // Drawn in the reader's language: the printer has no Persian letters of its own.
       final image = await rasterReceipt(
-        l: l, data: data, occurredAt: widget.sale.occurredAt, zone: zone,
+        l: l, data: _receiptData(l), occurredAt: widget.sale.occurredAt, zone: ref.read(branchZoneProvider),
         paperMm: ref.read(printerSettingsControllerProvider).asData?.value.paperMm ?? 80,
         voided: _status == 'voided',
         heading: widget.sale.refundOf == null ? null : l.returnLabel,
       );
       // A printer that stops answering must not hold the till.
-      await printer.printRaw(const EscPosEncoder().encodeRaster(image)).timeout(const Duration(seconds: 10));
+      await printer.printRaw(const EscPosEncoder().encodeRaster(image)).timeout(printJobTimeout(printer.transport));
+    } on PrinterAccessDenied {
+      _say(l.printerPermissionDenied);
+      if (mounted) setState(() => _printing = false);
+      return;
     } on Object {
       _say(l.printFailed);
       if (mounted) setState(() => _printing = false);
@@ -1037,7 +1091,10 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
     var drawerOk = true;
     if (widget.openDrawer) {
       try {
-        await printer.kickCashDrawer().timeout(const Duration(seconds: 5));
+        // A network printer's drawer answers at once; a Bluetooth or USB one connects again first.
+        final drawerTimeout =
+            printer.transport == PrinterTransport.tcp ? const Duration(seconds: 5) : printJobTimeout(printer.transport);
+        await printer.kickCashDrawer().timeout(drawerTimeout);
       } on Object {
         drawerOk = false; // the receipt did print: say that the drawer failed, not the print
       }
@@ -1101,6 +1158,15 @@ class _ReceiptDialogState extends ConsumerState<_ReceiptDialog> {
           onVoided: () {
             if (mounted) setState(() => _status = 'voided');
           },
+        ),
+        Builder(
+          builder: (buttonContext) => TextButton.icon(
+            onPressed: _sharing ? null : () => _sharePdf(l, shareOriginOf(buttonContext)),
+            icon: _sharing
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.picture_as_pdf_outlined),
+            label: Text(l.shareReceiptPdf),
+          ),
         ),
         TextButton.icon(
           onPressed: _printing ? null : () => _print(l),

@@ -1,10 +1,12 @@
-/// DukanPro hardware ports. Implementations are owned by us (thin platform
-/// channels / TCP sockets) so no vendor plugin leaks into the app. Preferred
-/// transports: HID scanners (keyboard), camera scan (ML Kit), and ESC/POS over
-/// TCP :9100 (pure Dart sockets) — with Bluetooth/USB as secondary.
+/// DukanPro hardware ports. This package stays pure Dart: the TCP printer lives
+/// here, and the vendor plugins for camera scanning and for Bluetooth and USB
+/// printers stay inside the app's infrastructure adapters, behind these ports,
+/// so no plugin type reaches the till. Transports: HID (keyboard-wedge) and
+/// camera scanners; ESC/POS over TCP :9100, Bluetooth Classic, BLE and USB.
 library;
 
 export 'src/escpos.dart';
+export 'src/pdf.dart';
 export 'src/raster.dart';
 export 'src/receipt.dart';
 export 'src/tcp_printer.dart';
@@ -23,7 +25,20 @@ abstract interface class BarcodeScanner {
 }
 
 /// How a thermal printer is reached.
-enum PrinterTransport { tcp, bluetooth, usb }
+enum PrinterTransport {
+  /// ESC/POS over TCP, usually port 9100, on Wi-Fi or a LAN cable.
+  tcp,
+
+  /// Bluetooth Classic (SPP), which most small receipt printers speak. Android
+  /// only: iOS has no API for it.
+  bluetooth,
+
+  /// Bluetooth Low Energy: the only Bluetooth printers an iPhone or iPad can use.
+  ble,
+
+  /// A printer on the device's USB port. Android only.
+  usb,
+}
 
 /// An ESC/POS thermal receipt printer. Receipt layout is built per-locale and
 /// fonts are embedded; see docs/localization.md.

@@ -91,7 +91,7 @@ The server is authoritative; the device keeps just enough to work offline.
   - The lock screen offers no sign-out.
   - Instead it offers "use another account", which keeps the cached session until that sign-in succeeds. Going back keeps the POS cart.
 - **Biometric unlock.** It stays off until the user opts in with their password. It accepts biometrics only (never the device PIN) and belongs to that one user.
-- **Backups.** Android cloud backup and device transfer exclude all app data.
+- **Backups.** Android cloud backup and device transfer exclude all app data. The only copy that leaves a device is the one a shop with no server makes itself, encrypted with its password (see [Backing up](#backing-up-a-shop-with-no-server)).
 - **The local database is encrypted** with SQLCipher (review F047). The key is 32 random bytes that only this device's secure storage holds, and on iOS it is never restored onto another phone. A copied file or a backup cannot be read anywhere else.
   - A database written before encryption is encrypted in place at the next start, keeping every row.
   - A file the key cannot open (the key was lost, or the file came from another device) is renamed aside, never deleted. The device starts empty and fills again from the server; changes that had not synced stay in the file set aside.
@@ -106,10 +106,26 @@ One device can be the whole shop. "Set up without a server" sits beside first-ru
 - **No offline window.** The window is the server's rule — how long a device may keep unlocking before the server confirms the user again. With no server there is nothing to confirm against, so `OFFLINE_EXPIRED` cannot happen.
 - **A PIN and a fingerprint always have a session behind them.** They wait for a live session only because a server can end one; here the device is the authority.
 - **No sign-out.** It would wipe the only account on the only device and leave the shop locked out of its own books, with no server to let it back in. The shell offers Lock instead, and the controller refuses it.
-- **Nothing is recoverable.** A forgotten password is a shop locked out of its books, so the setup screen says so while the password is still being chosen.
+- **Nothing is recoverable without the password.** A forgotten password is a shop locked out of its books, so the setup screen says so while the password is still being chosen. A lost or broken device is recoverable only from a backup, below.
 - What a server would own is not offered at all: staff, branches, the audit trail, insights and notifications, and sync — the device never syncs on its own and shows no sync control.
 - Everything else is unchanged, because it was already the device's: the till, products, customers and debt, suppliers, shifts, receipts, reports, voids and returns, the idle lock, the encrypted database.
 - The device still records every change in its outbox, so a shop that later grows into a server has its history ready. Moving a standalone shop onto a server is not built yet.
+
+### Backing up a shop with no server
+
+With no server, the device is the only place the books live. The owner backs the shop up from Settings, and the dashboard asks for a backup while there is none or the last is more than seven days old.
+
+- **What a backup is.** The whole device database (products, stock, sales, customers and debt, suppliers, shifts, the outbox, settings, the owner's profile) written to one `.dukanpro` file by `sqlcipher_export`. The file is itself a SQLCipher database keyed by the shop's password, from which SQLCipher derives the key (PBKDF2-HMAC-SHA512). The device's own random key is never in it.
+- **Making one.** The password is asked again and checked against the device's verifier, so the file is always keyed by the password that unlocks the shop. The file goes to the share sheet (WhatsApp, Telegram, email, Files, a USB stick). A backup counts as made only when a place to send it was chosen; the time is kept as `backup.last_at`.
+- **Restoring.** "Restore a shop from a backup" on the sign-in screen. The person chooses the file and types the password it was made with. The restore:
+  - refuses a device that already holds a shop (`BACKUP_DEVICE_NOT_EMPTY`), so it never overwrites one;
+  - reads a wrong password, or a file that is no backup, as `BACKUP_PASSWORD_WRONG`;
+  - refuses a backup from a newer app (`BACKUP_TOO_NEW`), and brings one from an older app up to this schema with the usual migrations first;
+  - works on a copy, so the chosen file is never changed, and replaces every table in one transaction;
+  - keeps this device's own id (`device.id`), so its sale numbers never repeat the old device's;
+  - makes the device a shop with no server, whose password is the backup's.
+- **What does not come back.** The PIN and fingerprint unlock, which belong to a device; they are set again on the new one.
+- **Who holds the password holds the shop.** Anyone with the file and the password can read the whole shop. A backup cannot be opened without the password, and nobody can recover one.
 
 ## Server secrets and first run
 

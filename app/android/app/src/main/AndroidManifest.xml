@@ -2,6 +2,24 @@
     <!-- The API server and the receipt printer (TCP 9100) are on the network.
          Debug builds get this from src/debug; release builds need it here. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Bluetooth receipt printers. Up to Android 11 a Bluetooth search also needs
+         location; from Android 12 it has its own permissions, never for location.
+         The camera permission comes with mobile_scanner, optional like these. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- None of this hardware is required: a phone or tablet without it still installs the app. -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
+    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
+    <!-- Implied as required by the location permissions (a Bluetooth search up to
+         Android 11) and by network_info_plus's Wi-Fi state: neither is needed, and
+         Google Play would otherwise hide the app from devices that lack them. -->
+    <uses-feature android:name="android.hardware.location" android:required="false"/>
+    <uses-feature android:name="android.hardware.wifi" android:required="false"/>
     <application
         android:label="DukanPro"
         android:name="${applicationName}"

@@ -68,6 +68,10 @@
 	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>DukanPro uses Face ID to unlock the app, only for the person who turned it on in Settings.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>DukanPro uses the camera to read barcodes, only while you are scanning.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>DukanPro uses Bluetooth to print receipts on your shop's printer.</string>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>

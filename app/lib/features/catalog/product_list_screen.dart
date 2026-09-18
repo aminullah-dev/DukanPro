@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../widgets/camera_scan_button.dart';
 import '../../widgets/digits.dart';
 import '../../widgets/bidi.dart';
 import '../../widgets/money.dart';
@@ -28,9 +29,18 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
     ref.invalidate(productsProvider);
   }
 
-  Future<void> _onScan(String code) async {
+  /// Opens the product a scanned code names. A code typed or wedge-scanned into
+  /// the search that names nothing stays a search; one the camera read is said.
+  Future<void> _onScan(String code, {bool sayIfMissing = false}) async {
     final product = await ref.read(localCatalogProvider).products.findByBarcode(normalizeDigits(code));
-    if (!mounted || product == null) return;
+    if (!mounted) return;
+    if (product == null) {
+      if (sayIfMissing) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).barcodeNoProduct)));
+      }
+      return;
+    }
     await _open(ProductEditScreen(product: product));
   }
 
@@ -57,6 +67,9 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
             child: TextField(
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon: ref.watch(cameraScanProvider) == null
+                    ? null
+                    : CameraScanButton(onScanned: (code) => _onScan(code, sayIfMissing: true)),
                 hintText: l.searchHint,
                 border: const OutlineInputBorder(),
               ),

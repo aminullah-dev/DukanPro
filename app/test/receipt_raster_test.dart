@@ -1,5 +1,8 @@
 // Receipts print as a picture, so Dari and Pashto reach the paper; the picture
 // fits the roll, reads right to left in Dari, and says when a sale was voided.
+import 'dart:convert';
+import 'dart:io' show ZLibDecoder;
+
 import 'package:dukan_core/dukan_core.dart' show defaultBranchZone;
 import 'package:dukan_hardware/dukan_hardware.dart';
 import 'package:dukanpro/features/pos/receipt_raster.dart';
@@ -92,5 +95,27 @@ void main() {
     expect(bytes.length, 2 + bands * 8 + image.bits.length + 3 + 3);
     expect(bytes.sublist(2, 6), [0x1D, 0x76, 0x30, 0x00]);
     expect(bytes.sublist(6, 8), [48, 0]); // 384 dots = 48 bytes a row
+  });
+
+  testWidgets('a receipt sent as a PDF is the printed picture, at the paper\'s size and three times as sharp', (tester) async {
+    final l = await AppLocalizations.delegate.load(const Locale('fa'));
+    final printed = await _draw(tester, 'fa');
+    final pdf = (await tester.runAsync(() => receiptPdf(
+          l: l, data: _receipt, occurredAt: DateTime.utc(2026, 9, 11, 10), zone: defaultBranchZone, paperMm: 80,
+        )))!;
+    final text = latin1.decode(pdf);
+    expect(text, startsWith('%PDF-1.4'));
+    // 576 dots at 203 dpi is 204.3 points across.
+    expect(text, contains('/MediaBox [0 0 204.30 ${(printed.height * 72 / 203).toStringAsFixed(2)}]'));
+    expect(text, contains('/Width ${576 * 3} /Height ${printed.height * 3} '));
+
+    final header = RegExp(r'/Length (\d+) >>\nstream\n').firstMatch(text)!;
+    final rgb = ZLibDecoder().convert(pdf.sublist(header.end, header.end + int.parse(header.group(1)!)));
+    expect(rgb, hasLength(576 * 3 * printed.height * 3 * 3));
+    var dark = 0;
+    for (var i = 0; i < rgb.length; i += 3) {
+      if (rgb[i] < 128) dark++;
+    }
+    expect(dark, greaterThan(2000 * 9), reason: 'the words are there, drawn nine times the dots');
   });
 }

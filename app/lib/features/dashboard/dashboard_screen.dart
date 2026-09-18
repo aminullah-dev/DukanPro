@@ -11,6 +11,7 @@ import '../../widgets/shell_scope.dart';
 import '../../widgets/locale_toggle.dart';
 import '../auth/providers.dart';
 import '../auth/session.dart';
+import '../settings/backup.dart';
 
 final localReportsProvider = Provider<LocalReports>(
   (ref) => LocalReports(ref.watch(databaseProvider)),
@@ -46,6 +47,7 @@ class DashboardScreen extends ConsumerWidget {
         data: (d) => ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const BackupReminder(),
             // Tiles take the height their text needs at any text size, not a
             // fraction of their width (a phone's narrow tile would overflow).
             GridView(

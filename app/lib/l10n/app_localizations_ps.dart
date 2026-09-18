@@ -865,6 +865,135 @@ class AppLocalizationsPs extends AppLocalizations {
   String get printFailed => 'چاپګر ته لاسرسی ونشو.';
 
   @override
+  String get scanWithCamera => 'د کمرې سکن';
+
+  @override
+  String get cameraLight => 'څراغ';
+
+  @override
+  String get cameraPermissionDenied =>
+      'دوکان‌پرو د کمرې د کارولو اجازه نه لري. د همدې وسیلې په تنظیماتو کې اجازه ورکړئ او بیا هڅه وکړئ.';
+
+  @override
+  String get cameraUnavailable => 'دا وسیله کمره نشي کارولی.';
+
+  @override
+  String get barcodeNoProduct => 'هیڅ توکی دا بارکوډ نه لري.';
+
+  @override
+  String get printerConnection => 'اتصال';
+
+  @override
+  String get printerTransportTcp => 'شبکه (وای‌فای یا کېبل)';
+
+  @override
+  String get printerTransportBluetooth => 'بلوتوث';
+
+  @override
+  String get printerTransportBle => 'کم مصرفه بلوتوث (BLE)';
+
+  @override
+  String get printerTransportUsb => 'د USB پورټ';
+
+  @override
+  String get findPrinters => 'چاپګرونه موندل';
+
+  @override
+  String get findingPrinters => 'د چاپګرونو لټون روان دی…';
+
+  @override
+  String get noPrintersFound =>
+      'هیڅ چاپګر ونه موندل شو. روښانه یې کړئ او نږدې یې راوړئ. کېدای شي بلوتوثي چاپګر لومړی د همدې وسیلې د بلوتوث په تنظیماتو کې وصل شي.';
+
+  @override
+  String get noPrinterChosen => 'تر اوسه هیڅ چاپګر نه دی ټاکل شوی.';
+
+  @override
+  String get printerPermissionDenied =>
+      'دوکان‌پرو د بلوتوث یا USB د کارولو اجازه نه لري. د همدې وسیلې په تنظیماتو کې اجازه ورکړئ او بیا هڅه وکړئ.';
+
+  @override
+  String get backupShop => 'د دې دوکان خوندي کاپي جوړول';
+
+  @override
+  String get backupHelp =>
+      'ټول دوکان په یوه فایل کې، ستاسو په پټنوم تړل شوی. دا فایل له دې وسیلې بهر یو ځای ته ولېږئ: واټس‌اپ، ټلګرام، برېښنالیک یا فلش.';
+
+  @override
+  String get backupNever => 'تر اوسه خوندي کاپي نه ده جوړه شوې';
+
+  @override
+  String backupLast(String time) {
+    return 'وروستۍ خوندي کاپي: $time';
+  }
+
+  @override
+  String get backupPasswordTitle => 'د دوکان پټنوم';
+
+  @override
+  String get backupAction => 'کاپي جوړول';
+
+  @override
+  String get backupReady =>
+      'خوندي کاپي جوړه شوه. له دې وسیلې بهر یې یو ځای وساتئ.';
+
+  @override
+  String get backupFailed => 'خوندي کاپي جوړه نه شوه. بیا هڅه وکړئ.';
+
+  @override
+  String get backupReminderNever =>
+      'د دې دوکان تر اوسه هېڅ خوندي کاپي نه ده جوړه شوې. که دا وسیله ورکه یا خرابه شي، د دوکان حساب کتاب به هم ورسره له منځه ولاړ شي.';
+
+  @override
+  String backupReminderOld(int days) {
+    final intl.NumberFormat daysNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String daysString = daysNumberFormat.format(days);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'وروستۍ خوندي کاپي $daysString ورځې مخکې جوړه شوې ده.',
+      one: 'وروستۍ خوندي کاپي $daysString ورځ مخکې جوړه شوې ده.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get backupNow => 'همدا اوس کاپي جوړول';
+
+  @override
+  String get restoreFromBackup => 'خوندي کاپي بېرته راوړل';
+
+  @override
+  String get restoreAction => 'بېرته راوړل';
+
+  @override
+  String get restoreFailed => 'بېرته راوړل ناکام شول. بیا هڅه وکړئ.';
+
+  @override
+  String get errBackupPassword =>
+      'دا پټنوم دا فایل نه خلاصوي. هماغه پټنوم وکاروئ چې خوندي کاپي پرې جوړه شوې وه، او وګورئ چې دا فایل د دوکان‌پرو خوندي کاپي ده.';
+
+  @override
+  String get errBackupTooNew =>
+      'دا خوندي کاپي د دوکان‌پرو یوې نوې نسخې جوړه کړې ده. لومړی اپ نوی کړئ، بیا یې بېرته راوړئ.';
+
+  @override
+  String get errBackupNotAShop => 'په دې فایل کې هېڅ دوکان نشته.';
+
+  @override
+  String get errBackupDeviceNotEmpty =>
+      'پر همدې وسیله له مخکې یو دوکان شته. خوندي کاپي یوازې پر داسې وسیله بېرته راوړل کېږي چې دوکان پرې نه وي.';
+
+  @override
+  String get shareReceiptPdf => 'PDF لېږل';
+
+  @override
+  String get receiptPdfFailed => 'د PDF فایل جوړ نه شو. بیا هڅه وکړئ.';
+
+  @override
   String get notifications => 'خبرتیاوې';
 
   @override

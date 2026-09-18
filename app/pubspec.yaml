@@ -32,6 +32,10 @@ dependencies:
   path_provider: ^2.1.6
   local_auth: ^3.0.2
   drift: ^2.35.0
+  mobile_scanner: 7.4.2
+  unified_esc_pos_printer: 3.4.0
+  share_plus: 13.3.0
+  file_picker: 13.1.0
 
 dev_dependencies:
   flutter_test:
@@ -59,3 +63,10 @@ hooks:
   user_defines:
     sqlite3:
       source: sqlcipher
+
+dependency_overrides:
+  # usb_serial 0.5.2, which unified_esc_pos_printer uses, no longer builds with
+  # Gradle 9: this is a copy with its Android build file patched.
+  # See third_party/usb_serial/PATCHES.md.
+  usb_serial:
+    path: ../third_party/usb_serial

@@ -21,7 +21,9 @@ phone/tablet · macOS (Windows next).
 - **Two ways to run a shop:** with a server behind it (staff, branches, audit
   trail, several devices syncing), or **one device on its own** — no server to
   install and no internet at all. Chosen when the shop is first set up
-  ([`docs/domain/identity-access.md`](docs/domain/identity-access.md)).
+  ([`docs/domain/identity-access.md`](docs/domain/identity-access.md)). A shop
+  on one device backs itself up to a file encrypted with its password, and
+  restores from it onto a new device.
 
 ## Layout
 
@@ -69,17 +71,20 @@ Melos (optional monorepo orchestration): `dart pub global activate melos` then
 
 Built does not mean shipped. What is still open:
 
-- **Not on `main` yet.** The encrypted database and the idle lock wait in PR #2;
-  the pilot work — receipts in Dari and Pashto, void and returns at the till,
-  sign-in lockout, the deployment kit, and the no-server mode — waits in PR #3.
+- **Not on `main` yet.** The handover work waits in PR #5: the app icon, signed
+  Android release builds, camera scanning, Bluetooth, BLE and USB printers,
+  backups for a shop with no server, and receipts sent as PDF.
 - **Deferred on purpose.** Push notifications (the app keeps its own in-app
-  feed instead), camera scanning and Bluetooth/USB printers (a keyboard-wedge
-  scanner and network ESC/POS printers do work), and a real language model
-  behind the insight narrator, which is template-based today.
+  feed instead), and a real language model behind the insight narrator, which
+  is template-based today.
+- **Built, not yet tried on real hardware.** Camera scanning on a device without
+  Google Play services, and Bluetooth, BLE and USB receipt printers
+  ([`docs/hardware.md`](docs/hardware.md)).
 - **Before a shop uses it.** A server and a domain for the multi-device setup;
-  an app icon, because both platforms still show Flutter's; release signing for
-  Android and TestFlight for iOS; and a run on real phones, tablets and a real
-  receipt printer, which has not happened yet.
+  the Android upload key, which only the app's owner should create and keep
+  ([`docs/release-android.md`](docs/release-android.md)); TestFlight for iOS; and
+  a run on real phones, tablets and a real receipt printer, which has not
+  happened yet.
 
 ## License
 

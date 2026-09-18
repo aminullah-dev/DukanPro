@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io' show Directory;
 
 import 'package:dukan_core/dukan_core.dart' show ValidationError, assertPasswordStrong, newId;
 import 'package:dukan_data/dukan_data.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../composition.dart';
 import '../../infrastructure/auth_api.dart';
+import '../../infrastructure/device_id.dart';
 import '../../infrastructure/http.dart';
 import '../../infrastructure/secure_store.dart';
 import '../../infrastructure/verifier.dart';
@@ -159,6 +161,41 @@ class AuthController extends Notifier<AuthState> {
     } catch (e, st) {
       state = AuthLoggedOut(error: _notSaved(e, st));
     }
+  }
+
+  /// Puts a shop with no server onto this device from a backup of it (see
+  /// [ShopBackup]), on a device that holds no shop yet. The backup opens with
+  /// the password the shop had when it was made, which is its owner's, so that
+  /// password unlocks this device from now on. The device keeps its own id.
+  Future<void> restoreStandalone({
+    required String path,
+    required String password,
+    Directory? workDirectory,
+  }) async {
+    try {
+      await ShopBackup(ref.read(databaseProvider))
+          .restoreInto(path, password, keepSettings: {deviceIdSettingKey}, workDirectory: workDirectory);
+      final profile = await _profiles.current();
+      if (profile == null) throw ValidationError('BACKUP_NOT_A_SHOP');
+      ref.read(appModeProvider.notifier).set(AppMode.standalone);
+      await _store.delete(SecureKeys.pinVerifier);
+      await _store.delete(SecureKeys.biometricUser);
+      await _store.write(SecureKeys.passwordVerifier, await _verifier.derive(password));
+      await _markValidated();
+      state = AuthLoggedIn(profile);
+    } on ValidationError catch (e) {
+      state = AuthLoggedOut(error: e.code);
+    } catch (e, st) {
+      developer.log('a backup could not be restored', name: 'auth', error: e, stackTrace: st);
+      state = const AuthLoggedOut(error: 'BACKUP_FAILED');
+    }
+  }
+
+  /// Whether [password] is this device's app password: asked again before
+  /// something as weighty as writing the whole shop out to a file.
+  Future<bool> checkPassword(String password) async {
+    final stored = await _store.read(SecureKeys.passwordVerifier);
+    return stored != null && await _verifier.verify(password, stored);
   }
 
   CachedProfileRow? get _returnTo {

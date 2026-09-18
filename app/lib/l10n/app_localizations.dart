@@ -1529,6 +1529,216 @@ abstract class AppLocalizations {
   /// **'Couldn\'t reach the printer.'**
   String get printFailed;
 
+  /// No description provided for @scanWithCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan with camera'**
+  String get scanWithCamera;
+
+  /// No description provided for @cameraLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get cameraLight;
+
+  /// No description provided for @cameraPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'DukanPro may not use the camera. Allow it in this device\'s settings, then try again.'**
+  String get cameraPermissionDenied;
+
+  /// No description provided for @cameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This device can\'t use a camera.'**
+  String get cameraUnavailable;
+
+  /// No description provided for @barcodeNoProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'No product has this barcode.'**
+  String get barcodeNoProduct;
+
+  /// No description provided for @printerConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get printerConnection;
+
+  /// No description provided for @printerTransportTcp.
+  ///
+  /// In en, this message translates to:
+  /// **'Network (Wi-Fi or cable)'**
+  String get printerTransportTcp;
+
+  /// No description provided for @printerTransportBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth'**
+  String get printerTransportBluetooth;
+
+  /// No description provided for @printerTransportBle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth LE'**
+  String get printerTransportBle;
+
+  /// No description provided for @printerTransportUsb.
+  ///
+  /// In en, this message translates to:
+  /// **'USB'**
+  String get printerTransportUsb;
+
+  /// No description provided for @findPrinters.
+  ///
+  /// In en, this message translates to:
+  /// **'Find printers'**
+  String get findPrinters;
+
+  /// No description provided for @findingPrinters.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for printers…'**
+  String get findingPrinters;
+
+  /// No description provided for @noPrintersFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No printer found. Turn it on and bring it closer. A Bluetooth printer may first need pairing in this device\'s Bluetooth settings.'**
+  String get noPrintersFound;
+
+  /// No description provided for @noPrinterChosen.
+  ///
+  /// In en, this message translates to:
+  /// **'No printer chosen yet.'**
+  String get noPrinterChosen;
+
+  /// No description provided for @printerPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'DukanPro may not use Bluetooth or USB. Allow it in this device\'s settings, then try again.'**
+  String get printerPermissionDenied;
+
+  /// No description provided for @backupShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up this shop'**
+  String get backupShop;
+
+  /// No description provided for @backupHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'The whole shop in one file, locked with your password. Send it somewhere other than this device: WhatsApp, Telegram, email or a USB stick.'**
+  String get backupHelp;
+
+  /// No description provided for @backupNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never backed up'**
+  String get backupNever;
+
+  /// No description provided for @backupLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Last backup: {time}'**
+  String backupLast(String time);
+
+  /// No description provided for @backupPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The shop\'s password'**
+  String get backupPasswordTitle;
+
+  /// No description provided for @backupAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up'**
+  String get backupAction;
+
+  /// No description provided for @backupReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup made. Keep it somewhere other than this device.'**
+  String get backupReady;
+
+  /// No description provided for @backupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The backup could not be made. Try again.'**
+  String get backupFailed;
+
+  /// No description provided for @backupReminderNever.
+  ///
+  /// In en, this message translates to:
+  /// **'This shop has never been backed up. If this device is lost or broken, the shop\'s books go with it.'**
+  String get backupReminderNever;
+
+  /// No description provided for @backupReminderOld.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{The last backup is a day old.} other{The last backup is {days} days old.}}'**
+  String backupReminderOld(int days);
+
+  /// No description provided for @backupNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get backupNow;
+
+  /// No description provided for @restoreFromBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore a shop from a backup'**
+  String get restoreFromBackup;
+
+  /// No description provided for @restoreAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get restoreAction;
+
+  /// No description provided for @restoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The backup could not be restored. Try again.'**
+  String get restoreFailed;
+
+  /// No description provided for @errBackupPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'This password does not open the file. Use the password the shop had when the backup was made, and check that the file is a DukanPro backup.'**
+  String get errBackupPassword;
+
+  /// No description provided for @errBackupTooNew.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup was made by a newer DukanPro. Update the app, then restore it.'**
+  String get errBackupTooNew;
+
+  /// No description provided for @errBackupNotAShop.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no shop in this file.'**
+  String get errBackupNotAShop;
+
+  /// No description provided for @errBackupDeviceNotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This device already holds a shop. A backup restores only onto a device that holds none.'**
+  String get errBackupDeviceNotEmpty;
+
+  /// No description provided for @shareReceiptPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Send as PDF'**
+  String get shareReceiptPdf;
+
+  /// No description provided for @receiptPdfFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The PDF could not be made. Try again.'**
+  String get receiptPdfFailed;
+
   /// No description provided for @notifications.
   ///
   /// In en, this message translates to:

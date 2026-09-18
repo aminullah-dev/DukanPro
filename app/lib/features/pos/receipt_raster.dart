@@ -1,3 +1,5 @@
+import 'dart:isolate';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dukan_core/dukan_core.dart' show branchWallClock;
@@ -22,6 +24,56 @@ Future<RasterImage> rasterReceipt({
   required int paperMm,
   bool voided = false,
   String? heading,
+}) async {
+  final (:rgba, :width, :height) = await _drawReceipt(
+    l: l, data: data, occurredAt: occurredAt, zone: zone, paperMm: paperMm, voided: voided, heading: heading, scale: 1,
+  );
+  return RasterImage.fromRgba(rgba, width: width, height: height);
+}
+
+/// The printed receipt as a PDF to send to a customer: the same drawing, at the
+/// paper's own size, but three times as sharp so it reads well on a phone.
+Future<Uint8List> receiptPdf({
+  required AppLocalizations l,
+  required ReceiptData data,
+  required DateTime occurredAt,
+  required String zone,
+  required int paperMm,
+  bool voided = false,
+  String? heading,
+}) async {
+  const scale = 3;
+  final (:rgba, :width, :height) = await _drawReceipt(
+    l: l, data: data, occurredAt: occurredAt, zone: zone, paperMm: paperMm, voided: voided, heading: heading, scale: scale,
+  );
+  // Compressing a tall receipt takes a moment: off the UI isolate.
+  return Isolate.run(() {
+    final rgb = Uint8List(width * height * 3);
+    for (var i = 0, j = 0; j < rgb.length; i += 4, j += 3) {
+      rgb[j] = rgba[i];
+      rgb[j + 1] = rgba[i + 1];
+      rgb[j + 2] = rgba[i + 2];
+    }
+    return imagePdf(
+      rgb: rgb, width: width, height: height,
+      pageWidth: width / scale * _pointsPerDot, pageHeight: height / scale * _pointsPerDot,
+    );
+  });
+}
+
+/// A thermal printer's dot, 1/203 inch, in PDF points of 1/72 inch.
+const _pointsPerDot = 72 / 203;
+
+/// Lays the receipt out in printer dots and draws it [scale] times over, on white.
+Future<({Uint8List rgba, int width, int height})> _drawReceipt({
+  required AppLocalizations l,
+  required ReceiptData data,
+  required DateTime occurredAt,
+  required String zone,
+  required int paperMm,
+  required bool voided,
+  required String? heading,
+  required int scale,
 }) async {
   final width = paperDots(paperMm);
   final solar = l.localeName.startsWith('fa') || l.localeName.startsWith('ps');
@@ -59,6 +111,7 @@ Future<RasterImage> rasterReceipt({
   final height = (margin * 2 + rows.fold<double>(0, (sum, r) => sum + r.height + gap)).ceil();
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder)
+    ..scale(scale.toDouble())
     ..drawRect(Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()), Paint()..color = const Color(0xFFFFFFFF));
   var y = margin;
   for (final row in rows) {
@@ -66,11 +119,11 @@ Future<RasterImage> rasterReceipt({
     y += row.height + gap;
   }
   final picture = recorder.endRecording();
-  final image = await picture.toImage(width, height);
+  final image = await picture.toImage(width * scale, height * scale);
   final pixels = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
   image.dispose();
   picture.dispose();
-  return RasterImage.fromRgba(pixels!.buffer.asUint8List(), width: width, height: height);
+  return (rgba: pixels!.buffer.asUint8List(), width: width * scale, height: height * scale);
 }
 
 sealed class _Row {

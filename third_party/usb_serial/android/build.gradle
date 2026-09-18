@@ -1,0 +1,27 @@
+// DukanPro's patch of usb_serial 0.5.2: see ../PATCHES.md. The published build
+// file no longer evaluates under Gradle 9 and Android Gradle Plugin 9. It called
+// jcenter(), which Gradle 9 removed; it pinned AGP 4.1 in its own buildscript;
+// and it added JitPack to the repositories of every project in the build. The
+// app's root build declares the repositories, JitPack only for the driver below.
+group 'dev.bessems.usbserial'
+version '1.0'
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'dev.bessems.usbserial'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 21
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'com.github.felHR85:UsbSerial:6.1.0'
+}

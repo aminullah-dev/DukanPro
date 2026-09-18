@@ -69,6 +69,19 @@ void assertUniqueBarcode({required String code, required bool taken}) {
   if (taken) throw ConflictError('BARCODE_DUPLICATE', {'barcode': code});
 }
 
+/// The codes a scanned barcode may be stored under, in the order to try them.
+///
+/// A UPC-A is the same product as the EAN-13 written with a zero in front, and
+/// readers disagree about which they report: Android's ML Kit gives the 12
+/// digits, Apple's Vision the 13, and a keyboard-wedge scanner whichever it was
+/// set up to send. The code as read comes first, then its twin.
+List<String> barcodeLookupCodes(String code) {
+  if (!RegExp(r'^[0-9]+$').hasMatch(code)) return [code];
+  if (code.length == 12) return [code, '0$code'];
+  if (code.length == 13 && code.startsWith('0')) return [code, code.substring(1)];
+  return [code];
+}
+
 int _pow10(int n) {
   var r = 1;
   for (var i = 0; i < n; i++) {
